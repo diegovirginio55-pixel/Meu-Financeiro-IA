@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pluggyClient } from "./client";
+import { getPluggyClient } from "./client";
 
 const TRANSACTIONS_LOOKBACK_DAYS = 90;
 
@@ -52,7 +52,7 @@ async function syncTransactionsForAccount(
   const dateFrom = new Date();
   dateFrom.setDate(dateFrom.getDate() - TRANSACTIONS_LOOKBACK_DAYS);
 
-  const transactions = await pluggyClient.fetchAllTransactions(pluggyAccountId, {
+  const transactions = await getPluggyClient().fetchAllTransactions(pluggyAccountId, {
     dateFrom: toDateOnly(dateFrom),
   });
 
@@ -85,8 +85,8 @@ export async function syncBankConnection(
   bankConnectionId: string,
   pluggyItemId: string,
 ) {
-  const item = await pluggyClient.fetchItem(pluggyItemId);
-  const { results: accounts } = await pluggyClient.fetchAccounts(pluggyItemId);
+  const item = await getPluggyClient().fetchItem(pluggyItemId);
+  const { results: accounts } = await getPluggyClient().fetchAccounts(pluggyItemId);
 
   for (const account of accounts) {
     if (account.type === "BANK") {

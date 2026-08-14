@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { pluggyClient } from "@/lib/pluggy/client";
+import { getPluggyClient } from "@/lib/pluggy/client";
 import { syncBankConnection } from "@/lib/pluggy/sync";
 
 async function loadOwnedConnection(
@@ -57,7 +57,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   try {
-    await pluggyClient.deleteItem(connection.pluggy_item_id);
+    await getPluggyClient().deleteItem(connection.pluggy_item_id);
   } catch (error) {
     console.error("Erro ao remover item na Pluggy (seguindo com a remoção local):", error);
   }

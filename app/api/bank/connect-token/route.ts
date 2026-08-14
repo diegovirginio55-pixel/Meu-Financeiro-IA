@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { pluggyClient } from "@/lib/pluggy/client";
+import { getPluggyClient } from "@/lib/pluggy/client";
 
 /**
  * Gera um connect token de curta duração (30 min) para abrir o widget da
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const webhookUrl = `${new URL(request.url).origin}/api/bank/webhook`;
 
   try {
-    const { accessToken } = await pluggyClient.createConnectToken(undefined, {
+    const { accessToken } = await getPluggyClient().createConnectToken(undefined, {
       clientUserId: user.id,
       webhookUrl,
       avoidDuplicates: true,

@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { PluggyConnect } from "react-pluggy-connect";
 import type { BankConnection } from "@/lib/finance/types";
+
+const PluggyConnect = dynamic(
+  () => import("react-pluggy-connect").then((mod) => mod.PluggyConnect),
+  { ssr: false },
+);
 
 const STATUS_LABELS: Record<string, { label: string; tone: string }> = {
   UPDATED: { label: "Atualizado", tone: "text-emerald-400" },
