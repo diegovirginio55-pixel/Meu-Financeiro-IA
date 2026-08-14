@@ -81,6 +81,24 @@ components/
 supabase/migrations/0001_init.sql
 ```
 
+## 6. Deploy no Render
+
+O repositório já inclui um [`render.yaml`](render.yaml) (Blueprint), então o Render detecta e configura o serviço automaticamente:
+
+1. Acesse [dashboard.render.com](https://dashboard.render.com) e conecte sua conta do GitHub (autorize o acesso ao repositório `Meu-Financeiro-IA`).
+2. Clique em **New +** → **Blueprint**, selecione o repositório e a branch `main`.
+3. O Render vai ler o `render.yaml` e propor a criação do serviço `meu-financeiro-ia` (plano **Free**, runtime Node).
+4. Antes de confirmar, preencha as 3 variáveis de ambiente marcadas como secretas:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `GEMINI_API_KEY`
+5. Clique em **Apply** / **Create Web Service**. O build roda `npm ci && npm run build` e o start é `npm start`.
+6. Após o primeiro deploy (alguns minutos), a URL pública (algo como `https://meu-financeiro-ia.onrender.com`) fica disponível na aba do serviço.
+
+Observações do plano gratuito do Render: o serviço "dorme" depois de 15 minutos sem tráfego e demora ~1 minuto para acordar na próxima requisição — normal para uso pessoal, sem custo.
+
+Cada novo `git push` na branch `main` gera um novo deploy automático.
+
 ## Notas e limitações da v1
 
 - Editar ou excluir um lançamento na aba Detalhes corrige o registro em si, mas **não** reajusta automaticamente o saldo da conta/fatura que já foi alterado no momento da criação.
@@ -89,7 +107,4 @@ supabase/migrations/0001_init.sql
 
 ## Próximos passos (fora do escopo desta primeira versão)
 
-1. Validar o app localmente por um tempo.
-2. Subir o código para o GitHub.
-3. Migrar o banco para o Supabase Cloud (se ainda estiver usando um projeto de teste) e fazer o deploy do app no Render.
-4. Integrar Open Finance para importar transações automaticamente.
+1. Integrar Open Finance para importar transações automaticamente.
