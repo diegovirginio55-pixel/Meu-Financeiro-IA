@@ -50,11 +50,11 @@ export default function BancosClient({
     setLoadingToken(true);
     try {
       const res = await fetch("/api/bank/connect-token", { method: "POST" });
-      if (!res.ok) throw new Error("Falha ao iniciar conexão.");
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Falha ao iniciar conexão.");
       setConnectToken(data.accessToken);
-    } catch {
-      setError("Não foi possível iniciar a conexão com o banco. Tente novamente.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível iniciar a conexão com o banco. Tente novamente.");
     } finally {
       setLoadingToken(false);
     }
