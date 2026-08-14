@@ -6,6 +6,9 @@ export interface Account {
   name: string;
   type: string;
   balance: number;
+  pluggy_account_id: string | null;
+  bank_connection_id: string | null;
+  source: "manual" | "pluggy";
   created_at: string;
   updated_at: string;
 }
@@ -18,6 +21,9 @@ export interface Card {
   closing_day: number | null;
   due_day: number | null;
   current_invoice: number;
+  pluggy_account_id: string | null;
+  bank_connection_id: string | null;
+  source: "manual" | "pluggy";
   created_at: string;
   updated_at: string;
 }
@@ -32,8 +38,22 @@ export interface Transaction {
   date: string;
   account_id: string | null;
   card_id: string | null;
-  source: "chat" | "manual";
+  pluggy_transaction_id: string | null;
+  source: "chat" | "manual" | "pluggy";
   created_at: string;
+}
+
+export interface BankConnection {
+  id: string;
+  user_id: string;
+  pluggy_item_id: string;
+  institution_name: string;
+  institution_image_url: string | null;
+  status: string;
+  status_detail: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RecurringItem {

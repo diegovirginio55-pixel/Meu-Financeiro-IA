@@ -1,23 +1,25 @@
 # 💰 Meu Financeiro IA
 
-Painel financeiro pessoal (uso individual) com três abas:
+Painel financeiro pessoal com quatro abas:
 
 - **🤖 Conversa com IA** — conte suas movimentações em linguagem natural e a IA registra tudo.
 - **📊 Dashboard** — visão geral com cards e gráficos (Recharts).
 - **📋 Detalhes** — extrato completo com filtros e edição manual dos lançamentos.
+- **🏦 Bancos** — conecte bancos reais via Open Finance (Pluggy) para importar saldo e extrato.
 
-Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Postgres + Auth) + **Google Gemini** para interpretar as mensagens.
+Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Postgres + Auth) + **Google Gemini** + **Pluggy**.
 
 ## 1. Pré-requisitos
 
 - Node.js 20+
 - Uma conta no [Supabase](https://supabase.com) (gratuita)
 - Uma chave de API do [Google AI Studio](https://aistudio.google.com/apikey) (camada gratuita do Gemini, sem cartão de crédito)
+- Uma conta na [Pluggy](https://dashboard.pluggy.ai) (Client ID e Client Secret) para conectar bancos
 
 ## 2. Criar o projeto no Supabase
 
 1. Crie um novo projeto em [supabase.com](https://supabase.com/dashboard).
-2. Vá em **SQL Editor** e execute o conteúdo de [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
+2. Vá em **SQL Editor** e execute as migrations em [`supabase/migrations/`](supabase/migrations/) (na ordem: `0001_init.sql`, `0002_bank_connections.sql`, `0003_cards_bank_connection.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
 3. Em **Authentication > Providers**, deixe o provedor **Email** habilitado. Novos usuários se cadastram pela própria tela de login do app. Cada conta fica isolada das outras (RLS).
 4. Em **Project Settings > API**, copie a **Project URL** e a **anon public key**.
 
@@ -33,6 +35,9 @@ cp .env.local.example .env.local
 NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key-aqui
 GEMINI_API_KEY=sua-chave-gemini-aqui
+PLUGGY_CLIENT_ID=seu-client-id
+PLUGGY_CLIENT_SECRET=seu-client-secret
+SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key
 ```
 
 ## 4. Rodar localmente
@@ -64,21 +69,24 @@ O **Dashboard** e a aba **Detalhes** refletem esses dados em tempo real.
 ```
 app/
   login/page.tsx            # tela de login (Supabase Auth)
-  (app)/                    # rotas protegidas (layout com as 3 abas)
+  (app)/                    # rotas protegidas (layout com as 4 abas)
     chat/page.tsx
     dashboard/page.tsx
     detalhes/page.tsx
+    bancos/page.tsx
   api/
     chat/route.ts            # loop de tool-use com Gemini
+    bank/                    # conexão, sync e webhook da Pluggy
     transactions/route.ts    # listagem/filtros usados na aba Detalhes
     transactions/[id]/route.ts
 lib/
   supabase/                  # clientes Supabase (browser, server, middleware)
   ai/                        # cliente Gemini, prompt e definição das tools
   finance/                   # tipos, categorias, formatação e cálculo do snapshot financeiro
+  pluggy/                    # cliente e sincronização Open Finance
 components/
-  chat/ dashboard/ detalhes/ auth/ nav/
-supabase/migrations/0001_init.sql
+  chat/ dashboard/ detalhes/ bancos/ auth/ nav/
+supabase/migrations/
 ```
 
 ## 6. Deploy no Render
@@ -88,10 +96,13 @@ O repositório já inclui um [`render.yaml`](render.yaml) (Blueprint), então o 
 1. Acesse [dashboard.render.com](https://dashboard.render.com) e conecte sua conta do GitHub (autorize o acesso ao repositório `Meu-Financeiro-IA`).
 2. Clique em **New +** → **Blueprint**, selecione o repositório e a branch `main`.
 3. O Render vai ler o `render.yaml` e propor a criação do serviço `meu-financeiro-ia` (plano **Free**, runtime Node).
-4. Antes de confirmar, preencha as 3 variáveis de ambiente marcadas como secretas:
+4. Antes de confirmar, preencha as variáveis de ambiente marcadas como secretas:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `GEMINI_API_KEY`
+   - `PLUGGY_CLIENT_ID`
+   - `PLUGGY_CLIENT_SECRET`
+   - `SUPABASE_SERVICE_ROLE_KEY`
 5. Clique em **Apply** / **Create Web Service**. O build roda `npm ci && npm run build` e o start é `npm start`.
 6. Após o primeiro deploy (alguns minutos), a URL pública (algo como `https://meu-financeiro-ia.onrender.com`) fica disponível na aba do serviço.
 
@@ -102,9 +113,9 @@ Cada novo `git push` na branch `main` gera um novo deploy automático.
 ## Notas e limitações da v1
 
 - Editar ou excluir um lançamento na aba Detalhes corrige o registro em si, mas **não** reajusta automaticamente o saldo da conta/fatura que já foi alterado no momento da criação.
-- Sem Open Finance por enquanto — todos os lançamentos entram via conversa (ou futuramente via edição manual). A integração bancária pode ser adicionada depois, alimentando o mesmo fluxo de dados.
+- Sem Open Finance nativo do BACEN — a conexão com bancos reais passa pela Pluggy (leitura de saldo e extrato). Atualizações automáticas dependem do ciclo do banco/Pluggy (não são no segundo da compra).
 - Sem planos e sem pagamentos — cada pessoa cria a própria conta na tela de login e vê só os seus dados.
 
-## Próximos passos (fora do escopo desta primeira versão)
+## Próximos passos
 
-1. Integrar Open Finance para importar transações automaticamente.
+1. Validar as conexões bancárias reais no ambiente da Pluggy (produção vs sandbox).

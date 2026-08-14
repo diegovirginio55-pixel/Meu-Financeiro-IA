@@ -8,6 +8,7 @@ const TABS = [
   { href: "/chat", label: "Conversa com IA", icon: "🤖" },
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/detalhes", label: "Detalhes", icon: "📋" },
+  { href: "/bancos", label: "Bancos", icon: "🏦" },
 ];
 
 export default function TabNav() {

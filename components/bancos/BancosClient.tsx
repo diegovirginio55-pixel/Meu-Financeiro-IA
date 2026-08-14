@@ -1,0 +1,187 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { PluggyConnect } from "react-pluggy-connect";
+import type { BankConnection } from "@/lib/finance/types";
+
+const STATUS_LABELS: Record<string, { label: string; tone: string }> = {
+  UPDATED: { label: "Atualizado", tone: "text-emerald-400" },
+  UPDATING: { label: "Atualizando…", tone: "text-amber-400" },
+  LOGIN_ERROR: { label: "Erro de login — reconecte", tone: "text-red-400" },
+  OUTDATED: { label: "Desatualizado", tone: "text-amber-400" },
+  WAITING_USER_INPUT: { label: "Aguardando ação", tone: "text-amber-400" },
+  WAITING_USER_ACTION: { label: "Aguardando ação", tone: "text-amber-400" },
+};
+
+function formatDateTime(value: string | null) {
+  if (!value) return "nunca";
+  return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+export default function BancosClient({
+  initialConnections,
+}: {
+  initialConnections: BankConnection[];
+}) {
+  const router = useRouter();
+  const [connections, setConnections] = useState(initialConnections);
+  const [connectToken, setConnectToken] = useState<string | null>(null);
+  const [loadingToken, setLoadingToken] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshConnections = useCallback(async () => {
+    const res = await fetch("/api/bank/connections");
+    if (res.ok) {
+      const data = await res.json();
+      setConnections(data.connections ?? []);
+    }
+    router.refresh();
+  }, [router]);
+
+  async function handleConnect() {
+    setError(null);
+    setLoadingToken(true);
+    try {
+      const res = await fetch("/api/bank/connect-token", { method: "POST" });
+      if (!res.ok) throw new Error("Falha ao iniciar conexão.");
+      const data = await res.json();
+      setConnectToken(data.accessToken);
+    } catch {
+      setError("Não foi possível iniciar a conexão com o banco. Tente novamente.");
+    } finally {
+      setLoadingToken(false);
+    }
+  }
+
+  async function handleSuccess(itemData: { item: unknown }) {
+    setConnectToken(null);
+    try {
+      await fetch("/api/bank/callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item: itemData.item }),
+      });
+    } finally {
+      await refreshConnections();
+    }
+  }
+
+  async function handleSync(id: string) {
+    setSyncingId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/bank/connections/${id}`, { method: "POST" });
+      if (!res.ok) throw new Error("Falha ao sincronizar.");
+      await refreshConnections();
+    } catch {
+      setError("Não foi possível sincronizar agora. Tente de novo em alguns minutos.");
+    } finally {
+      setSyncingId(null);
+    }
+  }
+
+  async function handleDisconnect(id: string) {
+    if (!confirm("Desconectar este banco? As contas/transações já importadas continuam salvas.")) return;
+    setSyncingId(id);
+    try {
+      await fetch(`/api/bank/connections/${id}`, { method: "DELETE" });
+      await refreshConnections();
+    } finally {
+      setSyncingId(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+        <div>
+          <h2 className="text-sm font-medium text-zinc-50">Conectar um novo banco</h2>
+          <p className="text-sm text-zinc-400">
+            Leitura automática de saldo e extrato via Open Finance. Nenhum pagamento é feito por aqui.
+          </p>
+        </div>
+        <button
+          onClick={handleConnect}
+          disabled={loadingToken}
+          className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+        >
+          {loadingToken ? "Abrindo…" : "+ Conectar banco"}
+        </button>
+      </div>
+
+      {error && (
+        <p className="rounded-xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>
+      )}
+
+      {connections.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
+          Nenhum banco conectado ainda.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {connections.map((connection) => {
+            const statusInfo = STATUS_LABELS[connection.status] ?? {
+              label: connection.status,
+              tone: "text-zinc-400",
+            };
+            const isBusy = syncingId === connection.id;
+            return (
+              <div
+                key={connection.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4"
+              >
+                <div className="flex items-center gap-3">
+                  {connection.institution_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={connection.institution_image_url}
+                      alt=""
+                      className="h-9 w-9 rounded-full bg-white object-contain p-1"
+                    />
+                  ) : (
+                    <span className="text-2xl">🏦</span>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-zinc-50">{connection.institution_name}</p>
+                    <p className={`text-xs ${statusInfo.tone}`}>{statusInfo.label}</p>
+                    <p className="text-xs text-zinc-500">
+                      Última sincronização: {formatDateTime(connection.last_synced_at)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSync(connection.id)}
+                    disabled={isBusy}
+                    className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50"
+                  >
+                    {isBusy ? "…" : "Sincronizar agora"}
+                  </button>
+                  <button
+                    onClick={() => handleDisconnect(connection.id)}
+                    disabled={isBusy}
+                    className="rounded-full border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-950/50 disabled:opacity-50"
+                  >
+                    Desconectar
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {connectToken && (
+        <PluggyConnect
+          connectToken={connectToken}
+          includeSandbox
+          onSuccess={handleSuccess}
+          onError={() => setError("A conexão com o banco falhou ou foi cancelada.")}
+          onClose={() => setConnectToken(null)}
+        />
+      )}
+    </div>
+  );
+}
