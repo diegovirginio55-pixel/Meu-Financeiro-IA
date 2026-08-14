@@ -18,7 +18,7 @@ Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Pos
 
 1. Crie um novo projeto em [supabase.com](https://supabase.com/dashboard).
 2. Vá em **SQL Editor** e execute o conteúdo de [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
-3. Vá em **Authentication > Users** e crie manualmente o seu próprio usuário (e-mail + senha). Não há tela de cadastro público — o acesso é fechado, só para você.
+3. Em **Authentication > Providers**, deixe o provedor **Email** habilitado. Novos usuários se cadastram pela própria tela de login do app. Cada conta fica isolada das outras (RLS).
 4. Em **Project Settings > API**, copie a **Project URL** e a **anon public key**.
 
 ## 3. Configurar variáveis de ambiente
@@ -103,7 +103,7 @@ Cada novo `git push` na branch `main` gera um novo deploy automático.
 
 - Editar ou excluir um lançamento na aba Detalhes corrige o registro em si, mas **não** reajusta automaticamente o saldo da conta/fatura que já foi alterado no momento da criação.
 - Sem Open Finance por enquanto — todos os lançamentos entram via conversa (ou futuramente via edição manual). A integração bancária pode ser adicionada depois, alimentando o mesmo fluxo de dados.
-- Sem cadastro público, sem planos, sem pagamentos — é um projeto pessoal de uso individual.
+- Sem planos e sem pagamentos — cada pessoa cria a própria conta na tela de login e vê só os seus dados.
 
 ## Próximos passos (fora do escopo desta primeira versão)
 
