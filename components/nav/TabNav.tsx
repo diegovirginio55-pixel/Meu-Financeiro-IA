@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { InstallAppButton } from "@/components/pwa/PwaInstall";
 
 const TABS = [
   { href: "/chat", label: "Conversa com IA", icon: "🤖" },
@@ -52,12 +53,15 @@ export default function TabNav() {
           })}
         </nav>
 
-        <button
-          onClick={handleLogout}
-          className="text-sm text-zinc-500 hover:text-zinc-200"
-        >
-          Sair
-        </button>
+        <div className="flex items-center gap-3">
+          <InstallAppButton variant="nav" />
+          <button
+            onClick={handleLogout}
+            className="text-sm text-zinc-500 hover:text-zinc-200"
+          >
+            Sair
+          </button>
+        </div>
       </div>
     </header>
   );

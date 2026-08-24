@@ -10,23 +10,27 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/dashboard";
 
   return (
-    <div className={isHome ? "min-h-screen bg-[#C9D6DE] text-zinc-900" : "min-h-screen bg-zinc-950 text-zinc-100"}>
-      {!isHome && (
-        <div className="hidden md:block">
-          <TabNav />
-        </div>
-      )}
+    <div
+      className={
+        isHome
+          ? "min-h-screen bg-[#C9D6DE] text-zinc-900 md:bg-zinc-950 md:text-zinc-100"
+          : "min-h-screen bg-zinc-950 text-zinc-100"
+      }
+    >
+      <div className="hidden md:block">
+        <TabNav />
+      </div>
       <AutoBankSync />
       <main
         className={
           isHome
-            ? "mx-auto min-h-screen w-full max-w-[430px] bg-[#F4F7F8] pb-24 shadow-2xl"
+            ? "mx-auto min-h-screen w-full max-w-[430px] bg-[#F4F7F8] pb-24 md:max-w-6xl md:bg-transparent md:px-4 md:py-6 md:pb-6"
             : "mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-24 md:pb-6"
         }
       >
         {children}
       </main>
-      <div className={isHome ? "block" : "md:hidden"}>
+      <div className="md:hidden">
         <BottomNav />
       </div>
     </div>
