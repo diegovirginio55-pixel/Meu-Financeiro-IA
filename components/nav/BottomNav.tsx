@@ -87,7 +87,7 @@ export default function BottomNav() {
       {menuOpen && (
         <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setMenuOpen(false)}>
           <div
-            className="absolute inset-x-0 bottom-16 mx-auto w-full max-w-[430px] rounded-t-3xl bg-white p-5 text-zinc-800 shadow-2xl"
+            className="absolute inset-x-0 bottom-16 w-full rounded-t-3xl bg-white p-5 text-zinc-800 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <p className="text-sm font-semibold text-zinc-500">Menu</p>
@@ -120,7 +120,7 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-[430px] -translate-x-1/2 border-t border-zinc-200 bg-[#EEF1F3] pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-zinc-200 bg-[#EEF1F3] pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-5 px-1 py-1.5">
           {TABS.map((tab) => {
             const active = pathname === tab.href || (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
