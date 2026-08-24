@@ -16,24 +16,42 @@ export default async function BancosPage() {
       <div>
         <h1 className="text-xl font-semibold text-zinc-50">Bancos conectados</h1>
         <p className="text-sm text-zinc-400">
-          Conecte seus bancos reais para importar saldo e extrato automaticamente.
+          Importação gratuita dos seus bancos via Meu Pluggy (Open Finance do seu CPF).
         </p>
       </div>
 
-      <div className="rounded-2xl border border-amber-900/70 bg-amber-950/40 p-4 text-sm text-amber-100">
-        <p className="font-medium text-amber-50">Conta Pluggy ainda em modo demo</p>
-        <p className="mt-1 text-amber-200/90">
-          Inter, Nubank e outros bancos reais só ligam depois que a Pluggy liberar produção.
-          Enquanto isso, o widget só aceita o banco de teste (Pluggy Bank).
-        </p>
-        <a
-          href="https://dashboard.pluggy.ai/applications"
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 inline-flex rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-amber-400"
-        >
-          Abrir Pluggy e ir para produção
-        </a>
+      <div className="rounded-2xl border border-emerald-900/70 bg-emerald-950/30 p-4 text-sm text-emerald-100">
+        <p className="font-medium text-emerald-50">Como conectar sem pagar</p>
+        <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-emerald-200/90">
+          <li>
+            Em{" "}
+            <a
+              href="https://meu.pluggy.ai"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-emerald-500/60 underline-offset-2 hover:text-emerald-50"
+            >
+              meu.pluggy.ai
+            </a>{" "}
+            crie sua conta e conecte Inter, Nubank etc. (é aí que entra o CPF e o login do banco).
+          </li>
+          <li>
+            Em{" "}
+            <a
+              href="https://dashboard.pluggy.ai/customization"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-emerald-500/60 underline-offset-2 hover:text-emerald-50"
+            >
+              dashboard.pluggy.ai/customization
+            </a>{" "}
+            habilite o conector <strong>MeuPluggy</strong> na sua aplicação.
+          </li>
+          <li>
+            Volte aqui e clique em <strong>Conectar Meu Pluggy</strong>. Autorize com a mesma conta.
+            Se tiver vários bancos no Meu Pluggy, repita uma vez por banco.
+          </li>
+        </ol>
       </div>
 
       <BancosClient initialConnections={(data ?? []) as BankConnection[]} />

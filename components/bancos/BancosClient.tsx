@@ -102,9 +102,9 @@ export default function BancosClient({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
         <div>
-          <h2 className="text-sm font-medium text-zinc-50">Conectar um novo banco</h2>
+          <h2 className="text-sm font-medium text-zinc-50">Conectar Meu Pluggy</h2>
           <p className="text-sm text-zinc-400">
-            Leitura automática de saldo e extrato via Open Finance. Nenhum pagamento é feito por aqui.
+            Lê saldo e extrato das contas que você já autorizou em meu.pluggy.ai. Sem custo, só o seu CPF.
           </p>
         </div>
         <button
@@ -112,7 +112,7 @@ export default function BancosClient({
           disabled={loadingToken}
           className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
         >
-          {loadingToken ? "Abrindo…" : "+ Conectar banco"}
+          {loadingToken ? "Abrindo…" : "+ Conectar Meu Pluggy"}
         </button>
       </div>
 
@@ -122,7 +122,7 @@ export default function BancosClient({
 
       {connections.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
-          Nenhum banco conectado ainda.
+          Nenhum banco importado ainda. Conecte primeiro em meu.pluggy.ai e depois autorize aqui.
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -181,9 +181,14 @@ export default function BancosClient({
       {connectToken && (
         <PluggyConnect
           connectToken={connectToken}
-          includeSandbox
+          includeSandbox={false}
+          connectorIds={[200]}
+          selectedConnectorId={200}
+          language="pt"
+          theme="dark"
+          forceOauthInBrowser
           onSuccess={handleSuccess}
-          onError={() => setError("A conexão com o banco falhou ou foi cancelada.")}
+          onError={() => setError("A conexão com o Meu Pluggy falhou ou foi cancelada.")}
           onClose={() => setConnectToken(null)}
         />
       )}

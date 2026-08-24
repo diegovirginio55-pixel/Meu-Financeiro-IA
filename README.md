@@ -5,7 +5,7 @@ Painel financeiro pessoal com quatro abas:
 - **🤖 Conversa com IA** — conte suas movimentações em linguagem natural e a IA registra tudo.
 - **📊 Dashboard** — visão geral com cards e gráficos (Recharts).
 - **📋 Detalhes** — extrato completo com filtros e edição manual dos lançamentos.
-- **🏦 Bancos** — conecte bancos reais via Open Finance (Pluggy) para importar saldo e extrato.
+- **🏦 Bancos** — importe saldo e extrato do seu CPF via Meu Pluggy (Open Finance gratuito).
 
 Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Postgres + Auth) + **Google Gemini** + **Pluggy**.
 
@@ -113,9 +113,9 @@ Cada novo `git push` na branch `main` gera um novo deploy automático.
 ## Notas e limitações da v1
 
 - Editar ou excluir um lançamento na aba Detalhes corrige o registro em si, mas **não** reajusta automaticamente o saldo da conta/fatura que já foi alterado no momento da criação.
-- Sem Open Finance nativo do BACEN — a conexão com bancos reais passa pela Pluggy (leitura de saldo e extrato). Atualizações automáticas dependem do ciclo do banco/Pluggy (não são no segundo da compra).
+- Sem Open Finance nativo do BACEN. Uso pessoal gratuito via [Meu Pluggy](https://meu.pluggy.ai) (conector 200). Conectar contas de outros CPFs direto no widget exige plano comercial da Pluggy.
 - Sem planos e sem pagamentos — cada pessoa cria a própria conta na tela de login e vê só os seus dados.
 
 ## Próximos passos
 
-1. Validar as conexões bancárias reais no ambiente da Pluggy (produção vs sandbox).
+1. Conectar os bancos em meu.pluggy.ai e autorizar o conector MeuPluggy no app.
