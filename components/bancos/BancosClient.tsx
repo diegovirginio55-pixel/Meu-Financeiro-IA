@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type { BankConnection } from "@/lib/finance/types";
@@ -36,6 +36,8 @@ export default function BancosClient({
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const autoStarted = useRef(false);
+
   const refreshConnections = useCallback(async () => {
     const res = await fetch("/api/bank/connections");
     if (res.ok) {
@@ -45,7 +47,7 @@ export default function BancosClient({
     router.refresh();
   }, [router]);
 
-  async function handleConnect() {
+  const handleConnect = useCallback(async () => {
     setError(null);
     setLoadingToken(true);
     try {
@@ -58,7 +60,13 @@ export default function BancosClient({
     } finally {
       setLoadingToken(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (autoStarted.current || initialConnections.length > 0) return;
+    autoStarted.current = true;
+    void handleConnect();
+  }, [handleConnect, initialConnections.length]);
 
   async function handleSuccess(itemData: { item: unknown }) {
     setConnectToken(null);
@@ -70,6 +78,7 @@ export default function BancosClient({
       });
     } finally {
       await refreshConnections();
+      router.push("/dashboard");
     }
   }
 
@@ -108,7 +117,7 @@ export default function BancosClient({
           </p>
         </div>
         <button
-          onClick={handleConnect}
+          onClick={() => void handleConnect()}
           disabled={loadingToken}
           className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
         >

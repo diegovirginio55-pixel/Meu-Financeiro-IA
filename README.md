@@ -20,7 +20,7 @@ Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Pos
 
 1. Crie um novo projeto em [supabase.com](https://supabase.com/dashboard).
 2. Vá em **SQL Editor** e execute as migrations em [`supabase/migrations/`](supabase/migrations/) (na ordem: `0001_init.sql`, `0002_bank_connections.sql`, `0003_cards_bank_connection.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
-3. Em **Authentication > Providers**, deixe o provedor **Email** habilitado. Novos usuários se cadastram pela própria tela de login do app. Cada conta fica isolada das outras (RLS).
+3. Em **Authentication > Providers**, deixe o provedor **Email** habilitado. O login é pessoal (sem cadastro público na tela).
 4. Em **Project Settings > API**, copie a **Project URL** e a **anon public key**.
 
 ## 3. Configurar variáveis de ambiente
@@ -114,7 +114,7 @@ Cada novo `git push` na branch `main` gera um novo deploy automático.
 
 - Editar ou excluir um lançamento na aba Detalhes corrige o registro em si, mas **não** reajusta automaticamente o saldo da conta/fatura que já foi alterado no momento da criação.
 - Sem Open Finance nativo do BACEN. Uso pessoal gratuito via [Meu Pluggy](https://meu.pluggy.ai) (conector 200). Conectar contas de outros CPFs direto no widget exige plano comercial da Pluggy.
-- Sem planos e sem pagamentos — cada pessoa cria a própria conta na tela de login e vê só os seus dados.
+- Sem planos e sem pagamentos — acesso pessoal (um usuário). Dados do banco entram via Meu Pluggy.
 
 ## Próximos passos
 

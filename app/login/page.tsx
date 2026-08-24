@@ -10,7 +10,7 @@ export default function LoginPage() {
             Meu Financeiro IA
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Entre ou crie sua conta
+            Acesso pessoal
           </p>
         </div>
         <LoginForm />
