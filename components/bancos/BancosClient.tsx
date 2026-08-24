@@ -203,6 +203,8 @@ export default function BancosClient({
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     setConnections(initialConnections);
@@ -245,8 +247,44 @@ export default function BancosClient({
     }
   }, [existingItemId]);
 
+  async function handleBringBanks() {
+    if (!connections[0]) return;
+    setError(null);
+    setImporting(true);
+    const realId = realConnectionId(connections[0].id);
+    try {
+      const res = await fetch(`/api/bank/connections/${realId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trigger: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.needsWidget) {
+        await handleConnect();
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || "Falha ao trazer os bancos.");
+      await refreshConnections();
+      setAddOpen(false);
+    } catch {
+      setError("Não deu para trazer agora. Tente de novo em alguns minutos, ou use Reautorizar.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleAddClick() {
+    setError(null);
+    if (hasConnection) {
+      setAddOpen(true);
+      return;
+    }
+    void handleConnect();
+  }
+
   async function handleSuccess(itemData: { item: unknown }) {
     setConnectToken(null);
+    setAddOpen(false);
     try {
       await fetch("/api/bank/callback", {
         method: "POST",
@@ -300,20 +338,15 @@ export default function BancosClient({
           Os bancos ficam salvos. A atualização roda sozinha quando você abre o app.
         </p>
         <div className="mt-3 rounded-xl border border-zinc-800 bg-[#141414] px-4 py-3 text-sm text-zinc-400">
-          <p className="font-medium text-zinc-200">Para conectar o Inter</p>
+          <p className="font-medium text-zinc-200">Para conectar outro banco (Inter, Caixa…)</p>
           <ol className="mt-2 list-decimal space-y-1.5 pl-5">
             <li>
-              Abra{" "}
-              <a href="https://meu.pluggy.ai" target="_blank" rel="noreferrer" className="text-zinc-200 underline">
-                meu.pluggy.ai
-              </a>{" "}
-              e conecte o Inter (o Nubank já pode estar lá).
+              Clique em <span className="text-zinc-200">Adicionar banco</span> e abra o Meu Pluggy.
             </li>
+            <li>Conecte o Inter (ou outro banco) lá, com o Nubank já autenticado.</li>
             <li>
-              Volte aqui e clique em <span className="text-zinc-200">Atualizar bancos</span>. Não crie uma
-              conexão nova — isso gera o erro que você viu.
+              Volte e clique em <span className="text-zinc-200">Já conectei — trazer para o app</span>.
             </li>
-            <li>Autorize o Meu Pluggy de novo. O Inter aparece junto, sem apagar o Nubank.</li>
           </ol>
         </div>
       </div>
@@ -346,21 +379,21 @@ export default function BancosClient({
 
           <button
             type="button"
-            onClick={() => void handleConnect()}
-            disabled={loadingToken}
+            onClick={handleAddClick}
+            disabled={loadingToken || importing}
             className="flex min-h-[168px] flex-col items-start rounded-2xl border border-dashed border-zinc-800 bg-transparent p-4 text-left transition-colors hover:border-zinc-600 disabled:opacity-50"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-800 text-xl text-zinc-400">
               +
             </div>
             <p className="mt-6 text-[15px] font-semibold text-white">
-              {loadingToken ? "Abrindo…" : hasConnection ? "Atualizar bancos" : "Conectar banco"}
+              {loadingToken || importing ? "Abrindo…" : "Adicionar banco"}
             </p>
             <p className="mt-1 text-xs text-zinc-500">
-              {hasConnection ? "Puxa o Inter e atualiza o Nubank" : "Via Meu Pluggy, sem custo"}
+              {hasConnection ? "Inter, Caixa e outros pelo Meu Pluggy" : "Via Meu Pluggy, sem custo"}
             </p>
             <span className="mt-auto border-t border-zinc-800 pt-3 text-xs text-zinc-500">
-              {hasConnection ? "Atualizar >" : "Adicionar >"}
+              Adicionar &gt;
             </span>
           </button>
         </div>
@@ -388,26 +421,71 @@ export default function BancosClient({
         />
       )}
 
+      {addOpen && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-4 sm:items-center">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setAddOpen(false)}
+            aria-label="Fechar"
+          />
+          <div className="relative z-10 w-full max-w-lg rounded-2xl border border-zinc-800 bg-[#141414] p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-white">Adicionar outro banco</h3>
+                <p className="mt-1 text-sm text-zinc-400">
+                  O Nubank já está salvo. Bancos novos entram pelo Meu Pluggy, não por uma conexão nova aqui.
+                </p>
+              </div>
+              <button type="button" onClick={() => setAddOpen(false)} className="text-sm text-zinc-500 hover:text-zinc-200">
+                Fechar
+              </button>
+            </div>
+            <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-zinc-400">
+              <li>Abra o Meu Pluggy e conecte o Inter (ou outro banco).</li>
+              <li>Volte aqui e traga os bancos para o app. O Nubank continua.</li>
+            </ol>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <a
+                href="https://meu.pluggy.ai"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200"
+              >
+                Abrir Meu Pluggy
+              </a>
+              <button
+                type="button"
+                onClick={() => void handleBringBanks()}
+                disabled={importing || loadingToken}
+                className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {importing ? "Trazendo…" : "Já conectei — trazer para o app"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConnect()}
+                disabled={loadingToken || importing}
+                className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                Reautorizar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {connectToken && (
         <PluggyConnect
           connectToken={connectToken}
           includeSandbox={false}
-          connectorIds={[200]}
-          selectedConnectorId={200}
+          {...(existingItemId
+            ? { updateItem: existingItemId }
+            : { connectorIds: [200], selectedConnectorId: 200, forceOauthInBrowser: true })}
           products={["ACCOUNTS", "CREDIT_CARDS", "TRANSACTIONS", "INVESTMENTS"]}
           language="pt"
           theme="dark"
-          forceOauthInBrowser
           onSuccess={handleSuccess}
-          onError={(error) => {
-            const text = JSON.stringify(error ?? {});
-            if (/ALREADY_EXISTS|already exists/i.test(text)) {
-              setConnectToken(null);
-              setError(
-                "O Meu Pluggy já está conectado. Feche e use “Atualizar bancos” depois de conectar o Inter em meu.pluggy.ai.",
-              );
-            }
-          }}
           onClose={() => setConnectToken(null)}
         />
       )}

@@ -126,7 +126,7 @@ export const pluggyApi = {
         clientUserId: options.clientUserId,
         webhookUrl: options.webhookUrl,
         oauthRedirectUri: options.oauthRedirectUri,
-        avoidDuplicates: options.avoidDuplicates ?? true,
+        avoidDuplicates: options.itemId ? false : (options.avoidDuplicates ?? true),
       },
     };
     if (options.itemId) payload.itemId = options.itemId;

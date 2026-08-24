@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       clientUserId: user.id,
       webhookUrl,
       oauthRedirectUri,
-      avoidDuplicates: true,
+      avoidDuplicates: !body.itemId,
       itemId: body.itemId,
     });
 

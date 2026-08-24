@@ -33,7 +33,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Conexão não encontrada." }, { status: 404 });
   }
 
+  const body = (await request.json().catch(() => ({}))) as { trigger?: boolean };
+
   try {
+    if (body.trigger) {
+      try {
+        await pluggyApi.patchItem(connection.pluggy_item_id, {});
+      } catch (error) {
+        console.error("Atualização silenciosa da Pluggy indisponível, usar widget:", error);
+        return NextResponse.json({ needsWidget: true });
+      }
+    }
     await syncBankConnection(supabase, user.id, connection.id, connection.pluggy_item_id);
     return NextResponse.json({ ok: true });
   } catch (error) {
