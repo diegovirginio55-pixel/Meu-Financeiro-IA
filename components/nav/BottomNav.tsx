@@ -18,8 +18,8 @@ function HomeIcon({ active }: { active?: boolean }) {
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
       <path
         d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
-        fill={active ? "#FFFFFF" : "none"}
-        stroke={active ? "#FFFFFF" : "#71717A"}
+        fill={active ? "#10B981" : "none"}
+        stroke={active ? "#10B981" : "#71717A"}
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
@@ -28,7 +28,7 @@ function HomeIcon({ active }: { active?: boolean }) {
 }
 
 function ExtratoIcon({ active }: { active?: boolean }) {
-  const color = active ? "#34D399" : "#71717A";
+  const color = active ? "#10B981" : "#71717A";
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
       <rect x="5" y="3.5" width="14" height="17" rx="2" stroke={color} strokeWidth="1.6" />
@@ -41,7 +41,7 @@ function PixIcon({ active }: { active?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden>
       <path
-        fill={active ? "#34D399" : "#71717A"}
+        fill={active ? "#10B981" : "#71717A"}
         d="M12.8 4.3 19.7 11.2a1.1 1.1 0 0 1 0 1.6l-6.9 6.9a1.1 1.1 0 0 1-1.6 0L4.3 12.8a1.1 1.1 0 0 1 0-1.6l6.9-6.9a1.1 1.1 0 0 1 1.6 0Z"
       />
     </svg>
@@ -49,7 +49,7 @@ function PixIcon({ active }: { active?: boolean }) {
 }
 
 function ChatIcon({ active }: { active?: boolean }) {
-  const color = active ? "#34D399" : "#71717A";
+  const color = active ? "#10B981" : "#71717A";
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
       <path
@@ -87,7 +87,7 @@ export default function BottomNav() {
       {menuOpen && (
         <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setMenuOpen(false)}>
           <div
-            className="absolute inset-x-0 bottom-16 w-full rounded-t-3xl border-t border-white/10 bg-zinc-900 p-5 text-zinc-100 shadow-2xl"
+            className="absolute inset-x-0 bottom-16 w-full rounded-t-3xl border-t border-zinc-800 bg-zinc-950 p-5 text-zinc-100 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <p className="text-sm font-semibold text-zinc-400">Menu</p>
@@ -102,16 +102,16 @@ export default function BottomNav() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-800"
+                  className="rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
                 >
                   {item.label}
                 </Link>
               ))}
-              <InstallAppButton variant="light" />
+              <InstallAppButton variant="dark" />
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                className="rounded-xl px-3 py-3 text-left text-[15px] text-red-600 hover:bg-red-50"
+                className="rounded-xl px-3 py-3 text-left text-[15px] text-red-400 hover:bg-red-950/40"
               >
                 Sair
               </button>
@@ -120,25 +120,18 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-white/10 bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-zinc-800 bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <div className="grid grid-cols-5 px-1 py-1.5">
           {TABS.map((tab) => {
             const active = pathname === tab.href || (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
             const Icon = tab.icon;
-            const homeActive = tab.href === "/dashboard" && active;
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
                 className="flex flex-col items-center gap-0.5 text-[11px]"
               >
-                <span
-                  className={
-                    homeActive
-                      ? "flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600"
-                      : "flex h-9 w-9 items-center justify-center"
-                  }
-                >
+                <span className="flex h-9 w-9 items-center justify-center">
                   <Icon active={active} />
                 </span>
                 <span className={active ? "font-semibold text-emerald-400" : "text-zinc-500"}>{tab.label}</span>
