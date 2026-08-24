@@ -158,7 +158,7 @@ export default function AtivosClient({
           <select
             value={connectionId}
             onChange={(event) => setConnectionId(event.target.value)}
-            className="bg-transparent text-sm text-zinc-100 outline-none"
+            className="bg-[#141414] text-sm text-zinc-100 outline-none [color-scheme:dark]"
           >
             <option value="all">Todas conexões</option>
             {connections.map((connection) => (

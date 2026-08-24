@@ -55,7 +55,7 @@ export default function TransactionsFilters({
       <select
         value={filters.category}
         onChange={(e) => update("category", e.target.value)}
-        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200"
+        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 [color-scheme:dark]"
       >
         <option value="">Categoria</option>
         {CATEGORIES.map((c) => (
@@ -68,7 +68,7 @@ export default function TransactionsFilters({
       <select
         value={filters.type}
         onChange={(e) => update("type", e.target.value)}
-        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200"
+        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 [color-scheme:dark]"
       >
         <option value="">Entradas e saídas</option>
         <option value="entrada">Entradas</option>
@@ -78,7 +78,7 @@ export default function TransactionsFilters({
       <select
         value={filters.accountId}
         onChange={(e) => update("accountId", e.target.value)}
-        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200"
+        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 [color-scheme:dark]"
       >
         <option value="">Conta</option>
         {accounts.map((a) => (
@@ -91,7 +91,7 @@ export default function TransactionsFilters({
       <select
         value={filters.cardId}
         onChange={(e) => update("cardId", e.target.value)}
-        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200"
+        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 [color-scheme:dark]"
       >
         <option value="">Cartão</option>
         {cards.map((c) => (

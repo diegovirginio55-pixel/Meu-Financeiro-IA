@@ -17,6 +17,16 @@ body {
   color: var(--foreground);
 }
 
+select,
+select option {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #18181b;
+  color: #fafafa;
+}
+
 * {
   scrollbar-color: #3f3f46 transparent;
 }
