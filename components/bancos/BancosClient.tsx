@@ -205,6 +205,7 @@ export default function BancosClient({
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [connectMode, setConnectMode] = useState<"create" | "update">("create");
 
   useEffect(() => {
     setConnections(initialConnections);
@@ -228,14 +229,19 @@ export default function BancosClient({
     router.refresh();
   }, [router]);
 
-  const handleConnect = useCallback(async () => {
+  const handleConnect = useCallback(async (mode: "create" | "update" = "create") => {
     setError(null);
+    setConnectMode(mode);
     setLoadingToken(true);
     try {
       const res = await fetch("/api/bank/connect-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(existingItemId ? { itemId: existingItemId } : {}),
+        body: JSON.stringify(
+          mode === "update" && existingItemId
+            ? { itemId: existingItemId }
+            : { addAnother: hasConnection },
+        ),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Falha ao iniciar conexão.");
@@ -245,41 +251,17 @@ export default function BancosClient({
     } finally {
       setLoadingToken(false);
     }
-  }, [existingItemId]);
+  }, [existingItemId, hasConnection]);
 
   async function handleBringBanks() {
-    if (!connections[0]) return;
     setError(null);
-    setImporting(true);
-    const realId = realConnectionId(connections[0].id);
-    try {
-      const res = await fetch(`/api/bank/connections/${realId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trigger: true }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data.needsWidget) {
-        await handleConnect();
-        return;
-      }
-      if (!res.ok) throw new Error(data.error || "Falha ao trazer os bancos.");
-      await refreshConnections();
-      setAddOpen(false);
-    } catch {
-      setError("Não deu para trazer agora. Tente de novo em alguns minutos, ou use Reautorizar.");
-    } finally {
-      setImporting(false);
-    }
+    setAddOpen(false);
+    await handleConnect("create");
   }
 
   function handleAddClick() {
     setError(null);
-    if (hasConnection) {
-      setAddOpen(true);
-      return;
-    }
-    void handleConnect();
+    void handleConnect("create");
   }
 
   async function handleSuccess(itemData: { item: unknown }) {
@@ -314,7 +296,7 @@ export default function BancosClient({
   async function handleDisconnect(id: string) {
     if (
       !confirm(
-        "Desconectar o Meu Pluggy? Nubank, Inter e os outros bancos dessa autorização saem juntos. As contas já importadas continuam salvas.",
+        "Desconectar este banco? As contas já importadas continuam salvas.",
       )
     ) {
       return;
@@ -335,7 +317,7 @@ export default function BancosClient({
       <div>
         <h1 className="text-4xl font-semibold tracking-tight text-white">Data Passport</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Inter, Caixa e Nubank no Meu Pluggy não entram sozinhos. Traga-os para este app.
+          Inter, Caixa e Nubank no Meu Pluggy precisam de uma autorização cada um neste app.
         </p>
         {hasConnection && (
           <button
@@ -344,14 +326,14 @@ export default function BancosClient({
             disabled={importing || loadingToken}
             className="mt-4 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {importing ? "Trazendo Inter e Caixa…" : "Trazer bancos do Meu Pluggy"}
+            {importing || loadingToken ? "Abrindo autorização…" : "Autorizar Inter ou Caixa"}
           </button>
         )}
         <div className="mt-3 rounded-xl border border-zinc-800 bg-[#141414] px-4 py-3 text-sm text-zinc-400">
-          <p className="font-medium text-zinc-200">Você já conectou os bancos no meu.pluggy.ai</p>
+          <p className="font-medium text-zinc-200">Essa janela do Meu Pluggy é normal</p>
           <p className="mt-1">
-            Essa tela do Meu Pluggy é só o cadastro. Para Inter, Caixa e Nubank aparecerem no{" "}
-            <span className="text-zinc-200">Meu Financeiro IA</span>, clique no botão verde acima.
+            Clique em <span className="text-zinc-200">Continuar</span> e autorize o Inter. Depois clique de novo no
+            botão verde para a Caixa. O Nubank já está salvo.
           </p>
         </div>
       </div>
@@ -469,7 +451,7 @@ export default function BancosClient({
               </button>
               <button
                 type="button"
-                onClick={() => void handleConnect()}
+                onClick={() => void handleConnect("update")}
                 disabled={loadingToken || importing}
                 className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
               >
@@ -484,7 +466,7 @@ export default function BancosClient({
         <PluggyConnect
           connectToken={connectToken}
           includeSandbox={false}
-          {...(existingItemId
+          {...(connectMode === "update" && existingItemId
             ? { updateItem: existingItemId }
             : { connectorIds: [200], selectedConnectorId: 200, forceOauthInBrowser: true })}
           products={["ACCOUNTS", "CREDIT_CARDS", "TRANSACTIONS", "INVESTMENTS"]}
