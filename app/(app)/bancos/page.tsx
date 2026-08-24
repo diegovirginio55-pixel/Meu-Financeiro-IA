@@ -20,6 +20,22 @@ export default async function BancosPage() {
         </p>
       </div>
 
+      <div className="rounded-2xl border border-amber-900/70 bg-amber-950/40 p-4 text-sm text-amber-100">
+        <p className="font-medium text-amber-50">Conta Pluggy ainda em modo demo</p>
+        <p className="mt-1 text-amber-200/90">
+          Inter, Nubank e outros bancos reais só ligam depois que a Pluggy liberar produção.
+          Enquanto isso, o widget só aceita o banco de teste (Pluggy Bank).
+        </p>
+        <a
+          href="https://dashboard.pluggy.ai/applications"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-amber-400"
+        >
+          Abrir Pluggy e ir para produção
+        </a>
+      </div>
+
       <BancosClient initialConnections={(data ?? []) as BankConnection[]} />
     </div>
   );
