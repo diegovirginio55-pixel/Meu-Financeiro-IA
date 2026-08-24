@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pluggyApi } from "./client";
 import {
-  bankFromTransferNumber,
   inferInstitutionName,
+  institutionForAccount,
   isGenericConnectorName,
   withInstitutionPrefix,
 } from "./institution";
@@ -130,8 +130,7 @@ export async function syncBankConnection(
   );
 
   for (const account of accounts) {
-    const fromCompe = bankFromTransferNumber(account.bankData?.transferNumber);
-    const institution = fromCompe ?? institutionName;
+    const institution = institutionForAccount(account, institutionName);
     const rawName = pluggyAccountName(account);
 
     if (account.type === "BANK") {
@@ -188,7 +187,10 @@ export async function syncBankConnection(
     if (active.length > 0) {
       const rows = active.map((inv) => ({
         user_id: userId,
-        name: withInstitutionPrefix(inv.name || "Investimento", institutionName),
+        name: withInstitutionPrefix(
+          inv.name || "Investimento",
+          inferInstitutionName([inv.name], institutionName),
+        ),
         amount: Number(inv.balance ?? inv.amount ?? 0),
         type: investmentLabel(inv.type, inv.subtype),
         amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),

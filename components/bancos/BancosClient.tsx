@@ -335,19 +335,24 @@ export default function BancosClient({
       <div>
         <h1 className="text-4xl font-semibold tracking-tight text-white">Data Passport</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Os bancos ficam salvos. A atualização roda sozinha quando você abre o app.
+          Inter, Caixa e Nubank no Meu Pluggy não entram sozinhos. Traga-os para este app.
         </p>
+        {hasConnection && (
+          <button
+            type="button"
+            onClick={() => void handleBringBanks()}
+            disabled={importing || loadingToken}
+            className="mt-4 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {importing ? "Trazendo Inter e Caixa…" : "Trazer bancos do Meu Pluggy"}
+          </button>
+        )}
         <div className="mt-3 rounded-xl border border-zinc-800 bg-[#141414] px-4 py-3 text-sm text-zinc-400">
-          <p className="font-medium text-zinc-200">Para conectar outro banco (Inter, Caixa…)</p>
-          <ol className="mt-2 list-decimal space-y-1.5 pl-5">
-            <li>
-              Clique em <span className="text-zinc-200">Adicionar banco</span> e abra o Meu Pluggy.
-            </li>
-            <li>Conecte o Inter (ou outro banco) lá, com o Nubank já autenticado.</li>
-            <li>
-              Volte e clique em <span className="text-zinc-200">Já conectei — trazer para o app</span>.
-            </li>
-          </ol>
+          <p className="font-medium text-zinc-200">Você já conectou os bancos no meu.pluggy.ai</p>
+          <p className="mt-1">
+            Essa tela do Meu Pluggy é só o cadastro. Para Inter, Caixa e Nubank aparecerem no{" "}
+            <span className="text-zinc-200">Meu Financeiro IA</span>, clique no botão verde acima.
+          </p>
         </div>
       </div>
 

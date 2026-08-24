@@ -70,6 +70,20 @@ export function inferInstitutionName(labels: Array<string | null | undefined>, f
   return fallback;
 }
 
+export function institutionForAccount(
+  account: {
+    name?: string;
+    marketingName?: string | null;
+    bankData?: { transferNumber?: string | null } | null;
+  },
+  fallback: string,
+): string {
+  return inferInstitutionName(
+    [account.marketingName, account.name, account.bankData?.transferNumber],
+    fallback,
+  );
+}
+
 export function withInstitutionPrefix(name: string, institution: string | null): string {
   if (!institution) return name;
   const firstWord = institution.split(" ")[0];

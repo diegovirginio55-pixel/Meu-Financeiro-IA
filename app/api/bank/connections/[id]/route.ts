@@ -39,6 +39,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (body.trigger) {
       try {
         await pluggyApi.patchItem(connection.pluggy_item_id, {});
+        const item = await pluggyApi.waitForItemIdle(connection.pluggy_item_id);
+        if (item.status === "WAITING_USER_INPUT" || item.status === "LOGIN_ERROR") {
+          return NextResponse.json({ needsWidget: true });
+        }
       } catch (error) {
         console.error("Atualização silenciosa da Pluggy indisponível, usar widget:", error);
         return NextResponse.json({ needsWidget: true });

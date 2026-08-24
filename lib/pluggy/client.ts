@@ -148,6 +148,17 @@ export const pluggyApi = {
     });
   },
 
+  async waitForItemIdle(itemId: string, timeoutMs = 25000) {
+    const started = Date.now();
+    let item = await this.fetchItem(itemId);
+    while (Date.now() - started < timeoutMs) {
+      if (item.status !== "UPDATING") return item;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      item = await this.fetchItem(itemId);
+    }
+    return item;
+  },
+
   async fetchItem(itemId: string) {
     return (await pluggyFetch(`/items/${itemId}`)) as unknown as PluggyItem;
   },
