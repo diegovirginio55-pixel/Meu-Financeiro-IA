@@ -1,73 +1,228 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { differenceInCalendarDays, isToday, isYesterday } from "date-fns";
 import { formatCurrency } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
+import { brandInitials, getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 
 const PluggyConnect = dynamic(
   () => import("react-pluggy-connect").then((mod) => mod.PluggyConnect),
   { ssr: false },
 );
 
-const STATUS_LABELS: Record<string, { label: string; tone: string }> = {
-  UPDATED: { label: "Atualizado", tone: "text-emerald-400" },
-  UPDATING: { label: "Atualizando…", tone: "text-amber-400" },
-  LOGIN_ERROR: { label: "Erro de login — reconecte", tone: "text-red-400" },
-  OUTDATED: { label: "Desatualizado", tone: "text-amber-400" },
-  WAITING_USER_INPUT: { label: "Aguardando ação", tone: "text-amber-400" },
-  WAITING_USER_ACTION: { label: "Aguardando ação", tone: "text-amber-400" },
-};
+const ACTIVE_STATUSES = new Set(["UPDATED", "UPDATING"]);
 
-function formatDateTime(value: string | null) {
-  if (!value) return "nunca";
-  return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+function PlugIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
+      <path
+        d="M9 7V3M15 7V3M8 11h8v3.5A5.5 5.5 0 0 1 10.5 20H10v3M12 20v3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
-function ConnectionAssets({ connection }: { connection: BankConnectionWithAssets }) {
+function GridIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="8.25" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 8v4.2L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function formatLastSync(value: string | null): string {
+  if (!value) return "Nunca atualizado";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Nunca atualizado";
+  if (isToday(date)) return "Hoje";
+  if (isYesterday(date)) return "Ontem";
+  const days = differenceInCalendarDays(new Date(), date);
+  if (days < 7) return `Há ${days} dias`;
+  return date.toLocaleDateString("pt-BR");
+}
+
+function BankLogo({
+  name,
+  imageUrl,
+}: {
+  name: string;
+  imageUrl: string | null;
+}) {
+  const brand = getBankBrand(name);
+  if (brand) {
+    return (
+      <div
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xs font-bold tracking-tight"
+        style={{ backgroundColor: brand.bg, color: brand.fg }}
+      >
+        {brandInitials(name)}
+      </div>
+    );
+  }
+
+  if (imageUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={imageUrl}
+        alt=""
+        className="h-11 w-11 rounded-xl bg-white object-contain p-1"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-800 text-sm font-semibold text-zinc-200">
+      {brandInitials(name)}
+    </div>
+  );
+}
+
+function ConnectionCard({
+  connection,
+  onOpen,
+}: {
+  connection: BankConnectionWithAssets;
+  onOpen: () => void;
+}) {
+  const name = officialInstitutionName(connection.institution_name);
+  const active = ACTIVE_STATUSES.has(connection.status);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex min-h-[168px] flex-col rounded-2xl border border-zinc-800/90 bg-[#141414] p-4 text-left transition-colors hover:border-zinc-700"
+    >
+      <div className="flex items-start justify-between">
+        <BankLogo name={name} imageUrl={connection.institution_image_url} />
+        <span
+          className={`mt-1 h-2.5 w-2.5 rounded-full ${
+            active ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.85)]" : "bg-amber-400"
+          }`}
+        />
+      </div>
+      <p className="mt-6 text-[15px] font-semibold text-white">{name}</p>
+      <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+        <ClockIcon />
+        {formatLastSync(connection.last_synced_at)}
+      </p>
+      <span className="mt-auto w-full border-t border-zinc-800 pt-3 text-xs text-zinc-500">
+        Ver detalhes &gt;
+      </span>
+    </button>
+  );
+}
+
+function DetailsPanel({
+  connection,
+  syncing,
+  onClose,
+  onSync,
+  onDisconnect,
+}: {
+  connection: BankConnectionWithAssets;
+  syncing: boolean;
+  onClose: () => void;
+  onSync: () => void;
+  onDisconnect: () => void;
+}) {
+  const name = officialInstitutionName(connection.institution_name);
   const hasAssets =
     connection.accounts.length > 0 ||
     connection.cards.length > 0 ||
     connection.investments.length > 0;
 
-  if (!hasAssets) {
-    return (
-      <p className="mt-3 border-t border-zinc-800 pt-3 text-xs text-zinc-500">
-        Nenhuma conta importada ainda. Clique em Sincronizar agora para trazer saldo, cartões e
-        investimentos.
-      </p>
-    );
-  }
-
   return (
-    <ul className="mt-3 flex flex-col gap-2 border-t border-zinc-800 pt-3">
-      {connection.accounts.map((account) => (
-        <li key={account.id} className="flex items-center justify-between text-sm">
-          <span className="text-zinc-300">🏦 {account.name}</span>
-          <span className="font-medium text-zinc-50">{formatCurrency(Number(account.balance))}</span>
-        </li>
-      ))}
-      {connection.cards.map((card) => (
-        <li key={card.id} className="flex items-center justify-between text-sm">
-          <span className="text-zinc-300">💳 {card.name}</span>
-          <span className="font-medium text-red-400">
-            Fatura {formatCurrency(Number(card.current_invoice))}
-          </span>
-        </li>
-      ))}
-      {connection.investments.map((investment) => (
-        <li key={investment.id} className="flex items-center justify-between text-sm">
-          <span className="text-zinc-300">
-            📈 {investment.name}
-            {investment.type ? <span className="text-zinc-500"> · {investment.type}</span> : null}
-          </span>
-          <span className="font-medium text-emerald-400">
-            {formatCurrency(Number(investment.amount))}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-4 sm:items-center">
+      <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="Fechar" />
+      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-zinc-800 bg-[#141414] p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <BankLogo name={name} imageUrl={connection.institution_image_url} />
+            <div>
+              <h3 className="text-base font-semibold text-white">{name}</h3>
+              <p className="text-xs text-zinc-500">{formatLastSync(connection.last_synced_at)}</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="text-sm text-zinc-500 hover:text-zinc-200">
+            Fechar
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2">
+          {hasAssets ? (
+            <>
+              {connection.accounts.map((account) => (
+                <div key={account.id} className="flex items-center justify-between text-sm">
+                  <span className="text-zinc-300">{account.name}</span>
+                  <span className="font-medium text-white">{formatCurrency(Number(account.balance))}</span>
+                </div>
+              ))}
+              {connection.cards.map((card) => (
+                <div key={card.id} className="flex items-center justify-between text-sm">
+                  <span className="text-zinc-300">{card.name}</span>
+                  <span className="font-medium text-red-400">
+                    Fatura {formatCurrency(Number(card.current_invoice))}
+                  </span>
+                </div>
+              ))}
+              {connection.investments.map((investment) => (
+                <div key={investment.id} className="flex items-center justify-between text-sm">
+                  <span className="text-zinc-300">
+                    {investment.name}
+                    {investment.type ? <span className="text-zinc-500"> · {investment.type}</span> : null}
+                  </span>
+                  <span className="font-medium text-emerald-400">
+                    {formatCurrency(Number(investment.amount))}
+                  </span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <p className="text-sm text-zinc-500">Nenhuma conta importada ainda. Sincronize para trazer os dados.</p>
+          )}
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onSync}
+            disabled={syncing}
+            className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {syncing ? "Sincronizando…" : "Sincronizar agora"}
+          </button>
+          <button
+            type="button"
+            onClick={onDisconnect}
+            disabled={syncing}
+            className="rounded-full border border-red-900 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-950/40 disabled:opacity-50"
+          >
+            Desconectar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -81,9 +236,14 @@ export default function BancosClient({
   const [connectToken, setConnectToken] = useState<string | null>(null);
   const [loadingToken, setLoadingToken] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const autoStarted = useRef(false);
+  const selected = useMemo(
+    () => connections.find((connection) => connection.id === selectedId) ?? null,
+    [connections, selectedId],
+  );
+  const activeCount = connections.filter((connection) => ACTIVE_STATUSES.has(connection.status)).length;
 
   const refreshConnections = useCallback(async () => {
     const res = await fetch("/api/bank/connections");
@@ -108,12 +268,6 @@ export default function BancosClient({
       setLoadingToken(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (autoStarted.current || initialConnections.length > 0) return;
-    autoStarted.current = true;
-    void handleConnect();
-  }, [handleConnect, initialConnections.length]);
 
   async function handleSuccess(itemData: { item: unknown }) {
     setConnectToken(null);
@@ -147,6 +301,7 @@ export default function BancosClient({
     setSyncingId(id);
     try {
       await fetch(`/api/bank/connections/${id}`, { method: "DELETE" });
+      setSelectedId(null);
       await refreshConnections();
     } finally {
       setSyncingId(null);
@@ -154,83 +309,107 @@ export default function BancosClient({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-        <div>
-          <h2 className="text-sm font-medium text-zinc-50">Conectar Meu Pluggy</h2>
-          <p className="text-sm text-zinc-400">
-            Lê saldo e extrato das contas que você já autorizou em meu.pluggy.ai. Sem custo, só o seu CPF.
-          </p>
-        </div>
-        <button
-          onClick={() => void handleConnect()}
-          disabled={loadingToken}
-          className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
-        >
-          {loadingToken ? "Abrindo…" : "+ Conectar Meu Pluggy"}
-        </button>
+    <div className="flex flex-col">
+      <div>
+        <h1 className="text-4xl font-semibold tracking-tight text-white">Data Passport</h1>
+        <p className="mt-2 text-sm text-zinc-400">
+          Conecte, visualize e gerencie suas conexões financeiras.
+        </p>
+        <details className="mt-3 text-sm text-zinc-500">
+          <summary className="cursor-pointer text-zinc-400 hover:text-zinc-200">
+            Como conectar sem pagar
+          </summary>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-zinc-500">
+            <li>
+              Em{" "}
+              <a href="https://meu.pluggy.ai" target="_blank" rel="noreferrer" className="text-zinc-300 underline">
+                meu.pluggy.ai
+              </a>{" "}
+              conecte Inter, Nubank etc.
+            </li>
+            <li>
+              Em{" "}
+              <a
+                href="https://dashboard.pluggy.ai/customization"
+                target="_blank"
+                rel="noreferrer"
+                className="text-zinc-300 underline"
+              >
+                dashboard.pluggy.ai/customization
+              </a>{" "}
+              habilite o conector MeuPluggy.
+            </li>
+            <li>Volte aqui e clique em Conectar banco. Uma autorização por instituição.</li>
+          </ol>
+        </details>
       </div>
 
       {error && (
-        <p className="rounded-xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>
+        <p className="mt-4 rounded-xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>
       )}
 
-      {connections.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
-          Nenhum banco importado ainda. Conecte primeiro em meu.pluggy.ai e depois autorize aqui.
+      <section className="mt-10">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-rose-500">
+            <PlugIcon />
+          </span>
+          <h2 className="text-xs font-medium tracking-[0.18em] text-zinc-400">CONEXÕES</h2>
+          {connections.length > 0 && (
+            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+              {activeCount} {activeCount === 1 ? "ativa" : "ativas"}
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {connections.map((connection) => {
-            const statusInfo = STATUS_LABELS[connection.status] ?? {
-              label: connection.status,
-              tone: "text-zinc-400",
-            };
-            const isBusy = syncingId === connection.id;
-            return (
-              <div key={connection.id} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    {connection.institution_image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={connection.institution_image_url}
-                        alt=""
-                        className="h-9 w-9 rounded-full bg-white object-contain p-1"
-                      />
-                    ) : (
-                      <span className="text-2xl">🏦</span>
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-zinc-50">{connection.institution_name}</p>
-                      <p className={`text-xs ${statusInfo.tone}`}>{statusInfo.label}</p>
-                      <p className="text-xs text-zinc-500">
-                        Última sincronização: {formatDateTime(connection.last_synced_at)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleSync(connection.id)}
-                      disabled={isBusy}
-                      className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50"
-                    >
-                      {isBusy ? "…" : "Sincronizar agora"}
-                    </button>
-                    <button
-                      onClick={() => handleDisconnect(connection.id)}
-                      disabled={isBusy}
-                      className="rounded-full border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-950/50 disabled:opacity-50"
-                    >
-                      Desconectar
-                    </button>
-                  </div>
-                </div>
-                <ConnectionAssets connection={connection} />
-              </div>
-            );
-          })}
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {connections.map((connection) => (
+            <ConnectionCard
+              key={connection.id}
+              connection={connection}
+              onOpen={() => setSelectedId(connection.id)}
+            />
+          ))}
+
+          <button
+            type="button"
+            onClick={() => void handleConnect()}
+            disabled={loadingToken}
+            className="flex min-h-[168px] flex-col items-start rounded-2xl border border-dashed border-zinc-800 bg-transparent p-4 text-left transition-colors hover:border-zinc-600 disabled:opacity-50"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-800 text-xl text-zinc-400">
+              +
+            </div>
+            <p className="mt-6 text-[15px] font-semibold text-white">
+              {loadingToken ? "Abrindo…" : "Conectar banco"}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">Via Meu Pluggy, sem custo</p>
+            <span className="mt-auto border-t border-zinc-800 pt-3 text-xs text-zinc-500">
+              Adicionar &gt;
+            </span>
+          </button>
         </div>
+      </section>
+
+      <section className="mt-12">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-rose-500">
+            <GridIcon />
+          </span>
+          <h2 className="text-xs font-medium tracking-[0.18em] text-zinc-400">APPS PARCEIROS</h2>
+        </div>
+        <div className="flex min-h-[120px] items-center justify-center rounded-2xl border border-zinc-800/80 bg-transparent">
+          <p className="text-sm text-zinc-500">Nenhum app parceiro está acessando seus dados.</p>
+        </div>
+      </section>
+
+      {selected && (
+        <DetailsPanel
+          connection={selected}
+          syncing={syncingId === selected.id}
+          onClose={() => setSelectedId(null)}
+          onSync={() => handleSync(selected.id)}
+          onDisconnect={() => handleDisconnect(selected.id)}
+        />
       )}
 
       {connectToken && (
