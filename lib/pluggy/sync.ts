@@ -4,6 +4,7 @@ import {
   inferInstitutionName,
   institutionForAccount,
   isGenericConnectorName,
+  singleInstitutionFromAccounts,
   withInstitutionPrefix,
 } from "./institution";
 
@@ -85,6 +86,13 @@ const INVESTMENT_TYPE_LABELS: Record<string, string> = {
   EQUITY: "Renda variável",
   ETF: "ETF",
   COE: "COE",
+  CDB: "CDB",
+  LCI: "LCI",
+  LCA: "LCA",
+  TREASURY: "Tesouro",
+  CRI: "CRI",
+  CRA: "CRA",
+  DEBENTURES: "Debênture",
 };
 
 function investmentLabel(type?: string, subtype?: string | null) {
@@ -106,19 +114,31 @@ function pluggyAccountName(account: { name?: string; marketingName?: string | nu
   return base;
 }
 
-/**
- * Busca contas e extratos mais recentes da Pluggy para uma conexão bancária
- * e grava/atualiza os dados nas tabelas accounts/cards/transactions/investments.
- * Só leitura do lado do banco — nenhuma movimentação é feita.
- */
+function investmentInstitution(
+  inv: {
+    name?: string;
+    issuer?: string | null;
+    code?: string | null;
+    institution?: { name?: string | null; number?: string | null } | null;
+  },
+  accountsFallback: string | null,
+  itemFallback: string,
+) {
+  return inferInstitutionName(
+    [inv.institution?.name, inv.issuer, inv.name, inv.institution?.number, inv.code],
+    accountsFallback ?? itemFallback,
+  );
+}
+
 export async function syncBankConnection(
   supabase: SupabaseClient,
   userId: string,
   bankConnectionId: string,
   pluggyItemId: string,
 ) {
-  const item = await pluggyApi.fetchItem(pluggyItemId);
+  const item = await pluggyApi.waitForItemIdle(pluggyItemId);
   const { results: accounts } = await pluggyApi.fetchAccounts(pluggyItemId);
+  const onlyBank = singleInstitutionFromAccounts(accounts);
 
   const institutionName = inferInstitutionName(
     [
@@ -182,14 +202,13 @@ export async function syncBankConnection(
   try {
     const { results: investments } = await pluggyApi.fetchInvestments(pluggyItemId);
     const active = investments.filter((inv) => inv.status !== "TOTAL_WITHDRAWAL");
-    const activeIds = active.map((inv) => inv.id);
 
     if (active.length > 0) {
       const rows = active.map((inv) => ({
         user_id: userId,
         name: withInstitutionPrefix(
           inv.name || "Investimento",
-          inferInstitutionName([inv.name], institutionName),
+          investmentInstitution(inv, onlyBank, institutionName),
         ),
         amount: Number(inv.balance ?? inv.amount ?? 0),
         type: investmentLabel(inv.type, inv.subtype),
@@ -275,17 +294,19 @@ export async function syncBankConnection(
       }
     }
 
-    let staleQuery = supabase
-      .from("investments")
-      .delete()
-      .eq("bank_connection_id", bankConnectionId)
-      .eq("source", "pluggy");
-    if (activeIds.length > 0) {
-      staleQuery = staleQuery.not("pluggy_investment_id", "in", `(${activeIds.join(",")})`);
-    }
-    const { error: cleanupError } = await staleQuery;
-    if (cleanupError) {
-      console.error("Erro ao limpar investimentos antigos da Pluggy:", cleanupError);
+    const withdrawnIds = investments
+      .filter((inv) => inv.status === "TOTAL_WITHDRAWAL")
+      .map((inv) => inv.id);
+    if (withdrawnIds.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from("investments")
+        .delete()
+        .eq("bank_connection_id", bankConnectionId)
+        .eq("source", "pluggy")
+        .in("pluggy_investment_id", withdrawnIds);
+      if (cleanupError) {
+        console.error("Erro ao limpar investimentos encerrados da Pluggy:", cleanupError);
+      }
     }
   } catch (error) {
     console.error("Erro ao importar investimentos da Pluggy:", error);

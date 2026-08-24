@@ -102,6 +102,9 @@ export type PluggyInvestment = {
   amountOriginal?: number | null;
   lastMonthRate?: number | null;
   status?: string;
+  issuer?: string | null;
+  code?: string | null;
+  institution?: { name?: string | null; number?: string | null } | null;
 };
 
 export type PluggyInvestmentTransaction = {
@@ -148,7 +151,7 @@ export const pluggyApi = {
     });
   },
 
-  async waitForItemIdle(itemId: string, timeoutMs = 25000) {
+  async waitForItemIdle(itemId: string, timeoutMs = 40000) {
     const started = Date.now();
     let item = await this.fetchItem(itemId);
     while (Date.now() - started < timeoutMs) {

@@ -244,7 +244,8 @@ export default function AtivosClient({
 
           {assets.length === 0 ? (
             <p className="mt-6 text-sm text-zinc-500">
-              Nenhum investimento nesta conexão. Sincronize o banco na aba Bancos.
+              Nenhum investimento nesta conexão. Na aba Bancos, sincronize o Inter. Se ainda vier vazio,
+              no meu.pluggy.ai reconecte o Inter incluindo o consentimento de <strong>Investimentos</strong>.
             </p>
           ) : (
             <div className="mt-5 flex flex-col gap-5">

@@ -40,6 +40,25 @@ const NAME_HINTS: Array<[RegExp, string]> = [
   [/\bneon\b/i, "Neon"],
 ];
 
+const CNPJ_BANKS: Record<string, string> = {
+  "00416968": "Inter",
+  "18945670": "Inter",
+  "31872495": "Inter",
+  "18236120": "Nubank",
+  "00360305": "Caixa",
+};
+
+function digits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+export function bankFromCnpj(value?: string | null): string | null {
+  if (!value) return null;
+  const raw = digits(value);
+  if (raw.length < 8) return null;
+  return CNPJ_BANKS[raw.slice(0, 8)] ?? null;
+}
+
 export function bankFromTransferNumber(transferNumber?: string | null): string | null {
   if (!transferNumber) return null;
   const compe = transferNumber.split("/")[0]?.replace(/\D/g, "").padStart(3, "0");
@@ -64,6 +83,8 @@ export function inferInstitutionName(labels: Array<string | null | undefined>, f
   for (const label of labels) {
     const fromName = bankFromLabel(label);
     if (fromName) return fromName;
+    const fromCnpj = bankFromCnpj(label);
+    if (fromCnpj) return fromCnpj;
     const fromCompe = bankFromTransferNumber(label);
     if (fromCompe) return fromCompe;
   }
@@ -82,6 +103,22 @@ export function institutionForAccount(
     [account.marketingName, account.name, account.bankData?.transferNumber],
     fallback,
   );
+}
+
+export function singleInstitutionFromAccounts(
+  accounts: Array<{
+    name?: string;
+    marketingName?: string | null;
+    bankData?: { transferNumber?: string | null } | null;
+  }>,
+): string | null {
+  const banks = new Set(
+    accounts
+      .map((account) => institutionForAccount(account, ""))
+      .filter((name) => name.length > 0),
+  );
+  if (banks.size === 1) return [...banks][0];
+  return null;
 }
 
 export function withInstitutionPrefix(name: string, institution: string | null): string {
