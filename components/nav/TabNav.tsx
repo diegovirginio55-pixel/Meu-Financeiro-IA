@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 const TABS = [
   { href: "/chat", label: "Conversa com IA", icon: "🤖" },
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
+  { href: "/fluxo", label: "Fluxo", icon: "💸" },
   { href: "/detalhes", label: "Detalhes", icon: "📋" },
   { href: "/ativos", label: "Ativos", icon: "📈" },
   { href: "/bancos", label: "Bancos", icon: "🏦" },

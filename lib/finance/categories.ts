@@ -44,3 +44,23 @@ export const CATEGORY_COLORS: Record<string, string> = {
   Dívidas: "#dc2626",
   Outros: "#71717a",
 };
+
+const FALLBACK_PALETTE = [
+  "#ef4444",
+  "#a855f7",
+  "#3b82f6",
+  "#ec4899",
+  "#06b6d4",
+  "#eab308",
+  "#f97316",
+  "#22c55e",
+];
+
+export function categoryColor(category: string): string {
+  if (CATEGORY_COLORS[category]) return CATEGORY_COLORS[category];
+  let hash = 0;
+  for (let i = 0; i < category.length; i += 1) {
+    hash = category.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return FALLBACK_PALETTE[Math.abs(hash) % FALLBACK_PALETTE.length];
+}
