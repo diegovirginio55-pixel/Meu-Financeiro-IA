@@ -21,9 +21,10 @@ export function BankLogo({
   const remote = !isGenericPluggyImage(imageUrl) ? imageUrl : null;
 
   if (logo || remote) {
+    const src = logo ? `${logo}?v=2` : (remote ?? "");
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={logo ?? remote ?? ""} alt={name} className={`${box} shrink-0 object-cover`} />
+      <img src={src} alt={name} className={`${box} shrink-0 overflow-hidden object-contain`} />
     );
   }
 
