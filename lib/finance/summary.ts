@@ -111,17 +111,19 @@ export async function getFinancialSnapshot(
   const patrimonio =
     totalBalance + totalInvestments - totalInvoices - totalDebts;
 
+  const isGasto = (t: Transaction) => t.type === "saida" && t.category !== "Investimentos";
+
   const monthEntradas = monthTx
     .filter((t) => t.type === "entrada")
     .reduce((s, t) => s + Number(t.amount), 0);
   const monthDespesas = monthTx
-    .filter((t) => t.type === "saida")
+    .filter(isGasto)
     .reduce((s, t) => s + Number(t.amount), 0);
   const economia = monthEntradas - monthDespesas;
 
   const categoriaMap = new Map<string, number>();
   monthTx
-    .filter((t) => t.type === "saida")
+    .filter(isGasto)
     .forEach((t) => {
       categoriaMap.set(
         t.category,
@@ -133,7 +135,7 @@ export async function getFinancialSnapshot(
     .sort((a, b) => b.total - a.total);
 
   const maioresGastos = [...monthTx]
-    .filter((t) => t.type === "saida")
+    .filter(isGasto)
     .sort((a, b) => Number(b.amount) - Number(a.amount))
     .slice(0, 5);
 
@@ -191,7 +193,7 @@ export async function getFinancialSnapshot(
     const bucket = evolucaoMap.get(key);
     if (!bucket) return;
     if (t.type === "entrada") bucket.entradas += Number(t.amount);
-    else bucket.despesas += Number(t.amount);
+    else if (t.category !== "Investimentos") bucket.despesas += Number(t.amount);
   });
   const evolucaoMensal = Array.from(evolucaoMap.entries()).map(
     ([mes, v]) => ({ mes, ...v }),

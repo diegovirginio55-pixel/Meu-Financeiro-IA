@@ -193,6 +193,7 @@ export default function BancosClient({
           includeSandbox={false}
           connectorIds={[200]}
           selectedConnectorId={200}
+          products={["ACCOUNTS", "CREDIT_CARDS", "TRANSACTIONS", "INVESTMENTS"]}
           language="pt"
           theme="dark"
           forceOauthInBrowser

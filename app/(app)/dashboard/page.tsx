@@ -7,6 +7,7 @@ import {
   MaioresGastos,
   ProximasContas,
   GoalsProgress,
+  InvestmentsList,
 } from "@/components/dashboard/ListPanels";
 import Link from "next/link";
 
@@ -50,14 +51,17 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <MaioresGastos items={snapshot.maioresGastos} />
+        <InvestmentsList investments={snapshot.investments} />
         <ProximasContas
           items={snapshot.proximos30Dias}
           saldoPrevisto={snapshot.saldoPrevisto30Dias}
         />
       </div>
 
-      <GoalsProgress goals={snapshot.goals} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <MaioresGastos items={snapshot.maioresGastos} />
+        <GoalsProgress goals={snapshot.goals} />
+      </div>
     </div>
   );
 }

@@ -85,6 +85,16 @@ export type PluggyTransaction = {
   date: string;
 };
 
+export type PluggyInvestment = {
+  id: string;
+  name?: string;
+  type?: string;
+  subtype?: string | null;
+  balance?: number;
+  amount?: number;
+  status?: string;
+};
+
 export const pluggyApi = {
   async createConnectToken(options: {
     clientUserId: string;
@@ -108,6 +118,27 @@ export const pluggyApi = {
   async fetchAccounts(itemId: string) {
     const body = await pluggyFetch(`/accounts?itemId=${encodeURIComponent(itemId)}`);
     return { results: (body.results ?? []) as PluggyAccount[] };
+  },
+
+  async fetchInvestments(itemId: string) {
+    const results: PluggyInvestment[] = [];
+    let page = 1;
+
+    for (let i = 0; i < 20; i++) {
+      const params = new URLSearchParams({
+        itemId,
+        page: String(page),
+        pageSize: "50",
+      });
+      const body = await pluggyFetch(`/investments?${params.toString()}`);
+      results.push(...((body.results ?? []) as PluggyInvestment[]));
+
+      const totalPages = Number(body.totalPages ?? 1);
+      if (page >= totalPages) break;
+      page += 1;
+    }
+
+    return { results };
   },
 
   async fetchAllTransactions(accountId: string, dateFrom: string) {

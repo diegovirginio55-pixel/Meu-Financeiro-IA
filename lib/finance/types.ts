@@ -95,6 +95,9 @@ export interface Investment {
   name: string;
   amount: number;
   type: string | null;
+  pluggy_investment_id?: string | null;
+  bank_connection_id?: string | null;
+  source?: "manual" | "pluggy";
   updated_at: string;
 }
 

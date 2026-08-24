@@ -72,9 +72,24 @@ async function syncTransactionsForAccount(
   await supabase.from("transactions").upsert(rows, { onConflict: "pluggy_transaction_id" });
 }
 
+const INVESTMENT_TYPE_LABELS: Record<string, string> = {
+  FIXED_INCOME: "Renda Fixa",
+  SECURITY: "Previdência",
+  MUTUAL_FUND: "Fundo",
+  EQUITY: "Renda variável",
+  ETF: "ETF",
+  COE: "COE",
+};
+
+function investmentLabel(type?: string, subtype?: string | null) {
+  if (subtype && INVESTMENT_TYPE_LABELS[subtype]) return INVESTMENT_TYPE_LABELS[subtype];
+  if (type && INVESTMENT_TYPE_LABELS[type]) return INVESTMENT_TYPE_LABELS[type];
+  return type || "Investimento";
+}
+
 /**
  * Busca contas e extratos mais recentes da Pluggy para uma conexão bancária
- * e grava/atualiza os dados nas tabelas accounts/cards/transactions.
+ * e grava/atualiza os dados nas tabelas accounts/cards/transactions/investments.
  * Só leitura do lado do banco — nenhuma movimentação é feita.
  */
 export async function syncBankConnection(
@@ -131,6 +146,44 @@ export async function syncBankConnection(
 
       await syncTransactionsForAccount(supabase, userId, account.id, null, cardRow?.id ?? null);
     }
+  }
+
+  try {
+    const { results: investments } = await pluggyApi.fetchInvestments(pluggyItemId);
+    const active = investments.filter((inv) => inv.status !== "TOTAL_WITHDRAWAL");
+    const activeIds = active.map((inv) => inv.id);
+
+    if (active.length > 0) {
+      const rows = active.map((inv) => ({
+        user_id: userId,
+        name: inv.name || "Investimento",
+        amount: Number(inv.balance ?? inv.amount ?? 0),
+        type: investmentLabel(inv.type, inv.subtype),
+        pluggy_investment_id: inv.id,
+        bank_connection_id: bankConnectionId,
+        source: "pluggy" as const,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await supabase
+        .from("investments")
+        .upsert(rows, { onConflict: "pluggy_investment_id" });
+      if (error) throw error;
+    }
+
+    let staleQuery = supabase
+      .from("investments")
+      .delete()
+      .eq("bank_connection_id", bankConnectionId)
+      .eq("source", "pluggy");
+    if (activeIds.length > 0) {
+      staleQuery = staleQuery.not("pluggy_investment_id", "in", `(${activeIds.join(",")})`);
+    }
+    const { error: cleanupError } = await staleQuery;
+    if (cleanupError) {
+      console.error("Erro ao limpar investimentos antigos da Pluggy:", cleanupError);
+    }
+  } catch (error) {
+    console.error("Erro ao importar investimentos da Pluggy:", error);
   }
 
   await supabase

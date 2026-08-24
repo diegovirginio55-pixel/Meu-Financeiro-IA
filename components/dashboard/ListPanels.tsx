@@ -83,6 +83,35 @@ export function ProximasContas({
   );
 }
 
+export function InvestmentsList({
+  investments,
+}: {
+  investments: FinancialSnapshot["investments"];
+}) {
+  return (
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+      <h2 className="mb-3 text-sm font-medium text-zinc-300">📈 Investimentos</h2>
+      {investments.length === 0 ? (
+        <p className="text-sm text-zinc-500">Nenhum investimento importado ainda.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {investments.map((inv) => (
+            <li key={inv.id} className="flex items-center justify-between text-sm">
+              <span className="text-zinc-300">
+                {inv.name}
+                {inv.type ? <span className="text-zinc-500"> · {inv.type}</span> : null}
+              </span>
+              <span className="font-medium text-emerald-400">
+                {formatCurrency(Number(inv.amount))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function GoalsProgress({
   goals,
 }: {
