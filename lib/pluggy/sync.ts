@@ -191,6 +191,9 @@ export async function syncBankConnection(
         name: withInstitutionPrefix(inv.name || "Investimento", institutionName),
         amount: Number(inv.balance ?? inv.amount ?? 0),
         type: investmentLabel(inv.type, inv.subtype),
+        amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
+        amount_original: inv.amountOriginal == null ? null : Number(inv.amountOriginal),
+        last_month_rate: inv.lastMonthRate == null ? null : Number(inv.lastMonthRate),
         pluggy_investment_id: inv.id,
         bank_connection_id: bankConnectionId,
         source: "pluggy" as const,
@@ -200,6 +203,74 @@ export async function syncBankConnection(
         .from("investments")
         .upsert(rows, { onConflict: "pluggy_investment_id" });
       if (error) throw error;
+
+      const { data: localRows } = await supabase
+        .from("investments")
+        .select("id, pluggy_investment_id")
+        .eq("bank_connection_id", bankConnectionId);
+      const idByPluggy = new Map(
+        (localRows ?? []).map((row) => [row.pluggy_investment_id as string, row.id as string]),
+      );
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+
+      const snapshots = active.flatMap((inv) => {
+        const localId = idByPluggy.get(inv.id);
+        if (!localId) return [];
+        return [
+          {
+            user_id: userId,
+            investment_id: localId,
+            bank_connection_id: bankConnectionId,
+            snapshot_date: today,
+            amount: Number(inv.balance ?? inv.amount ?? 0),
+            amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
+          },
+        ];
+      });
+      if (snapshots.length > 0) {
+        const { error: snapshotError } = await supabase
+          .from("investment_snapshots")
+          .upsert(snapshots, { onConflict: "investment_id,snapshot_date" });
+        if (snapshotError) console.error("Erro ao gravar snapshot de investimentos:", snapshotError);
+      }
+
+      for (const inv of active) {
+        const localId = idByPluggy.get(inv.id);
+        if (!localId) continue;
+        try {
+          const txs = await pluggyApi.fetchInvestmentTransactions(inv.id);
+          if (txs.length === 0) continue;
+          const txRows = txs.map((transaction) => {
+            const raw = Number(transaction.amount ?? 0);
+            const type = transaction.type || "OTHER";
+            const signed =
+              type === "INTEREST"
+                ? Math.abs(raw)
+                : type === "SELL" || type === "TAX"
+                  ? -Math.abs(raw)
+                  : type === "BUY"
+                    ? Math.abs(raw)
+                    : transaction.movementType === "DEBIT"
+                      ? -Math.abs(raw)
+                      : raw;
+            return {
+              user_id: userId,
+              investment_id: localId,
+              bank_connection_id: bankConnectionId,
+              pluggy_transaction_id: transaction.id,
+              type,
+              amount: signed,
+              date: toDateOnly(transaction.date),
+              description: transaction.description,
+            };
+          });
+          await supabase.from("investment_transactions").upsert(txRows, {
+            onConflict: "pluggy_transaction_id",
+          });
+        } catch (txError) {
+          console.error("Erro ao importar movimentações do investimento:", txError);
+        }
+      }
     }
 
     let staleQuery = supabase

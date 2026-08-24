@@ -95,10 +95,31 @@ export interface Investment {
   name: string;
   amount: number;
   type: string | null;
+  amount_profit?: number | null;
+  amount_original?: number | null;
+  last_month_rate?: number | null;
   pluggy_investment_id?: string | null;
   bank_connection_id?: string | null;
   source?: "manual" | "pluggy";
   updated_at: string;
+}
+
+export interface InvestmentSnapshot {
+  id: string;
+  investment_id: string;
+  bank_connection_id: string | null;
+  snapshot_date: string;
+  amount: number;
+  amount_profit: number | null;
+}
+
+export interface InvestmentTxn {
+  id: string;
+  investment_id: string | null;
+  bank_connection_id: string | null;
+  type: string;
+  amount: number;
+  date: string;
 }
 
 export interface ChatMessageRow {

@@ -98,7 +98,19 @@ export type PluggyInvestment = {
   subtype?: string | null;
   balance?: number;
   amount?: number;
+  amountProfit?: number | null;
+  amountOriginal?: number | null;
+  lastMonthRate?: number | null;
   status?: string;
+};
+
+export type PluggyInvestmentTransaction = {
+  id: string;
+  type?: string | null;
+  movementType?: string | null;
+  description?: string | null;
+  amount?: number | null;
+  date: string;
 };
 
 export const pluggyApi = {
@@ -145,6 +157,27 @@ export const pluggyApi = {
     }
 
     return { results };
+  },
+
+  async fetchInvestmentTransactions(investmentId: string) {
+    const results: PluggyInvestmentTransaction[] = [];
+    let page = 1;
+
+    for (let i = 0; i < 20; i++) {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: "50",
+      });
+      const body = await pluggyFetch(
+        `/investments/${encodeURIComponent(investmentId)}/transactions?${params.toString()}`,
+      );
+      results.push(...((body.results ?? []) as PluggyInvestmentTransaction[]));
+      const totalPages = Number(body.totalPages ?? 1);
+      if (page >= totalPages) break;
+      page += 1;
+    }
+
+    return results;
   },
 
   async fetchAllTransactions(accountId: string, dateFrom: string) {

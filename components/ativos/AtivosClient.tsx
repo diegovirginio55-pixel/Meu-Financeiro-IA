@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
-import type { Investment } from "@/lib/finance/types";
+import type { Investment, InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
+import { buildDailyInvestmentPnl, totalAccumulatedProfit } from "@/lib/finance/investment-pnl";
+import { LucroDiarioChart } from "@/components/ativos/LucroDiarioChart";
 
 type AssetRow = Investment & {
   bankName: string;
@@ -73,11 +75,16 @@ function displayName(name: string, bankName: string): string {
 
 export default function AtivosClient({
   connections,
+  snapshots = [],
+  investmentTx = [],
 }: {
   connections: BankConnectionWithAssets[];
+  snapshots?: InvestmentSnapshot[];
+  investmentTx?: InvestmentTxn[];
 }) {
   const [connectionId, setConnectionId] = useState("all");
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const [chartMode, setChartMode] = useState<"juntos" | "separados" | "ambos">("ambos");
 
   const visibleConnections = useMemo(() => {
     if (connectionId === "all") return connections;
@@ -96,6 +103,23 @@ export default function AtivosClient({
   }, [visibleConnections]);
 
   const total = assets.reduce((sum, asset) => sum + Number(asset.amount), 0);
+  const lucroAcumulado = totalAccumulatedProfit(assets);
+
+  const pnl = useMemo(() => {
+    const visibleIds = new Set(visibleConnections.map((connection) => connection.id));
+    return buildDailyInvestmentPnl({
+      connections: visibleConnections,
+      investments: assets,
+      snapshots: snapshots.filter(
+        (item) => !item.bank_connection_id || visibleIds.has(item.bank_connection_id),
+      ),
+      transactions: investmentTx.filter(
+        (item) => !item.bank_connection_id || visibleIds.has(item.bank_connection_id),
+      ),
+    });
+  }, [visibleConnections, assets, snapshots, investmentTx]);
+
+  const lucroPeriodo = pnl.series.reduce((sum, point) => sum + Number(point.Total), 0);
 
   const groups = useMemo(() => {
     const map = new Map<string, AssetRow[]>();
@@ -157,6 +181,56 @@ export default function AtivosClient({
           para importar a carteira.
         </div>
       ) : (
+        <>
+        <section className="rounded-2xl border border-zinc-800 bg-[#141414] p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-medium text-zinc-200">Lucro diário dos investimentos</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Total de todos os bancos e o rendimento de cada um nos últimos 30 dias.
+                {pnl.estimated ? " Valores estimados pela taxa do último mês até haver histórico de sincronização." : ""}
+              </p>
+            </div>
+            <div className="flex rounded-full bg-zinc-900 p-0.5 text-[11px]">
+              {(
+                [
+                  ["juntos", "Juntos"],
+                  ["separados", "Por banco"],
+                  ["ambos", "Juntos e separados"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setChartMode(value)}
+                  className={`rounded-full px-2.5 py-1 ${
+                    chartMode === value ? "bg-emerald-600 text-white" : "text-zinc-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-zinc-800 px-3 py-2">
+              <p className="text-xs text-zinc-500">Lucro acumulado</p>
+              <p className={`mt-1 text-lg font-semibold ${lucroAcumulado >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {formatCurrency(lucroAcumulado)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-zinc-800 px-3 py-2">
+              <p className="text-xs text-zinc-500">Lucro no gráfico (30 dias)</p>
+              <p className={`mt-1 text-lg font-semibold ${lucroPeriodo >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {formatCurrency(lucroPeriodo)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <LucroDiarioChart data={pnl.series} banks={pnl.banks} mode={chartMode} />
+          </div>
+        </section>
+
         <section className="rounded-2xl border border-zinc-800 bg-[#141414] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm text-zinc-200">
@@ -211,7 +285,18 @@ export default function AtivosClient({
                               <span className="block text-sm font-medium text-emerald-400">
                                 {formatCurrency(amount)}
                               </span>
-                              <span className="text-xs text-zinc-500">{share.toFixed(1)}%</span>
+                              {asset.amount_profit != null ? (
+                                <span
+                                  className={`text-xs ${
+                                    Number(asset.amount_profit) >= 0 ? "text-emerald-500/80" : "text-red-400"
+                                  }`}
+                                >
+                                  {Number(asset.amount_profit) >= 0 ? "+" : ""}
+                                  {formatCurrency(Number(asset.amount_profit))}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-zinc-500">{share.toFixed(1)}%</span>
+                              )}
                             </span>
                             <span className={`text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}>
                               ⌄
@@ -220,6 +305,18 @@ export default function AtivosClient({
                           {open && (
                             <div className="pb-3 pl-11 text-xs text-zinc-500">
                               Tipo: {asset.type || "Investimento"} · Parte da carteira: {share.toFixed(1)}%
+                              {asset.amount_profit != null && (
+                                <>
+                                  {" "}
+                                  · Lucro acumulado:{" "}
+                                  <span className={Number(asset.amount_profit) >= 0 ? "text-emerald-400" : "text-red-400"}>
+                                    {formatCurrency(Number(asset.amount_profit))}
+                                  </span>
+                                </>
+                              )}
+                              {asset.last_month_rate != null && Number(asset.last_month_rate) !== 0 && (
+                                <> · Taxa último mês: {Number(asset.last_month_rate).toFixed(2)}%</>
+                              )}
                             </div>
                           )}
                         </li>
@@ -231,6 +328,7 @@ export default function AtivosClient({
             </div>
           )}
         </section>
+        </>
       )}
     </div>
   );
