@@ -19,7 +19,7 @@ function HomeIcon({ active }: { active?: boolean }) {
       <path
         d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
         fill={active ? "#FFFFFF" : "none"}
-        stroke={active ? "#FFFFFF" : "#6B7C86"}
+        stroke={active ? "#FFFFFF" : "#71717A"}
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
@@ -28,7 +28,7 @@ function HomeIcon({ active }: { active?: boolean }) {
 }
 
 function ExtratoIcon({ active }: { active?: boolean }) {
-  const color = active ? "#005CA9" : "#6B7C86";
+  const color = active ? "#34D399" : "#71717A";
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
       <rect x="5" y="3.5" width="14" height="17" rx="2" stroke={color} strokeWidth="1.6" />
@@ -41,7 +41,7 @@ function PixIcon({ active }: { active?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden>
       <path
-        fill={active ? "#005CA9" : "#6B7C86"}
+        fill={active ? "#34D399" : "#71717A"}
         d="M12.8 4.3 19.7 11.2a1.1 1.1 0 0 1 0 1.6l-6.9 6.9a1.1 1.1 0 0 1-1.6 0L4.3 12.8a1.1 1.1 0 0 1 0-1.6l6.9-6.9a1.1 1.1 0 0 1 1.6 0Z"
       />
     </svg>
@@ -49,7 +49,7 @@ function PixIcon({ active }: { active?: boolean }) {
 }
 
 function ChatIcon({ active }: { active?: boolean }) {
-  const color = active ? "#005CA9" : "#6B7C86";
+  const color = active ? "#34D399" : "#71717A";
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
       <path
@@ -65,7 +65,7 @@ function ChatIcon({ active }: { active?: boolean }) {
 function MenuIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
-      <path d="M5 7h14M5 12h14M5 17h14" stroke="#6B7C86" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M5 7h14M5 12h14M5 17h14" stroke="#71717A" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -87,10 +87,10 @@ export default function BottomNav() {
       {menuOpen && (
         <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setMenuOpen(false)}>
           <div
-            className="absolute inset-x-0 bottom-16 w-full rounded-t-3xl bg-white p-5 text-zinc-800 shadow-2xl"
+            className="absolute inset-x-0 bottom-16 w-full rounded-t-3xl border-t border-white/10 bg-zinc-900 p-5 text-zinc-100 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-zinc-500">Menu</p>
+            <p className="text-sm font-semibold text-zinc-400">Menu</p>
             <div className="mt-3 flex flex-col gap-1">
               {[
                 { href: "/visao", label: "Visão geral e gráficos" },
@@ -102,7 +102,7 @@ export default function BottomNav() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-100"
+                  className="rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-800"
                 >
                   {item.label}
                 </Link>
@@ -120,7 +120,7 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-zinc-200 bg-[#EEF1F3] pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-white/10 bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <div className="grid grid-cols-5 px-1 py-1.5">
           {TABS.map((tab) => {
             const active = pathname === tab.href || (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
@@ -135,20 +135,20 @@ export default function BottomNav() {
                 <span
                   className={
                     homeActive
-                      ? "flex h-9 w-9 items-center justify-center rounded-full bg-[#005CA9]"
+                      ? "flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600"
                       : "flex h-9 w-9 items-center justify-center"
                   }
                 >
                   <Icon active={active} />
                 </span>
-                <span className={active ? "font-semibold text-[#005CA9]" : "text-[#6B7C86]"}>{tab.label}</span>
+                <span className={active ? "font-semibold text-emerald-400" : "text-zinc-500"}>{tab.label}</span>
               </Link>
             );
           })}
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
-            className="flex flex-col items-center gap-0.5 text-[11px] text-[#6B7C86]"
+            className="flex flex-col items-center gap-0.5 text-[11px] text-zinc-500"
           >
             <span className="flex h-9 w-9 items-center justify-center">
               <MenuIcon />

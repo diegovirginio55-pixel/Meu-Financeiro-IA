@@ -89,7 +89,7 @@ export function InstallAppButton({ variant = "dark" }: { variant?: "dark" | "lig
             ? "text-sm text-emerald-400 hover:text-emerald-300"
             : dark
               ? "mt-4 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:border-emerald-500"
-              : "w-full rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-100"
+              : "w-full rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-800"
         }
       >
         Instalar aplicativo
