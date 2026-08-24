@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import type { BankConnection } from "@/lib/finance/types";
+import { formatCurrency } from "@/lib/finance/format";
+import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 
 const PluggyConnect = dynamic(
   () => import("react-pluggy-connect").then((mod) => mod.PluggyConnect),
@@ -24,10 +25,56 @@ function formatDateTime(value: string | null) {
   return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+function ConnectionAssets({ connection }: { connection: BankConnectionWithAssets }) {
+  const hasAssets =
+    connection.accounts.length > 0 ||
+    connection.cards.length > 0 ||
+    connection.investments.length > 0;
+
+  if (!hasAssets) {
+    return (
+      <p className="mt-3 border-t border-zinc-800 pt-3 text-xs text-zinc-500">
+        Nenhuma conta importada ainda. Clique em Sincronizar agora para trazer saldo, cartões e
+        investimentos.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="mt-3 flex flex-col gap-2 border-t border-zinc-800 pt-3">
+      {connection.accounts.map((account) => (
+        <li key={account.id} className="flex items-center justify-between text-sm">
+          <span className="text-zinc-300">🏦 {account.name}</span>
+          <span className="font-medium text-zinc-50">{formatCurrency(Number(account.balance))}</span>
+        </li>
+      ))}
+      {connection.cards.map((card) => (
+        <li key={card.id} className="flex items-center justify-between text-sm">
+          <span className="text-zinc-300">💳 {card.name}</span>
+          <span className="font-medium text-red-400">
+            Fatura {formatCurrency(Number(card.current_invoice))}
+          </span>
+        </li>
+      ))}
+      {connection.investments.map((investment) => (
+        <li key={investment.id} className="flex items-center justify-between text-sm">
+          <span className="text-zinc-300">
+            📈 {investment.name}
+            {investment.type ? <span className="text-zinc-500"> · {investment.type}</span> : null}
+          </span>
+          <span className="font-medium text-emerald-400">
+            {formatCurrency(Number(investment.amount))}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function BancosClient({
   initialConnections,
 }: {
-  initialConnections: BankConnection[];
+  initialConnections: BankConnectionWithAssets[];
 }) {
   const router = useRouter();
   const [connections, setConnections] = useState(initialConnections);
@@ -78,7 +125,6 @@ export default function BancosClient({
       });
     } finally {
       await refreshConnections();
-      router.push("/dashboard");
     }
   }
 
@@ -142,45 +188,45 @@ export default function BancosClient({
             };
             const isBusy = syncingId === connection.id;
             return (
-              <div
-                key={connection.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4"
-              >
-                <div className="flex items-center gap-3">
-                  {connection.institution_image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={connection.institution_image_url}
-                      alt=""
-                      className="h-9 w-9 rounded-full bg-white object-contain p-1"
-                    />
-                  ) : (
-                    <span className="text-2xl">🏦</span>
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-zinc-50">{connection.institution_name}</p>
-                    <p className={`text-xs ${statusInfo.tone}`}>{statusInfo.label}</p>
-                    <p className="text-xs text-zinc-500">
-                      Última sincronização: {formatDateTime(connection.last_synced_at)}
-                    </p>
+              <div key={connection.id} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    {connection.institution_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={connection.institution_image_url}
+                        alt=""
+                        className="h-9 w-9 rounded-full bg-white object-contain p-1"
+                      />
+                    ) : (
+                      <span className="text-2xl">🏦</span>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-zinc-50">{connection.institution_name}</p>
+                      <p className={`text-xs ${statusInfo.tone}`}>{statusInfo.label}</p>
+                      <p className="text-xs text-zinc-500">
+                        Última sincronização: {formatDateTime(connection.last_synced_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSync(connection.id)}
+                      disabled={isBusy}
+                      className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      {isBusy ? "…" : "Sincronizar agora"}
+                    </button>
+                    <button
+                      onClick={() => handleDisconnect(connection.id)}
+                      disabled={isBusy}
+                      className="rounded-full border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-950/50 disabled:opacity-50"
+                    >
+                      Desconectar
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleSync(connection.id)}
-                    disabled={isBusy}
-                    className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50"
-                  >
-                    {isBusy ? "…" : "Sincronizar agora"}
-                  </button>
-                  <button
-                    onClick={() => handleDisconnect(connection.id)}
-                    disabled={isBusy}
-                    className="rounded-full border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-950/50 disabled:opacity-50"
-                  >
-                    Desconectar
-                  </button>
-                </div>
+                <ConnectionAssets connection={connection} />
               </div>
             );
           })}

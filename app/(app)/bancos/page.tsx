@@ -1,15 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import BancosClient from "@/components/bancos/BancosClient";
-import type { BankConnection } from "@/lib/finance/types";
+import { getBankConnectionsWithAssets } from "@/lib/finance/bank-connections";
 
 export const dynamic = "force-dynamic";
 
 export default async function BancosPage() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("bank_connections")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const connections = await getBankConnectionsWithAssets(supabase);
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,12 +46,13 @@ export default async function BancosPage() {
           </li>
           <li>
             Volte aqui e clique em <strong>Conectar Meu Pluggy</strong>. Autorize com a mesma conta.
-            Se tiver vários bancos no Meu Pluggy, repita uma vez por banco.
+            Se tiver vários bancos no Meu Pluggy, clique em <strong>Conectar Meu Pluggy</strong> de novo
+            e autorize o próximo banco (uma vez por instituição).
           </li>
         </ol>
       </div>
 
-      <BancosClient initialConnections={(data ?? []) as BankConnection[]} />
+      <BancosClient initialConnections={connections} />
     </div>
   );
 }

@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pluggyApi } from "./client";
+import {
+  bankFromTransferNumber,
+  inferInstitutionName,
+  isGenericConnectorName,
+  withInstitutionPrefix,
+} from "./institution";
 
 const TRANSACTIONS_LOOKBACK_DAYS = 90;
 
@@ -87,6 +93,19 @@ function investmentLabel(type?: string, subtype?: string | null) {
   return type || "Investimento";
 }
 
+function accountTypeLabel(subtype?: string) {
+  if (subtype === "SAVINGS_ACCOUNT") return "poupanca";
+  return "corrente";
+}
+
+function pluggyAccountName(account: { name?: string; marketingName?: string | null; number?: string | null }) {
+  const base = account.marketingName || account.name || "Conta";
+  const digits = account.number?.replace(/\D/g, "") ?? "";
+  const last4 = digits.length >= 4 ? digits.slice(-4) : null;
+  if (last4 && !base.includes(last4)) return `${base} • ${last4}`;
+  return base;
+}
+
 /**
  * Busca contas e extratos mais recentes da Pluggy para uma conexão bancária
  * e grava/atualiza os dados nas tabelas accounts/cards/transactions/investments.
@@ -101,15 +120,28 @@ export async function syncBankConnection(
   const item = await pluggyApi.fetchItem(pluggyItemId);
   const { results: accounts } = await pluggyApi.fetchAccounts(pluggyItemId);
 
+  const institutionName = inferInstitutionName(
+    [
+      ...accounts.map((a) => a.marketingName),
+      ...accounts.map((a) => a.name),
+      ...accounts.map((a) => a.bankData?.transferNumber),
+    ],
+    isGenericConnectorName(item.connector.name) ? "Banco conectado" : item.connector.name,
+  );
+
   for (const account of accounts) {
+    const fromCompe = bankFromTransferNumber(account.bankData?.transferNumber);
+    const institution = fromCompe ?? institutionName;
+    const rawName = pluggyAccountName(account);
+
     if (account.type === "BANK") {
       const { data: accountRow } = await supabase
         .from("accounts")
         .upsert(
           {
             user_id: userId,
-            name: account.name || item.connector.name,
-            type: "corrente",
+            name: withInstitutionPrefix(rawName, institution),
+            type: accountTypeLabel(account.subtype),
             balance: account.balance,
             pluggy_account_id: account.id,
             bank_connection_id: bankConnectionId,
@@ -129,7 +161,7 @@ export async function syncBankConnection(
         .upsert(
           {
             user_id: userId,
-            name: account.name || item.connector.name,
+            name: withInstitutionPrefix(rawName, institution),
             credit_limit: credit?.creditLimit ?? null,
             closing_day: credit?.balanceCloseDate ? new Date(credit.balanceCloseDate).getDate() : null,
             due_day: credit?.balanceDueDate ? new Date(credit.balanceDueDate).getDate() : null,
@@ -156,7 +188,7 @@ export async function syncBankConnection(
     if (active.length > 0) {
       const rows = active.map((inv) => ({
         user_id: userId,
-        name: inv.name || "Investimento",
+        name: withInstitutionPrefix(inv.name || "Investimento", institutionName),
         amount: Number(inv.balance ?? inv.amount ?? 0),
         type: investmentLabel(inv.type, inv.subtype),
         pluggy_investment_id: inv.id,
@@ -189,7 +221,7 @@ export async function syncBankConnection(
   await supabase
     .from("bank_connections")
     .update({
-      institution_name: item.connector.name,
+      institution_name: institutionName,
       institution_image_url: item.connector.imageUrl ?? null,
       status: item.status,
       status_detail: item.statusDetail ? JSON.stringify(item.statusDetail) : null,

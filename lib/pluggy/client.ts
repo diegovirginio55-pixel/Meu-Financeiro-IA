@@ -60,8 +60,14 @@ async function pluggyFetch(path: string, init: RequestInit = {}): Promise<JsonMa
 export type PluggyAccount = {
   id: string;
   type: string;
+  subtype?: string;
   name?: string;
+  marketingName?: string | null;
+  number?: string | null;
   balance: number;
+  bankData?: {
+    transferNumber?: string | null;
+  } | null;
   creditData?: {
     creditLimit?: number | null;
     balanceCloseDate?: string | null;
