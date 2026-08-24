@@ -9,7 +9,7 @@ import { InstallAppButton } from "@/components/pwa/PwaInstall";
 const TABS = [
   { href: "/dashboard", label: "Início", icon: HomeIcon },
   { href: "/detalhes", label: "Extrato", icon: ExtratoIcon },
-  { href: "/fluxo", label: "Pix", icon: PixIcon },
+  { href: "/fluxo", label: "Fluxo", icon: PixIcon },
   { href: "/chat", label: "Chat", icon: ChatIcon },
 ] as const;
 

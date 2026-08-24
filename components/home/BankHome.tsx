@@ -17,18 +17,23 @@ function accountKind(account: Account): string {
   if (haystack.includes("poup") || account.type === "poupanca") return "Poupança";
   if (haystack.includes("corrente")) return "Conta corrente";
   if (haystack.includes("salário") || haystack.includes("salario")) return "Conta salário";
+  if (haystack.includes("cartão") || haystack.includes("cartao") || account.type === "credito") {
+    return "Cartão";
+  }
   return "Conta";
 }
 
-function accountCode(account: Account): string {
+function accountSubtitle(account: Account): string {
+  const kind = accountKind(account);
   const digits = account.name.replace(/\D/g, "");
-  if (digits.length >= 8) {
-    const ag = digits.slice(0, 4);
-    const rest = digits.slice(4);
-    return `Ag. ${ag} CP. ${rest.slice(0, -1)}-${rest.slice(-1)}`;
-  }
-  if (digits.length >= 4) return `CP. ${digits.slice(-4)}`;
-  return account.name.replace(/^.*[·•]\s*/, "").trim() || "Conta conectada";
+  if (digits.length >= 4) return `${kind} •••• ${digits.slice(-4)}`;
+  const cleaned = account.name.replace(/^.*[·•]\s*/, "").trim();
+  return cleaned || kind;
+}
+
+function shortBankName(name: string) {
+  if (name === "Caixa Econômica Federal") return "Caixa";
+  return name;
 }
 
 function isCaixa(name: string) {
@@ -42,10 +47,7 @@ export default function BankHome({
   snapshot: FinancialSnapshot;
   connections: BankConnectionWithAssets[];
 }) {
-  const caixa = connections.find((connection) =>
-    officialInstitutionName(connection.institution_name).toLowerCase().includes("caixa"),
-  );
-  const [connectionId, setConnectionId] = useState(caixa?.id ?? connections[0]?.id ?? "all");
+  const [connectionId, setConnectionId] = useState(connections[0]?.id ?? "all");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [hidden, setHidden] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -57,16 +59,13 @@ export default function BankHome({
 
   const accounts = selected?.accounts ?? snapshot.accounts;
   const currentAccount =
-    accounts.find((account) => account.id === accountId) ??
-    accounts.find((account) => accountKind(account) === "Poupança") ??
-    accounts[0] ??
-    null;
+    accounts.find((account) => account.id === accountId) ?? accounts[0] ?? null;
 
   const bankName = officialInstitutionName(selected?.institution_name ?? "Meu Financeiro");
   const brand = getBankBrand(bankName);
   const header = isCaixa(bankName) ? CAIXA_BLUE : (brand?.bg ?? CAIXA_BLUE);
   const balance = currentAccount ? Number(currentAccount.balance) : snapshot.totalBalance;
-  const title = currentAccount ? accountKind(currentAccount) : "Contas";
+  const title = shortBankName(bankName);
 
   if (connections.length === 0) {
     return (
@@ -96,7 +95,7 @@ export default function BankHome({
             <span>
               <span className="block text-[22px] font-bold leading-none tracking-tight">{title}</span>
               <span className="mt-1 flex items-center gap-1 text-[12px] font-medium text-white/90">
-                {currentAccount ? accountCode(currentAccount) : "Selecione uma conta"}
+                {currentAccount ? accountSubtitle(currentAccount) : "Toque para escolher a conta"}
                 <ChevronDown />
               </span>
             </span>
@@ -143,7 +142,7 @@ export default function BankHome({
               className="flex w-full flex-col rounded-xl px-2 py-2 text-left text-sm hover:bg-zinc-100"
             >
               <span className="font-medium text-zinc-800">{accountKind(account)}</span>
-              <span className="text-xs text-zinc-500">{accountCode(account)}</span>
+              <span className="text-xs text-zinc-500">{accountSubtitle(account)}</span>
             </button>
           ))}
         </div>
@@ -152,7 +151,7 @@ export default function BankHome({
       <section className="relative z-10 mx-4 -mt-[52px] rounded-[18px] bg-white px-5 py-4 shadow-[0_10px_28px_rgba(16,60,90,0.12)]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[13px] text-[#8A97A0]">Saldo atual</p>
+            <p className="text-[13px] text-[#8A97A0]">Saldo {currentAccount ? accountKind(currentAccount).toLowerCase() : "total"}</p>
             <p className="mt-1 text-[30px] font-semibold leading-none tracking-wide text-[#1A1A1A]">
               {hidden ? (
                 <span className="inline-flex items-baseline gap-1.5">
@@ -176,39 +175,39 @@ export default function BankHome({
         <Link href="/bancos" className="mt-4 flex items-center gap-3 border-t border-[#EEF1F3] pt-3">
           <OpenFinanceIcon />
           <span className="flex-1 text-[13px] font-medium leading-snug text-[#005CA9]">
-            Conecte outras contas via Open Finance
+            Conectar outro banco
           </span>
           <span className="text-lg text-[#005CA9]">›</span>
         </Link>
       </section>
 
       <section className="mx-4 mt-3.5 grid grid-cols-3 gap-2.5">
-        <QuickAction href="/visao" label="Pegar emprestado">
-          <LoanIcon color={header} />
-        </QuickAction>
-        <QuickAction href="/fluxo" label="Pagar conta">
+        <QuickAction href="/detalhes" label="Extrato">
           <BarcodeIcon color={header} />
         </QuickAction>
-        <QuickAction href="/fluxo" label="Fazer Pix">
-          <PixMark color={header} />
+        <QuickAction href="/fluxo" label="Fluxo">
+          <LoanIcon color={header} />
+        </QuickAction>
+        <QuickAction href="/chat" label="Chat IA">
+          <ChatQuickIcon color={header} />
         </QuickAction>
       </section>
 
       <section className="mx-4 mt-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[18px] font-bold text-[#2C3A42]">Serviços</h2>
+          <h2 className="text-[18px] font-bold text-[#2C3A42]">Atalhos</h2>
           <Link href="/visao" className="text-[13px] font-medium text-[#005CA9]">
-            Mostrar todos &gt;
+            Ver gráficos &gt;
           </Link>
         </div>
         <div className="grid grid-cols-3 gap-2.5">
           {[
-            { href: "/bancos", label: "Minha conta", icon: "logo" },
+            { href: "/bancos", label: "Bancos", icon: "logo" },
             { href: "/ativos", label: "Investimentos", icon: "chart" },
-            { href: "/visao", label: "Habitação", icon: "home" },
-            { href: "/visao", label: "Cartão de crédito", icon: "card" },
-            { href: "/visao", label: "Empréstimos", icon: "doc" },
-            { href: "/chat", label: "Loterias", icon: "leaf" },
+            { href: "/visao", label: "Gráficos", icon: "home" },
+            { href: "/detalhes", label: "Extrato", icon: "doc" },
+            { href: "/fluxo", label: "Fluxo", icon: "card" },
+            { href: "/chat", label: "Chat IA", icon: "leaf" },
           ].map((item) => (
             <Link
               key={item.label}
@@ -233,13 +232,13 @@ export default function BankHome({
       <section className="mx-4 mt-6">
         <h2 className="mb-3 text-[18px] font-bold text-[#2C3A42]">Destaques</h2>
         <div className="grid grid-cols-2 gap-2.5">
-          <Link href="/visao" className="flex min-h-[148px] flex-col justify-between rounded-[16px] p-4 text-white" style={{ backgroundColor: header }}>
-            <HeartHandIcon />
-            <p className="text-[14px] font-semibold leading-snug">Seguro, consórcio e capitalização</p>
-          </Link>
           <Link href="/chat" className="flex min-h-[148px] flex-col justify-between rounded-[16px] p-4 text-white" style={{ backgroundColor: header }}>
+            <HeartHandIcon />
+            <p className="text-[14px] font-semibold leading-snug">Conversar com a IA sobre seus gastos</p>
+          </Link>
+          <Link href="/ativos" className="flex min-h-[148px] flex-col justify-between rounded-[16px] p-4 text-white" style={{ backgroundColor: header }}>
             <PhoneCheckIcon />
-            <p className="text-[14px] font-semibold leading-snug">Recarga de Celular</p>
+            <p className="text-[14px] font-semibold leading-snug">Ver investimentos e lucro diário</p>
           </Link>
         </div>
       </section>
@@ -354,11 +353,15 @@ function BarcodeIcon({ color }: { color: string }) {
   );
 }
 
-function PixMark({ color }: { color: string }) {
+function ChatQuickIcon({ color }: { color: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-8 w-8" aria-hidden>
-      <path fill={color} d="M12.85 3.4 20.6 11.15a1.2 1.2 0 0 1 0 1.7L12.85 20.6a1.2 1.2 0 0 1-1.7 0L3.4 12.85a1.2 1.2 0 0 1 0-1.7L11.15 3.4a1.2 1.2 0 0 1 1.7 0Z" />
-      <path fill="#fff" d="M12 7.2 14.3 9.5 12 11.8 9.7 9.5 12 7.2Zm4.8 2.9L19.1 12 16.8 14.3 14.5 12l2.3-1.9ZM12 12.2 14.3 14.5 12 16.8 9.7 14.5 12 12.2ZM7.2 10.1 9.5 12 7.2 13.9 4.9 12l2.3-1.9Z" />
+    <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" aria-hidden>
+      <path
+        d="M5 6.5h14a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 19 16.5H11l-4 3v-3H5A1.5 1.5 0 0 1 3.5 15V8A1.5 1.5 0 0 1 5 6.5Z"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
