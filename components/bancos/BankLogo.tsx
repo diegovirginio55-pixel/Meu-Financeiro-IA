@@ -12,10 +12,11 @@ export function BankLogo({
 }: {
   name: string;
   imageUrl?: string | null;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
 }) {
   const brand = getBankBrand(name);
-  const box = size === "sm" ? "h-5 w-5 rounded-md" : "h-11 w-11 rounded-xl";
+  const box =
+    size === "sm" ? "h-5 w-5 rounded-md" : size === "lg" ? "h-9 w-9 rounded-lg" : "h-11 w-11 rounded-xl";
   const logo = brand?.logo;
   const remote = !isGenericPluggyImage(imageUrl) ? imageUrl : null;
 

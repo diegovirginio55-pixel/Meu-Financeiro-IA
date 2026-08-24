@@ -1,4 +1,5 @@
 import LoginForm from "@/components/auth/LoginForm";
+import { InstallAppButton } from "@/components/pwa/PwaInstall";
 
 export default function LoginPage() {
   return (
@@ -14,6 +15,7 @@ export default function LoginPage() {
           </p>
         </div>
         <LoginForm />
+        <InstallAppButton />
       </div>
     </div>
   );

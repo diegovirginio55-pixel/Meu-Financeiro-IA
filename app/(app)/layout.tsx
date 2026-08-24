@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import TabNav from "@/components/nav/TabNav";
-import AutoBankSync from "@/components/bancos/AutoBankSync";
+import AppChrome from "@/components/nav/AppChrome";
 
 export default async function AppLayout({
   children,
@@ -15,13 +14,5 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  return (
-    <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
-      <TabNav />
-      <AutoBankSync />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-        {children}
-      </main>
-    </div>
-  );
+  return <AppChrome>{children}</AppChrome>;
 }
