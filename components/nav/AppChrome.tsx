@@ -9,14 +9,19 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const phone = usePhoneLayout();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {!phone && <TabNav />}
+    <div className="relative min-h-screen bg-zinc-950 text-zinc-100">
+      {!phone && (
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.12),_transparent_60%)]" />
+          <TabNav />
+        </>
+      )}
       <AutoBankSync />
       <main
         className={
           phone
-            ? "mx-auto w-full max-w-lg px-4 pt-4 pb-28"
-            : "mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-24 md:pb-6"
+            ? "relative mx-auto w-full max-w-lg px-4 pt-4 pb-28"
+            : "relative mx-auto w-full max-w-7xl flex-1 px-6 py-8 pb-12 lg:px-8"
         }
       >
         {children}

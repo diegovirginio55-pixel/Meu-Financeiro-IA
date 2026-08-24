@@ -8,7 +8,7 @@ export function MaioresGastos({
   items: FinancialSnapshot["maioresGastos"];
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
       <h2 className="mb-3 text-sm font-medium text-zinc-300">
         🔥 Maiores gastos do mês
       </h2>
@@ -44,7 +44,7 @@ export function ProximasContas({
   saldoPrevisto: number;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-medium text-zinc-300">
           📅 Próximos 30 dias
@@ -89,7 +89,7 @@ export function InvestmentsList({
   investments: FinancialSnapshot["investments"];
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
       <h2 className="mb-3 text-sm font-medium text-zinc-300">📈 Investimentos</h2>
       {investments.length === 0 ? (
         <p className="text-sm text-zinc-500">Nenhum investimento importado ainda.</p>
@@ -120,7 +120,7 @@ export function GoalsProgress({
   if (goals.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
       <h2 className="mb-3 text-sm font-medium text-zinc-300">🎯 Metas</h2>
       <ul className="flex flex-col gap-3">
         {goals.map((g) => {

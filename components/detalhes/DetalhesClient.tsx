@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import TransactionsFilters, { type FiltersState } from "./TransactionsFilters";
 import TransactionsTable from "./TransactionsTable";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
+import { formatCurrency } from "@/lib/finance/format";
+import { HeroAmount, PageHero, PageShell, SoftPanel } from "@/components/ui/page-chrome";
 
 const DEFAULT_FILTERS: FiltersState = {
   period: "mes",
@@ -37,8 +39,6 @@ export default function DetalhesClient() {
   }, []);
 
   useEffect(() => {
-    // setState only happens after the fetch (async, post-await), the linter
-    // can't trace that across the useCallback boundary.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(filters);
   }, [filters, load]);
@@ -64,46 +64,58 @@ export default function DetalhesClient() {
   const totalSaidas = transactions
     .filter((t) => t.type === "saida")
     .reduce((s, t) => s + Number(t.amount), 0);
+  const saldo = totalEntradas - totalSaidas;
 
   return (
-    <div className="flex flex-col gap-4">
-      <TransactionsFilters
-        filters={filters}
-        onChange={setFilters}
-        accounts={accounts}
-        cards={cards}
-      />
+    <PageShell>
+      <PageHero
+        kicker="Extrato"
+        title={<HeroAmount>{formatCurrency(saldo)}</HeroAmount>}
+        subtitle={`${transactions.length} lançamentos neste filtro`}
+      >
+        <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
+          <div
+            className="bg-emerald-400"
+            style={{
+              width: `${totalEntradas + totalSaidas > 0 ? (totalEntradas / (totalEntradas + totalSaidas)) * 100 : 50}%`,
+            }}
+          />
+          <div className="bg-rose-400/80" />
+        </div>
+        <div className="mt-2 flex justify-between text-[11px] text-zinc-500">
+          <span className="text-emerald-300">entradas {formatCurrency(totalEntradas)}</span>
+          <span className="text-rose-300">saídas {formatCurrency(totalSaidas)}</span>
+        </div>
+      </PageHero>
 
-      <div className="flex gap-4 text-sm text-zinc-400">
-        <span>
-          {transactions.length} lançamento(s) · Entradas{" "}
-          <span className="text-emerald-400">
-            {totalEntradas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-          </span>{" "}
-          · Despesas{" "}
-          <span className="text-red-400">
-            {totalSaidas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-          </span>
-        </span>
-      </div>
-
-      {loading ? (
-        <p className="text-sm text-zinc-500">Carregando lançamentos...</p>
-      ) : (
-        <TransactionsTable
-          transactions={transactions}
+      <div className="px-4 lg:px-6">
+        <TransactionsFilters
+          filters={filters}
+          onChange={setFilters}
           accounts={accounts}
           cards={cards}
-          onUpdate={handleUpdate}
-          onDelete={handleDelete}
         />
-      )}
 
-      <p className="text-xs text-zinc-500">
-        Editar aqui corrige a descrição, categoria, valor ou data do
-        lançamento — mas não reajusta automaticamente o saldo da conta ou
-        fatura do cartão.
-      </p>
-    </div>
+        <div className="mt-5">
+          {loading ? (
+            <p className="text-sm text-zinc-500">Carregando lançamentos...</p>
+          ) : (
+            <SoftPanel>
+              <TransactionsTable
+                transactions={transactions}
+                accounts={accounts}
+                cards={cards}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+              />
+            </SoftPanel>
+          )}
+        </div>
+
+        <p className="mt-4 text-xs text-zinc-500">
+          Editar aqui corrige a descrição, categoria, valor ou data — mas não reajusta o saldo da conta.
+        </p>
+      </div>
+    </PageShell>
   );
 }

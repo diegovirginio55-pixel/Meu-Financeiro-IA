@@ -26,21 +26,27 @@ export default function ChatInput({
   }
 
   return (
-    <div className="flex items-end gap-2 border-t border-zinc-800 bg-zinc-950 p-3">
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Conte o que aconteceu... ex: 'gastei 45 no mercado e recebi 2800 de salário'"
-        rows={1}
-        className="flex-1 resize-none rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
-      />
+    <div className="flex items-center gap-2 pb-1">
+      <div className="flex flex-1 items-center gap-3 rounded-full border border-zinc-800 bg-zinc-900/70 px-4 py-2">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm text-zinc-950">
+          ✦
+        </span>
+        <textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="O que você quer saber sobre seu dinheiro?"
+          rows={1}
+          className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+        />
+      </div>
       <button
+        type="button"
         onClick={submit}
         disabled={disabled || !value.trim()}
-        className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-sm font-medium text-zinc-950 disabled:opacity-40"
       >
-        Enviar
+        →
       </button>
     </div>
   );

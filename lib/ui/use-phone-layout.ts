@@ -13,7 +13,9 @@ function computeIsPhone() {
 
 /** No computador (mouse/Chrome desktop) fica false, mesmo com a janela estreita. */
 export function usePhoneLayout() {
-  const [phone, setPhone] = useState(false);
+  const [phone, setPhone] = useState(() =>
+    typeof window === "undefined" ? false : computeIsPhone(),
+  );
 
   useEffect(() => {
     const update = () => setPhone(computeIsPhone());

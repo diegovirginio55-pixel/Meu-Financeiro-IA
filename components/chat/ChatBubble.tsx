@@ -6,10 +6,10 @@ export default function ChatBubble({ message }: { message: ChatUiMessage }) {
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[70%] ${
+        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[70%] lg:max-w-[52%] ${
           isUser
-            ? "bg-emerald-600 text-white"
-            : "bg-zinc-800 text-zinc-100"
+            ? "rounded-2xl rounded-br-md bg-emerald-600 text-white"
+            : "rounded-2xl rounded-bl-md border border-zinc-800 bg-zinc-900/80 text-zinc-100"
         }`}
       >
         {message.pending ? (

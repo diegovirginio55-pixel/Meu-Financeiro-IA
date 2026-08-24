@@ -5,6 +5,7 @@ import ChatBubble from "./ChatBubble";
 import ChatInput from "./ChatInput";
 import type { ChatUiMessage } from "@/lib/finance/chat-types";
 import type { ChatMessageRow } from "@/lib/finance/types";
+import { PageHero, PageShell } from "@/components/ui/page-chrome";
 
 export default function ChatWindow() {
   const [messages, setMessages] = useState<ChatUiMessage[]>([]);
@@ -100,24 +101,27 @@ export default function ChatWindow() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-9.5rem)] flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {loadingHistory ? (
-          <p className="text-center text-sm text-zinc-500">
-            Carregando conversa...
-          </p>
-        ) : messages.length === 0 ? (
-          <div className="mx-auto max-w-md rounded-2xl bg-zinc-800 px-4 py-3 text-sm text-zinc-300">
-            👋 Oi! Sou sua IA financeira. Me conte o que aconteceu:
-            recebimentos, gastos, contas fixas, dívidas... Eu registro tudo e
-            te ajudo a entender sua situação financeira.
-          </div>
-        ) : (
-          messages.map((m) => <ChatBubble key={m.id} message={m} />)
-        )}
-        <div ref={bottomRef} />
+    <PageShell>
+      <PageHero
+        kicker="IA"
+        title="Conversa"
+        subtitle="Pergunte sobre gastos, saldo e investimentos"
+      />
+      <div className="flex h-[calc(100vh-15rem)] flex-col px-4 lg:h-[calc(100vh-17rem)] lg:px-6">
+        <div className="flex-1 space-y-3 overflow-y-auto pb-3">
+          {loadingHistory ? (
+            <p className="text-center text-sm text-zinc-500">Carregando conversa...</p>
+          ) : messages.length === 0 ? (
+            <div className="rounded-3xl border border-zinc-800 bg-zinc-900/70 px-4 py-4 text-sm leading-relaxed text-zinc-300">
+              Oi. Sou sua IA financeira. Conte recebimentos, gastos, contas e dívidas em linguagem natural.
+            </div>
+          ) : (
+            messages.map((m) => <ChatBubble key={m.id} message={m} />)
+          )}
+          <div ref={bottomRef} />
+        </div>
+        <ChatInput disabled={sending} onSend={handleSend} />
       </div>
-      <ChatInput disabled={sending} onSend={handleSend} />
-    </div>
+    </PageShell>
   );
 }

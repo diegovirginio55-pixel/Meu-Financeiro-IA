@@ -7,39 +7,13 @@ import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Investment, InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
-import { buildDailyInvestmentPnl, totalAccumulatedProfit } from "@/lib/finance/investment-pnl";
-import { LucroDiarioChart } from "@/components/ativos/LucroDiarioChart";
+import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
+import { HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
 
 type AssetRow = Investment & {
   bankName: string;
   bankImage: string | null;
 };
-
-function FilterIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-      <path
-        d="M4 6h16M7 12h10M10 18h4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function BriefcaseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-      <path
-        d="M8 7V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1M4 9h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function TrendIcon() {
   return (
@@ -84,7 +58,6 @@ export default function AtivosClient({
 }) {
   const [connectionId, setConnectionId] = useState("all");
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
-  const [chartMode, setChartMode] = useState<"juntos" | "separados" | "ambos">("ambos");
 
   const visibleConnections = useMemo(() => {
     if (connectionId === "all") return connections;
@@ -103,21 +76,6 @@ export default function AtivosClient({
   }, [visibleConnections]);
 
   const total = assets.reduce((sum, asset) => sum + Number(asset.amount), 0);
-  const lucroAcumulado = totalAccumulatedProfit(assets);
-
-  const pnl = useMemo(() => {
-    const investmentIds = new Set(assets.map((asset) => asset.id));
-    return buildDailyInvestmentPnl({
-      connections: visibleConnections,
-      investments: assets,
-      snapshots: snapshots.filter((item) => investmentIds.has(item.investment_id)),
-      transactions: investmentTx.filter(
-        (item) => !item.investment_id || investmentIds.has(item.investment_id),
-      ),
-    });
-  }, [visibleConnections, assets, snapshots, investmentTx]);
-
-  const lucroPeriodo = pnl.series.reduce((sum, point) => sum + Number(point.Total), 0);
 
   const groups = useMemo(() => {
     const map = new Map<string, AssetRow[]>();
@@ -144,103 +102,52 @@ export default function AtivosClient({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-white">Ativos</h1>
-          <p className="mt-2 text-sm text-zinc-400">Seus investimentos e movimentações.</p>
-        </div>
+    <PageShell>
+      <PageHero
+        kicker="Investimentos"
+        title={<HeroAmount>{formatCurrency(total)}</HeroAmount>}
+        subtitle={`${assets.length} ${assets.length === 1 ? "ativo" : "ativos"} na carteira`}
+        trailing={
+          <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
+            <select
+              value={connectionId}
+              onChange={(event) => setConnectionId(event.target.value)}
+              className="bg-transparent outline-none [color-scheme:dark]"
+            >
+              <option value="all">Tudo</option>
+              {connections.map((connection) => (
+                <option key={connection.id} value={connection.id}>
+                  {officialInstitutionName(connection.institution_name)}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+      />
 
-        <label className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-[#141414] px-3 py-2 text-sm text-zinc-200">
-          <span className="text-zinc-500">
-            <FilterIcon />
-          </span>
-          <select
-            value={connectionId}
-            onChange={(event) => setConnectionId(event.target.value)}
-            className="bg-[#141414] text-sm text-zinc-100 outline-none [color-scheme:dark]"
-          >
-            <option value="all">Todas conexões</option>
-            {connections.map((connection) => (
-              <option key={connection.id} value={connection.id}>
-                {officialInstitutionName(connection.institution_name)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
+      <div className="flex flex-col gap-6 px-4 lg:gap-8 lg:px-6">
       {connections.length === 0 ? (
-        <div className="rounded-2xl border border-zinc-800 bg-[#141414] p-6 text-sm text-zinc-500">
+        <p className="text-sm text-zinc-400">
           Nenhum banco conectado ainda.{" "}
-          <Link href="/bancos" className="text-zinc-200 underline">
+          <Link href="/bancos" className="text-emerald-400">
             Conecte na aba Bancos
-          </Link>{" "}
-          para importar a carteira.
-        </div>
+          </Link>
+          .
+        </p>
       ) : (
         <>
-        <section className="rounded-2xl border border-zinc-800 bg-[#141414] p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-medium text-zinc-200">Lucro diário dos investimentos</h2>
-              <p className="mt-1 text-xs text-zinc-500">
-                Total de todos os bancos e o rendimento de cada um nos últimos 30 dias.
-                {pnl.estimated ? " Valores estimados pela taxa do último mês até haver histórico de sincronização." : ""}
-              </p>
-            </div>
-            <div className="flex rounded-full bg-zinc-900 p-0.5 text-[11px]">
-              {(
-                [
-                  ["juntos", "Juntos"],
-                  ["separados", "Por banco"],
-                  ["ambos", "Juntos e separados"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setChartMode(value)}
-                  className={`rounded-full px-2.5 py-1 ${
-                    chartMode === value ? "bg-emerald-600 text-white" : "text-zinc-400"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-zinc-800 px-3 py-2">
-              <p className="text-xs text-zinc-500">Lucro acumulado</p>
-              <p className={`mt-1 text-lg font-semibold ${lucroAcumulado >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                {formatCurrency(lucroAcumulado)}
-              </p>
-            </div>
-            <div className="rounded-xl border border-zinc-800 px-3 py-2">
-              <p className="text-xs text-zinc-500">Lucro no gráfico (30 dias)</p>
-              <p className={`mt-1 text-lg font-semibold ${lucroPeriodo >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                {formatCurrency(lucroPeriodo)}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <LucroDiarioChart data={pnl.series} banks={pnl.banks} mode={chartMode} />
-          </div>
-        </section>
+        <LucroAtivosPanel
+          connections={visibleConnections}
+          investments={assets}
+          snapshots={snapshots}
+          investmentTx={investmentTx}
+        />
 
-        <section className="rounded-2xl border border-zinc-800 bg-[#141414] p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm text-zinc-200">
-              <span className="text-rose-500">
-                <BriefcaseIcon />
-              </span>
-              <span className="font-medium">
-                Carteira ({assets.length} {assets.length === 1 ? "ativo" : "ativos"})
-              </span>
-            </div>
-            <p className="text-lg font-semibold text-emerald-400">{formatCurrency(total)}</p>
-          </div>
+        <section>
+          <SectionLabel action={<span className="text-xs text-emerald-400">{formatCurrency(total)}</span>}>
+            Carteira
+          </SectionLabel>
+          <SoftPanel className="p-4">
 
           {assets.length === 0 ? (
             <p className="mt-6 text-sm text-zinc-500">
@@ -326,9 +233,11 @@ export default function AtivosClient({
               ))}
             </div>
           )}
+          </SoftPanel>
         </section>
         </>
       )}
-    </div>
+      </div>
+    </PageShell>
   );
 }

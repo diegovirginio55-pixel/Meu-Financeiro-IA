@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatCurrency, formatDate } from "@/lib/finance/format";
 import { CATEGORIES, CATEGORY_ICONS } from "@/lib/finance/categories";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
+import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
 
 interface EditableFields {
   description: string;
@@ -39,6 +40,7 @@ export default function TransactionsTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditableFields | null>(null);
   const [saving, setSaving] = useState(false);
+  const phone = usePhoneLayout();
 
   function accountOrCardLabel(t: Transaction) {
     if (t.card_id) return cards.find((c) => c.id === t.card_id)?.name ?? "Cartão";
@@ -75,15 +77,80 @@ export default function TransactionsTable({
   }
 
   if (transactions.length === 0) {
+    return <p className="px-4 py-8 text-center text-sm text-zinc-500">Nenhum lançamento neste filtro.</p>;
+  }
+
+  if (phone) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center text-sm text-zinc-500">
-        Nenhum lançamento encontrado para esses filtros.
+      <div className="flex flex-col">
+        {transactions.map((t, index) => {
+          const isEditing = editingId === t.id;
+          return (
+            <div key={t.id} className={`px-4 py-3 ${index > 0 ? "border-t border-zinc-800" : ""}`}>
+              {isEditing && draft ? (
+                <div className="flex flex-col gap-2">
+                  <input
+                    value={draft.description}
+                    onChange={(e) => setDraft((d) => d && { ...d, description: e.target.value })}
+                    className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      value={draft.date}
+                      onChange={(e) => setDraft((d) => d && { ...d, date: e.target.value })}
+                      className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={draft.amount}
+                      onChange={(e) => setDraft((d) => d && { ...d, amount: e.target.value })}
+                      className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => saveEdit(t.id)}
+                      disabled={saving}
+                      className="rounded-full bg-white px-4 py-1.5 text-xs font-medium text-zinc-950"
+                    >
+                      Salvar
+                    </button>
+                    <button type="button" onClick={cancelEdit} className="text-xs text-zinc-400">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-3">
+                  <button type="button" onClick={() => startEdit(t)} className="min-w-0 text-left">
+                    <span className="block truncate text-sm text-zinc-100">{t.description}</span>
+                    <span className="text-xs text-zinc-500">
+                      {formatDate(t.date)} · {CATEGORY_ICONS[t.category] ?? "🔖"} {t.category}
+                    </span>
+                  </button>
+                  <div className="shrink-0 text-right">
+                    <p className={`text-sm font-medium ${t.type === "entrada" ? "text-emerald-400" : "text-rose-300"}`}>
+                      {t.type === "entrada" ? "+" : "−"}
+                      {formatCurrency(Number(t.amount))}
+                    </p>
+                    <button type="button" onClick={() => onDelete(t.id)} className="text-[11px] text-zinc-500">
+                      excluir
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-800 text-left text-zinc-400">

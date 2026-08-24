@@ -28,7 +28,7 @@ export function FluxoAreaChart({
   data: { dia: string; entradas: number; despesas: number }[];
 }) {
   return (
-    <div className="h-[280px] w-full">
+    <div className="h-[280px] w-full lg:h-[340px]">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
           <defs>
@@ -96,7 +96,7 @@ export function FluxoDonutChart({
   }
 
   return (
-    <div className="h-[220px] w-full">
+    <div className="h-[220px] w-full lg:h-[280px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie

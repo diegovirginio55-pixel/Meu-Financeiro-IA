@@ -62,18 +62,26 @@ function ChatIcon({ active }: { active?: boolean }) {
   );
 }
 
-function MenuIcon() {
+function MenuIcon({ active }: { active?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
-      <path d="M5 7h14M5 12h14M5 17h14" stroke="#71717A" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M5 7h14M5 12h14M5 17h14"
+        stroke={active ? "#10B981" : "#71717A"}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
+
+const MENU_ROUTES = ["/visao", "/ativos", "/bancos"];
 
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuActive = MENU_ROUTES.some((route) => pathname.startsWith(route));
 
   async function handleLogout() {
     const supabase = createClient();
@@ -107,7 +115,7 @@ export default function BottomNav() {
                   {item.label}
                 </Link>
               ))}
-              <InstallAppButton variant="dark" />
+              <InstallAppButton variant="menu" />
               <button
                 type="button"
                 onClick={() => void handleLogout()}
@@ -120,7 +128,7 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-zinc-800 bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-zinc-800 bg-zinc-950/95 pb-[max(0.4rem,env(safe-area-inset-bottom))] backdrop-blur">
         <div className="grid grid-cols-5 px-1 py-1.5">
           {TABS.map((tab) => {
             const active = pathname === tab.href || (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
@@ -144,9 +152,11 @@ export default function BottomNav() {
             className="flex flex-col items-center gap-0.5 text-[11px] text-zinc-500"
           >
             <span className="flex h-9 w-9 items-center justify-center">
-              <MenuIcon />
+              <MenuIcon active={menuActive || menuOpen} />
             </span>
-            Menu
+            <span className={menuActive || menuOpen ? "font-semibold text-emerald-400" : "text-zinc-500"}>
+              Menu
+            </span>
           </button>
         </div>
       </nav>

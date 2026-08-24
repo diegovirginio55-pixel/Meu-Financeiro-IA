@@ -60,14 +60,14 @@ export default function BankHome({
 
   if (connections.length === 0) {
     return (
-      <div className="flex min-h-[70vh] flex-col justify-end pb-8">
+      <div className="flex min-h-[70vh] flex-col justify-end pb-8 lg:justify-center lg:pb-0">
         <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-400">{greeting()}</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white lg:text-6xl">
           Seu dinheiro,
           <br />
           em um só lugar.
         </h1>
-        <p className="mt-4 max-w-xs text-sm leading-relaxed text-zinc-400">
+        <p className="mt-4 max-w-md text-sm leading-relaxed text-zinc-400 lg:text-base">
           Conecte Inter, Nubank ou Caixa para acompanhar patrimônio, gastos e investimentos.
         </p>
         <Link
@@ -81,110 +81,128 @@ export default function BankHome({
   }
 
   return (
-    <div className="-mx-4 pb-6 text-zinc-100">
-      <section className="relative overflow-hidden px-4 pb-7 pt-1">
-        <div className="pointer-events-none absolute -right-16 -top-10 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
+    <div className="-mx-4 pb-6 text-zinc-100 lg:-mx-6">
+      <section className="relative overflow-hidden px-4 pb-7 pt-1 lg:px-6 lg:pb-10">
+        <div className="pointer-events-none absolute -right-16 -top-10 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl lg:h-[22rem] lg:w-[22rem]" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
 
-        <header className="relative flex items-center justify-between">
-          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">
-            {greeting()}
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setHidden((value) => !value)}
-              aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400"
-            >
-              {hidden ? <EyeOffIcon /> : <EyeIcon />}
-            </button>
-            <Link
-              href="/bancos"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400"
-              aria-label="Bancos conectados"
-            >
-              <BanksIcon />
-            </Link>
-          </div>
-        </header>
+        <div className="relative lg:grid lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-16">
+          <div>
+            <header className="flex items-center justify-between">
+              <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">
+                {greeting()}
+              </p>
+              <div className="flex items-center gap-1 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setHidden((value) => !value)}
+                  aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400"
+                >
+                  {hidden ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+                <Link
+                  href="/bancos"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400"
+                  aria-label="Bancos conectados"
+                >
+                  <BanksIcon />
+                </Link>
+              </div>
+            </header>
 
-        <p className="relative mt-8 text-sm text-zinc-500">{bankLabel}</p>
-        <p className="relative mt-1 text-[44px] font-semibold leading-none tracking-tight text-white">
-          {money(hidden, patrimonio)}
-        </p>
-        <p className="relative mt-2 text-xs text-zinc-500">patrimônio líquido</p>
+            <p className="mt-8 text-sm text-zinc-500 lg:mt-10">{bankLabel}</p>
+            <p className="mt-1 text-[44px] font-semibold leading-none tracking-tight text-white lg:text-[64px]">
+              {money(hidden, patrimonio)}
+            </p>
+            <p className="mt-2 text-xs text-zinc-500">patrimônio líquido</p>
 
-        <div className="relative mt-6 flex items-center gap-3 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => setConnectionId("all")}
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[11px] font-medium ${
-              connectionId === "all"
-                ? "bg-white text-zinc-950"
-                : "bg-zinc-900/80 text-zinc-400 ring-1 ring-zinc-800"
-            }`}
-          >
-            Tudo
-          </button>
-          {connections.map((connection) => {
-            const name = officialInstitutionName(connection.institution_name);
-            const active = connection.id === connectionId;
-            return (
+            <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-1">
               <button
-                key={connection.id}
                 type="button"
-                onClick={() => setConnectionId(connection.id)}
-                aria-label={shortBankName(name)}
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-900/80 ${
-                  active ? "ring-2 ring-emerald-400" : "ring-1 ring-zinc-800"
+                onClick={() => setConnectionId("all")}
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[11px] font-medium ${
+                  connectionId === "all"
+                    ? "bg-white text-zinc-950"
+                    : "bg-zinc-900/80 text-zinc-400 ring-1 ring-zinc-800"
                 }`}
               >
-                <BankLogo name={name} imageUrl={connection.institution_image_url} size="sm" />
+                Tudo
               </button>
-            );
-          })}
-        </div>
-
-        {connectionId === "all" && (
-          <div className="relative mt-7">
-            <div className="mb-2 flex items-end justify-between text-xs">
-              <span className="text-emerald-300">{hidden ? "••••" : formatCurrency(snapshot.monthEntradas)}</span>
-              <span className="text-zinc-500">fluxo do mês</span>
-              <span className="text-rose-300">{hidden ? "••••" : formatCurrency(snapshot.monthDespesas)}</span>
+              {connections.map((connection) => {
+                const name = officialInstitutionName(connection.institution_name);
+                const active = connection.id === connectionId;
+                return (
+                  <button
+                    key={connection.id}
+                    type="button"
+                    onClick={() => setConnectionId(connection.id)}
+                    aria-label={shortBankName(name)}
+                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-900/80 ${
+                      active ? "ring-2 ring-emerald-400" : "ring-1 ring-zinc-800"
+                    }`}
+                  >
+                    <BankLogo name={name} imageUrl={connection.institution_image_url} size="sm" />
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
-              <div className="bg-emerald-400" style={{ width: `${inShare}%` }} />
-              <div className="bg-rose-400/80" style={{ width: `${100 - inShare}%` }} />
-            </div>
-            <p className="mt-2 text-center text-[11px] text-zinc-500">
-              {snapshot.economia >= 0 ? "sobrou" : "faltou"}{" "}
-              {hidden ? "••••" : formatCurrency(Math.abs(snapshot.economia))} neste mês
-            </p>
           </div>
-        )}
+
+          <div className="mt-7 lg:mt-0">
+            <div className="mb-3 hidden items-center justify-end gap-2 lg:flex">
+              <button
+                type="button"
+                onClick={() => setHidden((value) => !value)}
+                className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300"
+              >
+                {hidden ? "Mostrar valores" : "Ocultar valores"}
+              </button>
+              <Link
+                href="/bancos"
+                className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300"
+              >
+                Bancos
+              </Link>
+            </div>
+            {connectionId === "all" && (
+              <div>
+                <div className="mb-2 flex items-end justify-between text-xs">
+                  <span className="text-emerald-300">{hidden ? "••••" : formatCurrency(snapshot.monthEntradas)}</span>
+                  <span className="text-zinc-500">fluxo do mês</span>
+                  <span className="text-rose-300">{hidden ? "••••" : formatCurrency(snapshot.monthDespesas)}</span>
+                </div>
+                <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                  <div className="bg-emerald-400" style={{ width: `${inShare}%` }} />
+                  <div className="bg-rose-400/80" style={{ width: `${100 - inShare}%` }} />
+                </div>
+                <p className="mt-2 text-center text-[11px] text-zinc-500">
+                  {snapshot.economia >= 0 ? "sobrou" : "faltou"}{" "}
+                  {hidden ? "••••" : formatCurrency(Math.abs(snapshot.economia))} neste mês
+                </p>
+              </div>
+            )}
+            <Link
+              href="/chat"
+              className="mt-5 flex items-center gap-3 rounded-full border border-zinc-800 bg-zinc-900/70 px-4 py-3"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm text-zinc-950">
+                ✦
+              </span>
+              <span className="flex-1 text-sm text-zinc-400">O que você quer saber sobre seu dinheiro?</span>
+            </Link>
+          </div>
+        </div>
       </section>
 
-      <div className="px-4">
-        <Link
-          href="/chat"
-          className="flex items-center gap-3 rounded-full border border-zinc-800 bg-zinc-900/70 px-4 py-3"
-        >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm text-zinc-950">
-            ✦
-          </span>
-          <span className="flex-1 text-sm text-zinc-400">O que você quer saber sobre seu dinheiro?</span>
-        </Link>
-      </div>
-
-      <section className="mt-8">
-        <div className="mb-3 flex items-baseline justify-between px-4">
+      <section className="mt-2 lg:mt-4">
+        <div className="mb-3 flex items-baseline justify-between px-4 lg:px-6">
           <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">Carteira</h2>
           <Link href="/bancos" className="text-xs text-emerald-400">
             gerenciar
           </Link>
         </div>
-        <div className="flex gap-3 overflow-x-auto px-4 pb-1">
+        <div className="flex gap-3 overflow-x-auto px-4 pb-1 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-6">
           {accounts.map((account) => {
             const connection =
               connections.find((item) => item.id === account.bank_connection_id) ?? selected;
@@ -193,7 +211,7 @@ export default function BankHome({
             return (
               <article
                 key={account.id}
-                className="w-[210px] shrink-0 rounded-3xl p-4"
+                className="w-[210px] shrink-0 rounded-3xl p-4 lg:w-auto"
                 style={{
                   background: brand
                     ? `linear-gradient(160deg, ${brand.bg} 0%, #09090b 78%)`
@@ -211,7 +229,7 @@ export default function BankHome({
           {bankInvestments > 0 && (
             <Link
               href="/ativos"
-              className="w-[210px] shrink-0 rounded-3xl bg-gradient-to-br from-emerald-700 to-zinc-950 p-4"
+              className="w-[210px] shrink-0 rounded-3xl bg-gradient-to-br from-emerald-700 to-zinc-950 p-4 lg:w-auto"
             >
               <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/80">Investido</p>
               <p className="mt-6 text-xs text-white/70">{investments.length} ativos</p>
@@ -224,7 +242,7 @@ export default function BankHome({
             <Link
               key={card.id}
               href="/detalhes"
-              className="w-[210px] shrink-0 rounded-3xl bg-gradient-to-br from-zinc-800 to-zinc-950 p-4 ring-1 ring-zinc-800"
+              className="w-[210px] shrink-0 rounded-3xl bg-gradient-to-br from-zinc-800 to-zinc-950 p-4 ring-1 ring-zinc-800 lg:w-auto"
             >
               <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Fatura</p>
               <p className="mt-6 truncate text-xs text-white/70">{card.name}</p>
@@ -239,8 +257,9 @@ export default function BankHome({
         </div>
       </section>
 
+      <div className="mt-8 px-4 lg:mt-10 lg:grid lg:grid-cols-2 lg:gap-12 lg:px-6">
       {connectionId === "all" && snapshot.gastosPorCategoria.length > 0 && (
-        <section className="mt-8 px-4">
+        <section>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
               Onde foi o dinheiro
@@ -269,7 +288,7 @@ export default function BankHome({
       )}
 
       {connectionId === "all" && snapshot.proximos30Dias.length > 0 && (
-        <section className="mt-8 px-4">
+        <section className="mt-8 lg:mt-0">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
               Próximos 30 dias
@@ -298,6 +317,7 @@ export default function BankHome({
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 }

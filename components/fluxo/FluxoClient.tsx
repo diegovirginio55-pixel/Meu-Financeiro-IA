@@ -14,32 +14,11 @@ import type { Account, BankConnection, Card, Debt, RecurringItem, Transaction } 
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { FluxoAreaChart, FluxoDonutChart } from "@/components/fluxo/FluxoCharts";
 import { assetMatchesBank, connectionBank, realConnectionId } from "@/lib/finance/connection-filter";
+import { HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel, chipClass } from "@/components/ui/page-chrome";
 
 function monthTitle(month: Date): string {
   const raw = format(month, "MMMM 'de' yyyy", { locale: ptBR });
   return raw.charAt(0).toUpperCase() + raw.slice(1);
-}
-
-function FilterIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-      <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function WalletIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-      <path
-        d="M4 8h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path d="M7 8V6.5A2.5 2.5 0 0 1 9.5 4h5A2.5 2.5 0 0 1 17 6.5V8" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="16.5" cy="13" r="1" fill="currentColor" />
-    </svg>
-  );
 }
 
 function ClockIcon() {
@@ -150,59 +129,64 @@ export default function FluxoClient({
     return { list, cardList };
   }, [accounts, cards, connectionId]);
 
-  return (
-    <div className="flex flex-col gap-6 pb-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-white">Fluxo de Caixa</h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Despesas, receitas e movimentações das suas contas.
-          </p>
-        </div>
-        <label className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-[#141414] px-3 py-2 text-sm text-zinc-200">
-          <span className="text-zinc-500">
-            <FilterIcon />
-          </span>
-          <select
-            value={connectionId}
-            onChange={(event) => {
-              setConnectionId(event.target.value);
-              setAccountId("all");
-            }}
-            className="bg-[#141414] text-sm text-zinc-100 outline-none [color-scheme:dark]"
-          >
-            <option value="all">Todas conexões</option>
-            {connections.map((connection) => (
-              <option key={connection.id} value={connection.id}>
-                {officialInstitutionName(connection.institution_name)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+  const economia = entradas - despesas;
 
+  return (
+    <PageShell>
+      <PageHero
+        kicker="Fluxo"
+        title={<HeroAmount>{formatCurrency(economia)}</HeroAmount>}
+        subtitle={`${monthTitle(month)} · entradas menos saídas`}
+        trailing={
+          <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
+            <select
+              value={connectionId}
+              onChange={(event) => {
+                setConnectionId(event.target.value);
+                setAccountId("all");
+              }}
+              className="bg-transparent outline-none [color-scheme:dark]"
+            >
+              <option value="all">Tudo</option>
+              {connections.map((connection) => (
+                <option key={connection.id} value={connection.id}>
+                  {officialInstitutionName(connection.institution_name)}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+      >
+        <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
+          <div
+            className="bg-emerald-400"
+            style={{ width: `${entradas + despesas > 0 ? (entradas / (entradas + despesas)) * 100 : 50}%` }}
+          />
+          <div className="bg-rose-400/80" />
+        </div>
+        <div className="mt-2 flex justify-between text-[11px] text-zinc-500">
+          <span className="text-emerald-300">{formatCurrency(entradas)}</span>
+          <span className="text-rose-300">{formatCurrency(despesas)}</span>
+        </div>
+      </PageHero>
+
+      <div className="flex flex-col gap-6 px-4 pb-2 lg:gap-8 lg:px-6">
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-2xl border border-zinc-800 bg-[#141414] p-4 lg:col-span-2">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-zinc-300">Movimentação do mês</h2>
-            <p className="text-xs text-zinc-500">Entradas vs despesas por dia</p>
-          </div>
+        <SoftPanel className="p-4 lg:col-span-2">
+          <SectionLabel>Movimentação do mês</SectionLabel>
           <FluxoAreaChart data={daily} />
-        </section>
-        <section className="rounded-2xl border border-zinc-800 bg-[#141414] p-4">
-          <h2 className="text-sm font-medium text-zinc-300">Composição das despesas</h2>
+        </SoftPanel>
+        <SoftPanel className="p-4">
+          <SectionLabel>Composição das despesas</SectionLabel>
           <FluxoDonutChart data={categorias} />
-        </section>
+        </SoftPanel>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-zinc-800 bg-[#141414] p-5">
-          <div className="flex items-center gap-2 text-xs font-medium tracking-[0.14em] text-red-400">
-            <WalletIcon />
-            DESPESAS
-          </div>
-          <p className="mt-2 text-3xl font-semibold text-red-400">{formatCurrency(despesas)}</p>
-          <p className="mt-1 text-xs text-zinc-500">Transações categorizadas</p>
+        <SoftPanel className="p-5">
+          <SectionLabel>Despesas</SectionLabel>
+          <p className="text-3xl font-semibold tracking-tight text-rose-300">{formatCurrency(despesas)}</p>
+          <p className="mt-1 text-xs text-zinc-500">por categoria neste mês</p>
           <div className="mt-5 flex flex-col gap-3">
             {categorias.length === 0 ? (
               <p className="text-sm text-zinc-500">Nenhuma despesa neste mês.</p>
@@ -226,9 +210,9 @@ export default function FluxoClient({
               })
             )}
           </div>
-        </section>
+        </SoftPanel>
 
-        <section className="flex min-h-[260px] flex-col rounded-2xl border border-zinc-800 bg-[#141414] p-5">
+        <SoftPanel className="flex min-h-[260px] flex-col p-5">
           {futuras.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center text-center">
               <span className="text-zinc-600">
@@ -239,7 +223,7 @@ export default function FluxoClient({
             </div>
           ) : (
             <>
-              <p className="text-sm font-medium text-zinc-200">Despesas futuras</p>
+              <SectionLabel>Despesas futuras</SectionLabel>
               <ul className="mt-4 flex flex-col gap-2">
                 {futuras.map((item) => (
                   <li key={item.id} className="flex items-center justify-between text-sm">
@@ -252,10 +236,10 @@ export default function FluxoClient({
               </ul>
             </>
           )}
-        </section>
+        </SoftPanel>
       </div>
 
-      <section className="rounded-2xl border border-zinc-800 bg-[#141414] p-4">
+      <SoftPanel className="p-4">
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -310,34 +294,23 @@ export default function FluxoClient({
                 </option>
               ))}
             </select>
-            <div className="flex rounded-full bg-zinc-950 p-1">
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {(
                 [
                   ["todos", "Todos"],
                   ["entrada", "Entradas"],
                   ["saida", "Saídas"],
                 ] as const
-              ).map(([value, label]) => {
-                const active = type === value;
-                const tone =
-                  value === "entrada"
-                    ? "bg-emerald-600 text-white"
-                    : value === "saida"
-                      ? "bg-red-500 text-white"
-                      : "bg-red-500 text-white";
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setType(value)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                      active ? tone : "text-zinc-400 hover:text-zinc-100"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setType(value)}
+                  className={chipClass(type === value)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -369,7 +342,8 @@ export default function FluxoClient({
         {scoped.length > 40 && (
           <p className="mt-2 text-center text-xs text-zinc-500">Mostrando as 40 movimentações mais recentes.</p>
         )}
-      </section>
-    </div>
+      </SoftPanel>
+      </div>
+    </PageShell>
   );
 }

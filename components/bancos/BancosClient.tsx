@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { differenceInCalendarDays, isToday, isYesterday } from "date-fns";
 import { formatCurrency } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
-import { officialInstitutionName } from "@/lib/pluggy/brands";
+import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
+import { PageHero, PageShell, SectionLabel } from "@/components/ui/page-chrome";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { realConnectionId } from "@/lib/finance/connection-filter";
 
@@ -16,31 +17,6 @@ const PluggyConnect = dynamic(
 );
 
 const ACTIVE_STATUSES = new Set(["UPDATED", "UPDATING"]);
-
-function PlugIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-      <path
-        d="M9 7V3M15 7V3M8 11h8v3.5A5.5 5.5 0 0 1 10.5 20H10v3M12 20v3"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function GridIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
 
 function ClockIcon() {
   return (
@@ -71,12 +47,18 @@ function ConnectionCard({
 }) {
   const name = officialInstitutionName(connection.institution_name);
   const active = ACTIVE_STATUSES.has(connection.status);
+  const brand = getBankBrand(name);
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="flex min-h-[168px] flex-col rounded-2xl border border-zinc-800/90 bg-[#141414] p-4 text-left transition-colors hover:border-zinc-700"
+      className="flex min-h-[168px] flex-col rounded-3xl p-4 text-left"
+      style={{
+        background: brand
+          ? `linear-gradient(160deg, ${brand.bg} 0%, #09090b 78%)`
+          : "linear-gradient(160deg, #27272a 0%, #09090b 78%)",
+      }}
     >
       <div className="flex items-start justify-between">
         <BankLogo name={name} imageUrl={connection.institution_image_url} />
@@ -313,47 +295,46 @@ export default function BancosClient({
   }
 
   return (
-    <div className="flex flex-col">
-      <div>
-        <h1 className="text-4xl font-semibold tracking-tight text-white">Bancos</h1>
-        <p className="mt-2 text-sm text-zinc-400">
-          Inter, Caixa e Nubank no Meu Pluggy precisam de uma autorização cada um neste app.
+    <PageShell>
+      <PageHero
+        kicker="Bancos"
+        title={`${connections.length} ${connections.length === 1 ? "conexão" : "conexões"}`}
+        subtitle="Inter, Caixa e Nubank — uma autorização cada um neste app"
+        trailing={
+          hasConnection ? (
+            <button
+              type="button"
+              onClick={() => void handleBringBanks()}
+              disabled={importing || loadingToken}
+              className="rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-950 disabled:opacity-50"
+            >
+              {importing || loadingToken ? "Abrindo…" : "Autorizar"}
+            </button>
+          ) : null
+        }
+      >
+        <p className="text-sm leading-relaxed text-zinc-400">
+          Na janela do Meu Pluggy, toque em Continuar e autorize o banco. O Nubank já fica salvo.
         </p>
-        {hasConnection && (
-          <button
-            type="button"
-            onClick={() => void handleBringBanks()}
-            disabled={importing || loadingToken}
-            className="mt-4 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            {importing || loadingToken ? "Abrindo autorização…" : "Autorizar Inter ou Caixa"}
-          </button>
-        )}
-        <div className="mt-3 rounded-xl border border-zinc-800 bg-[#141414] px-4 py-3 text-sm text-zinc-400">
-          <p className="font-medium text-zinc-200">Essa janela do Meu Pluggy é normal</p>
-          <p className="mt-1">
-            Clique em <span className="text-zinc-200">Continuar</span> e autorize o Inter. Depois clique de novo no
-            botão verde para a Caixa. O Nubank já está salvo.
-          </p>
-        </div>
-      </div>
+      </PageHero>
 
+      <div className="px-4 lg:px-6">
       {error && (
-        <p className="mt-4 rounded-xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>
+        <p className="mb-4 rounded-2xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>
       )}
 
-      <section className="mt-10">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-rose-500">
-            <PlugIcon />
-          </span>
-          <h2 className="text-xs font-medium tracking-[0.18em] text-zinc-400">CONEXÕES</h2>
-          {connections.length > 0 && (
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
-              {activeCount} {activeCount === 1 ? "ativa" : "ativas"}
-            </span>
-          )}
-        </div>
+      <section>
+        <SectionLabel
+          action={
+            connections.length > 0 ? (
+              <span className="text-xs text-emerald-400">
+                {activeCount} {activeCount === 1 ? "ativa" : "ativas"}
+              </span>
+            ) : null
+          }
+        >
+          Conexões
+        </SectionLabel>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {connections.map((connection) => (
@@ -386,13 +367,8 @@ export default function BancosClient({
         </div>
       </section>
 
-      <section className="mt-12">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-rose-500">
-            <GridIcon />
-          </span>
-          <h2 className="text-xs font-medium tracking-[0.18em] text-zinc-400">APPS PARCEIROS</h2>
-        </div>
+      <section className="mt-10">
+        <SectionLabel>Apps parceiros</SectionLabel>
         <div className="flex min-h-[120px] items-center justify-center rounded-2xl border border-zinc-800/80 bg-transparent">
           <p className="text-sm text-zinc-500">Nenhum app parceiro está acessando seus dados.</p>
         </div>
@@ -476,6 +452,7 @@ export default function BancosClient({
           onClose={() => setConnectToken(null)}
         />
       )}
-    </div>
+      </div>
+    </PageShell>
   );
 }

@@ -3,7 +3,7 @@
 import { Area, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatCurrency } from "@/lib/finance/format";
 import { getBankBrand } from "@/lib/pluggy/brands";
-import type { DailyPnlPoint } from "@/lib/finance/investment-pnl";
+import type { DailyPnlPoint, PnlSeriesKey } from "@/lib/finance/investment-pnl";
 
 const tooltipStyle = {
   background: "#141414",
@@ -12,29 +12,49 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
-const FALLBACK_COLORS = ["#60a5fa", "#fbbf24", "#f472b6", "#22d3ee", "#a78bfa", "#fb7185"];
+const FALLBACK_COLORS = [
+  "#34d399",
+  "#60a5fa",
+  "#fbbf24",
+  "#f472b6",
+  "#22d3ee",
+  "#a78bfa",
+  "#fb7185",
+  "#4ade80",
+  "#f97316",
+  "#38bdf8",
+  "#e879f9",
+  "#facc15",
+];
 
-function bankColor(name: string, index: number): string {
-  return getBankBrand(name)?.bg ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+export function seriesColor(key: string, index: number): string {
+  const brand = getBankBrand(key);
+  if (brand) return brand.bg;
+  return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
 }
 
 export function LucroDiarioChart({
   data,
   banks,
-  mode,
+  series,
+  mode = "ambos",
+  height = 280,
 }: {
   data: DailyPnlPoint[];
-  banks: string[];
-  mode: "juntos" | "separados" | "ambos";
+  banks?: string[];
+  series?: PnlSeriesKey[];
+  mode?: "juntos" | "separados" | "ambos";
+  height?: number;
 }) {
+  const lines = series ?? (banks ?? []).map((bank) => ({ key: bank, label: bank }));
   const showTotal = mode !== "separados";
-  const showBanks = mode !== "juntos";
+  const showLines = mode !== "juntos";
   const hasValues = data.some((point) =>
-    [point.Total, ...banks.map((bank) => Number(point[bank] ?? 0))].some((value) => value !== 0),
+    [point.Total, ...lines.map((item) => Number(point[item.key] ?? 0))].some((value) => value !== 0),
   );
 
   return (
-    <div className="relative h-[280px] w-full">
+    <div className="relative w-full" style={{ height }}>
       {!hasValues && (
         <p className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 px-6 text-center text-sm text-zinc-500">
           Ainda não há lucro diário suficiente. Sincronize os bancos para gravar o primeiro dia; o gráfico
@@ -63,11 +83,12 @@ export function LucroDiarioChart({
             contentStyle={tooltipStyle}
             formatter={(value, name) => [formatCurrency(Number(value)), name]}
           />
-          <Legend />
+          {showLines && lines.length <= 12 && <Legend />}
           {showTotal && (
             <Area
               type="monotone"
               dataKey="Total"
+              name="Total"
               stroke="#34d399"
               strokeWidth={2.6}
               fill="url(#lucroTotalFill)"
@@ -75,13 +96,14 @@ export function LucroDiarioChart({
               activeDot={{ r: 4, fill: "#34d399" }}
             />
           )}
-          {showBanks &&
-            banks.map((bank, index) => (
+          {showLines &&
+            lines.map((item, index) => (
               <Line
-                key={bank}
+                key={item.key}
                 type="monotone"
-                dataKey={bank}
-                stroke={bankColor(bank, index)}
+                dataKey={item.key}
+                name={item.label}
+                stroke={seriesColor(item.label, index)}
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}

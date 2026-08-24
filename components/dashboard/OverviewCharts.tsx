@@ -35,7 +35,7 @@ export function SaldoEvolutionChart({
   }));
 
   return (
-    <div className="h-[240px] w-full">
+    <div className="h-[240px] w-full lg:h-[320px]">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
           <defs>
@@ -90,7 +90,7 @@ export function FluxoBarrasChart({
   }));
 
   return (
-    <div className="h-[240px] w-full">
+    <div className="h-[240px] w-full lg:h-[320px]">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="#27272a" strokeDasharray="3 6" vertical={false} />
@@ -122,7 +122,7 @@ export function GastosDonutChart({
   }
 
   return (
-    <div className="h-[240px] w-full">
+    <div className="h-[240px] w-full lg:h-[320px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
