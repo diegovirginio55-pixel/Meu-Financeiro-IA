@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { formatCurrency } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
-import { officialInstitutionName } from "@/lib/pluggy/brands";
+import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
 
 function greeting() {
@@ -16,8 +18,15 @@ function greeting() {
 }
 
 function money(hidden: boolean, value: number) {
-  if (hidden) return "R$ •••••";
+  if (hidden) return "••••••";
   return formatCurrency(value);
+}
+
+function shortBankName(name: string) {
+  const official = officialInstitutionName(name);
+  if (official === "Caixa Econômica Federal") return "Caixa";
+  if (official === "Banco do Brasil") return "BB";
+  return official;
 }
 
 export default function BankHome({
@@ -44,17 +53,27 @@ export default function BankHome({
   const patrimonio = selected
     ? bankBalance + bankInvestments - bankInvoices
     : snapshot.patrimonio;
-  const economia = snapshot.economia;
-  const bankLabel = selected
-    ? officialInstitutionName(selected.institution_name)
-    : "Todos os bancos";
+  const bankLabel = selected ? shortBankName(selected.institution_name) : "visão geral";
+  const monthTotal = snapshot.monthEntradas + snapshot.monthDespesas;
+  const inShare = monthTotal > 0 ? (snapshot.monthEntradas / monthTotal) * 100 : 50;
+  const maxCategory = snapshot.gastosPorCategoria[0]?.total ?? 0;
 
   if (connections.length === 0) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center px-6 text-center">
-        <p className="text-lg font-semibold text-white">Nenhum banco conectado</p>
-        <p className="mt-2 text-sm text-zinc-400">Conecte Inter, Nubank ou Caixa para ver o patrimônio aqui.</p>
-        <Link href="/bancos" className="mt-5 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white">
+      <div className="flex min-h-[70vh] flex-col justify-end pb-8">
+        <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-400">{greeting()}</p>
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
+          Seu dinheiro,
+          <br />
+          em um só lugar.
+        </h1>
+        <p className="mt-4 max-w-xs text-sm leading-relaxed text-zinc-400">
+          Conecte Inter, Nubank ou Caixa para acompanhar patrimônio, gastos e investimentos.
+        </p>
+        <Link
+          href="/bancos"
+          className="mt-8 inline-flex w-fit rounded-full bg-white px-5 py-2.5 text-sm font-medium text-zinc-950"
+        >
           Conectar banco
         </Link>
       </div>
@@ -62,147 +81,218 @@ export default function BankHome({
   }
 
   return (
-    <div className="relative pb-4 text-zinc-100">
-      <div className="pointer-events-none absolute -top-24 right-0 h-56 w-56 rounded-full bg-emerald-500/15 blur-3xl" />
-      <div className="pointer-events-none absolute top-40 -left-16 h-40 w-40 rounded-full bg-violet-500/10 blur-3xl" />
+    <div className="-mx-4 pb-6 text-zinc-100">
+      <section className="relative overflow-hidden px-4 pb-7 pt-1">
+        <div className="pointer-events-none absolute -right-16 -top-10 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
 
-      <header className="relative flex items-start justify-between">
-        <div>
-          <p className="text-sm text-zinc-400">{greeting()}</p>
-          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-white">Meu Financeiro</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setHidden((value) => !value)}
-            className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-300"
-          >
-            {hidden ? "Mostrar" : "Ocultar"}
-          </button>
-          <Link href="/bancos" className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-300">
-            Bancos
-          </Link>
-        </div>
-      </header>
-
-      <div className="relative mt-5 flex gap-2 overflow-x-auto pb-1">
-        <button
-          type="button"
-          onClick={() => setConnectionId("all")}
-          className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${
-            connectionId === "all"
-              ? "bg-white text-zinc-950"
-              : "border border-zinc-800 bg-zinc-900 text-zinc-300"
-          }`}
-        >
-          Tudo
-        </button>
-        {connections.map((connection) => {
-          const name = officialInstitutionName(connection.institution_name);
-          const active = connection.id === connectionId;
-          return (
+        <header className="relative flex items-center justify-between">
+          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">
+            {greeting()}
+          </p>
+          <div className="flex items-center gap-1">
             <button
-              key={connection.id}
               type="button"
-              onClick={() => setConnectionId(connection.id)}
-              className={`flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm ${
-                active ? "bg-white text-zinc-950" : "border border-zinc-800 bg-zinc-900 text-zinc-300"
-              }`}
+              onClick={() => setHidden((value) => !value)}
+              aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400"
             >
-              <BankLogo name={name} imageUrl={connection.institution_image_url} size="sm" />
-              {name === "Caixa Econômica Federal" ? "Caixa" : name}
+              {hidden ? <EyeOffIcon /> : <EyeIcon />}
             </button>
-          );
-        })}
-      </div>
+            <Link
+              href="/bancos"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400"
+              aria-label="Bancos conectados"
+            >
+              <BanksIcon />
+            </Link>
+          </div>
+        </header>
 
-      <section className="relative mt-5 overflow-hidden rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-950 to-emerald-950/40 p-5">
-        <p className="text-sm text-zinc-400">Patrimônio · {bankLabel}</p>
-        <p className="mt-2 text-[34px] font-semibold leading-none tracking-tight text-white">
+        <p className="relative mt-8 text-sm text-zinc-500">{bankLabel}</p>
+        <p className="relative mt-1 text-[44px] font-semibold leading-none tracking-tight text-white">
           {money(hidden, patrimonio)}
         </p>
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <MiniStat label="Contas" value={money(hidden, bankBalance)} />
-          <MiniStat label="Investido" value={money(hidden, bankInvestments)} />
-          <MiniStat
-            label="Mês"
-            value={hidden ? "••••" : formatCurrency(economia)}
-            tone={economia >= 0 ? "good" : "bad"}
-          />
-        </div>
-      </section>
+        <p className="relative mt-2 text-xs text-zinc-500">patrimônio líquido</p>
 
-      <Link
-        href="/chat"
-        className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-800/60 bg-emerald-950/40 px-4 py-3"
-      >
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-lg">✦</span>
-        <span className="flex-1">
-          <span className="block text-sm font-medium text-white">Conversar com a IA</span>
-          <span className="text-xs text-emerald-200/80">Pergunte sobre gastos, saldo e investimentos</span>
-        </span>
-        <span className="text-emerald-300">›</span>
-      </Link>
-
-      <section className="mt-5 grid grid-cols-2 gap-3">
-        <ActionCard href="/detalhes" title="Extrato" subtitle="Lançamentos" />
-        <ActionCard href="/fluxo" title="Fluxo" subtitle="Entradas e saídas" />
-        <ActionCard href="/ativos" title="Investimentos" subtitle={`${investments.length} ativos`} />
-        <ActionCard href="/visao" title="Gráficos" subtitle="Visão do mês" />
-      </section>
-
-      <section className="mt-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-zinc-300">Contas</h2>
-          <Link href="/bancos" className="text-xs text-emerald-400">
-            Gerenciar
-          </Link>
-        </div>
-        <div className="flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70">
-          {accounts.length === 0 ? (
-            <p className="px-4 py-5 text-sm text-zinc-500">Nenhuma conta neste banco.</p>
-          ) : (
-            accounts.map((account, index) => (
-              <div
-                key={account.id}
-                className={`flex items-center justify-between px-4 py-3 ${
-                  index > 0 ? "border-t border-zinc-800" : ""
+        <div className="relative mt-6 flex items-center gap-3 overflow-x-auto pb-1">
+          <button
+            type="button"
+            onClick={() => setConnectionId("all")}
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[11px] font-medium ${
+              connectionId === "all"
+                ? "bg-white text-zinc-950"
+                : "bg-zinc-900/80 text-zinc-400 ring-1 ring-zinc-800"
+            }`}
+          >
+            Tudo
+          </button>
+          {connections.map((connection) => {
+            const name = officialInstitutionName(connection.institution_name);
+            const active = connection.id === connectionId;
+            return (
+              <button
+                key={connection.id}
+                type="button"
+                onClick={() => setConnectionId(connection.id)}
+                aria-label={shortBankName(name)}
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-900/80 ${
+                  active ? "ring-2 ring-emerald-400" : "ring-1 ring-zinc-800"
                 }`}
               >
-                <span className="min-w-0 pr-3">
-                  <span className="block truncate text-sm text-zinc-100">{account.name}</span>
-                  <span className="text-xs text-zinc-500">{account.type || "Conta"}</span>
-                </span>
-                <span className="shrink-0 text-sm font-medium text-emerald-400">
+                <BankLogo name={name} imageUrl={connection.institution_image_url} size="sm" />
+              </button>
+            );
+          })}
+        </div>
+
+        {connectionId === "all" && (
+          <div className="relative mt-7">
+            <div className="mb-2 flex items-end justify-between text-xs">
+              <span className="text-emerald-300">{hidden ? "••••" : formatCurrency(snapshot.monthEntradas)}</span>
+              <span className="text-zinc-500">fluxo do mês</span>
+              <span className="text-rose-300">{hidden ? "••••" : formatCurrency(snapshot.monthDespesas)}</span>
+            </div>
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
+              <div className="bg-emerald-400" style={{ width: `${inShare}%` }} />
+              <div className="bg-rose-400/80" style={{ width: `${100 - inShare}%` }} />
+            </div>
+            <p className="mt-2 text-center text-[11px] text-zinc-500">
+              {snapshot.economia >= 0 ? "sobrou" : "faltou"}{" "}
+              {hidden ? "••••" : formatCurrency(Math.abs(snapshot.economia))} neste mês
+            </p>
+          </div>
+        )}
+      </section>
+
+      <div className="px-4">
+        <Link
+          href="/chat"
+          className="flex items-center gap-3 rounded-full border border-zinc-800 bg-zinc-900/70 px-4 py-3"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm text-zinc-950">
+            ✦
+          </span>
+          <span className="flex-1 text-sm text-zinc-400">O que você quer saber sobre seu dinheiro?</span>
+        </Link>
+      </div>
+
+      <section className="mt-8">
+        <div className="mb-3 flex items-baseline justify-between px-4">
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">Carteira</h2>
+          <Link href="/bancos" className="text-xs text-emerald-400">
+            gerenciar
+          </Link>
+        </div>
+        <div className="flex gap-3 overflow-x-auto px-4 pb-1">
+          {accounts.map((account) => {
+            const connection =
+              connections.find((item) => item.id === account.bank_connection_id) ?? selected;
+            const name = officialInstitutionName(connection?.institution_name ?? account.name);
+            const brand = getBankBrand(name);
+            return (
+              <article
+                key={account.id}
+                className="w-[210px] shrink-0 rounded-3xl p-4"
+                style={{
+                  background: brand
+                    ? `linear-gradient(160deg, ${brand.bg} 0%, #09090b 78%)`
+                    : "linear-gradient(160deg, #27272a 0%, #09090b 78%)",
+                }}
+              >
+                <BankLogo name={name} imageUrl={connection?.institution_image_url} size="sm" />
+                <p className="mt-6 truncate text-xs text-white/70">{account.name}</p>
+                <p className="mt-1 text-xl font-semibold tracking-tight text-white">
                   {money(hidden, Number(account.balance))}
-                </span>
-              </div>
-            ))
+                </p>
+              </article>
+            );
+          })}
+          {bankInvestments > 0 && (
+            <Link
+              href="/ativos"
+              className="w-[210px] shrink-0 rounded-3xl bg-gradient-to-br from-emerald-700 to-zinc-950 p-4"
+            >
+              <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/80">Investido</p>
+              <p className="mt-6 text-xs text-white/70">{investments.length} ativos</p>
+              <p className="mt-1 text-xl font-semibold tracking-tight text-white">
+                {money(hidden, bankInvestments)}
+              </p>
+            </Link>
+          )}
+          {cards.map((card) => (
+            <Link
+              key={card.id}
+              href="/detalhes"
+              className="w-[210px] shrink-0 rounded-3xl bg-gradient-to-br from-zinc-800 to-zinc-950 p-4 ring-1 ring-zinc-800"
+            >
+              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Fatura</p>
+              <p className="mt-6 truncate text-xs text-white/70">{card.name}</p>
+              <p className="mt-1 text-xl font-semibold tracking-tight text-rose-300">
+                {money(hidden, Number(card.current_invoice))}
+              </p>
+            </Link>
+          ))}
+          {accounts.length === 0 && cards.length === 0 && bankInvestments === 0 && (
+            <p className="text-sm text-zinc-500">Nada neste banco ainda.</p>
           )}
         </div>
       </section>
 
-      {snapshot.maioresGastos.length > 0 && connectionId === "all" && (
-        <section className="mt-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-zinc-300">Maiores gastos</h2>
-            <Link href="/detalhes" className="text-xs text-emerald-400">
-              Ver extrato
+      {connectionId === "all" && snapshot.gastosPorCategoria.length > 0 && (
+        <section className="mt-8 px-4">
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
+              Onde foi o dinheiro
+            </h2>
+            <Link href="/visao" className="text-xs text-emerald-400">
+              gráficos
             </Link>
           </div>
-          <div className="flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70">
-            {snapshot.maioresGastos.slice(0, 4).map((item, index) => (
-              <div
-                key={item.id}
-                className={`flex items-center justify-between px-4 py-3 ${index > 0 ? "border-t border-zinc-800" : ""}`}
-              >
-                <span className="min-w-0 pr-3">
-                  <span className="block truncate text-sm text-zinc-100">{item.description}</span>
-                  <span className="text-xs text-zinc-500">{item.category}</span>
-                </span>
-                <span className="shrink-0 text-sm text-red-400">
-                  {hidden ? "••••" : formatCurrency(Number(item.amount))}
-                </span>
+          <div className="space-y-3">
+            {snapshot.gastosPorCategoria.slice(0, 5).map((item) => (
+              <div key={item.category}>
+                <div className="mb-1 flex items-center justify-between text-sm">
+                  <span className="text-zinc-200">{item.category}</span>
+                  <span className="text-zinc-400">{hidden ? "••••" : formatCurrency(item.total)}</span>
+                </div>
+                <div className="h-1 overflow-hidden rounded-full bg-zinc-800">
+                  <div
+                    className="h-full rounded-full bg-emerald-400/80"
+                    style={{ width: `${maxCategory > 0 ? (item.total / maxCategory) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {connectionId === "all" && snapshot.proximos30Dias.length > 0 && (
+        <section className="mt-8 px-4">
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
+              Próximos 30 dias
+            </h2>
+            <Link href="/fluxo" className="text-xs text-emerald-400">
+              fluxo
+            </Link>
+          </div>
+          <div className="relative ml-2 border-l border-zinc-800 pl-4">
+            {snapshot.proximos30Dias.slice(0, 4).map((item) => (
+              <div key={`${item.date}-${item.description}`} className="relative mb-4 last:mb-0">
+                <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-emerald-400" />
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">
+                  {format(parseISO(item.date), "d MMM", { locale: ptBR })}
+                </p>
+                <div className="mt-0.5 flex items-start justify-between gap-3">
+                  <p className="text-sm text-zinc-100">{item.description}</p>
+                  <p className={`shrink-0 text-sm ${item.type === "entrada" ? "text-emerald-400" : "text-rose-300"}`}>
+                    {hidden
+                      ? "••••"
+                      : `${item.type === "entrada" ? "+" : "−"}${formatCurrency(item.amount)}`}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -212,30 +302,38 @@ export default function BankHome({
   );
 }
 
-function MiniStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "good" | "bad";
-}) {
-  const color =
-    tone === "good" ? "text-emerald-400" : tone === "bad" ? "text-red-400" : "text-white";
+function EyeIcon() {
   return (
-    <div className="rounded-2xl bg-black/25 px-2 py-2.5">
-      <p className="text-[11px] text-zinc-400">{label}</p>
-      <p className={`mt-1 truncate text-[13px] font-medium ${color}`}>{value}</p>
-    </div>
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+      <path
+        d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <circle cx="12" cy="12" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
   );
 }
 
-function ActionCard({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
+function EyeOffIcon() {
   return (
-    <Link href={href} className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-      <p className="text-[15px] font-medium text-white">{title}</p>
-      <p className="mt-1 text-xs text-zinc-500">{subtitle}</p>
-    </Link>
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+      <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M9.5 6.3A10.5 10.5 0 0 1 12 5c6 0 9.5 7 9.5 7a16 16 0 0 1-3.2 3.9M6.6 8.2A16 16 0 0 0 2.5 12s3.5 7 9.5 7c1.4 0 2.7-.3 3.8-.8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function BanksIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+      <path d="M4 9.5 12 4l8 5.5V20H4V9.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M8 20v-6h8v6" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
   );
 }
