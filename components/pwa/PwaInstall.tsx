@@ -21,7 +21,7 @@ function isStandalone() {
 export function PwaRoot() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js");
+      void navigator.serviceWorker.register("/sw.js?v=2");
     }
 
     const onPrompt = (event: Event) => {
