@@ -8,6 +8,7 @@ const TABS = [
   { href: "/chat", label: "Conversa com IA", icon: "🤖" },
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/detalhes", label: "Detalhes", icon: "📋" },
+  { href: "/ativos", label: "Ativos", icon: "📈" },
   { href: "/bancos", label: "Bancos", icon: "🏦" },
 ];
 
@@ -30,7 +31,7 @@ export default function TabNav() {
           <span className="hidden sm:inline">Meu Financeiro IA</span>
         </div>
 
-        <nav className="flex items-center gap-1 rounded-full bg-zinc-900 p-1">
+        <nav className="flex max-w-[70%] items-center gap-1 overflow-x-auto rounded-full bg-zinc-900 p-1">
           {TABS.map((tab) => {
             const active = pathname?.startsWith(tab.href);
             return (

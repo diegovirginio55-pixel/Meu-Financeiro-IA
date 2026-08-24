@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { differenceInCalendarDays, isToday, isYesterday } from "date-fns";
 import { formatCurrency } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
-import { brandInitials, getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
+import { officialInstitutionName } from "@/lib/pluggy/brands";
+import { BankLogo } from "@/components/bancos/BankLogo";
 
 const PluggyConnect = dynamic(
   () => import("react-pluggy-connect").then((mod) => mod.PluggyConnect),
@@ -58,43 +59,6 @@ function formatLastSync(value: string | null): string {
   const days = differenceInCalendarDays(new Date(), date);
   if (days < 7) return `Há ${days} dias`;
   return date.toLocaleDateString("pt-BR");
-}
-
-function BankLogo({
-  name,
-  imageUrl,
-}: {
-  name: string;
-  imageUrl: string | null;
-}) {
-  const brand = getBankBrand(name);
-  if (brand) {
-    return (
-      <div
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xs font-bold tracking-tight"
-        style={{ backgroundColor: brand.bg, color: brand.fg }}
-      >
-        {brandInitials(name)}
-      </div>
-    );
-  }
-
-  if (imageUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={imageUrl}
-        alt=""
-        className="h-11 w-11 rounded-xl bg-white object-contain p-1"
-      />
-    );
-  }
-
-  return (
-    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-800 text-sm font-semibold text-zinc-200">
-      {brandInitials(name)}
-    </div>
-  );
 }
 
 function ConnectionCard({
