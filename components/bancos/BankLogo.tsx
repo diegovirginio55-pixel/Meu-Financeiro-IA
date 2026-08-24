@@ -1,5 +1,10 @@
 import { brandInitials, getBankBrand } from "@/lib/pluggy/brands";
 
+function isGenericPluggyImage(url?: string | null) {
+  if (!url) return true;
+  return /pluggy/i.test(url);
+}
+
 export function BankLogo({
   name,
   imageUrl,
@@ -10,12 +15,21 @@ export function BankLogo({
   size?: "sm" | "md";
 }) {
   const brand = getBankBrand(name);
-  const box = size === "sm" ? "h-5 w-5 rounded-md text-[9px]" : "h-11 w-11 rounded-xl text-xs";
+  const box = size === "sm" ? "h-5 w-5 rounded-md" : "h-11 w-11 rounded-xl";
+  const logo = brand?.logo;
+  const remote = !isGenericPluggyImage(imageUrl) ? imageUrl : null;
+
+  if (logo || remote) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={logo ?? remote ?? ""} alt={name} className={`${box} shrink-0 object-cover`} />
+    );
+  }
 
   if (brand) {
     return (
       <div
-        className={`flex shrink-0 items-center justify-center font-bold tracking-tight ${box}`}
+        className={`flex shrink-0 items-center justify-center text-xs font-bold tracking-tight ${box}`}
         style={{ backgroundColor: brand.bg, color: brand.fg }}
       >
         {brandInitials(name)}
@@ -23,15 +37,8 @@ export function BankLogo({
     );
   }
 
-  if (imageUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={imageUrl} alt="" className={`${box} bg-white object-contain p-0.5`} />
-    );
-  }
-
   return (
-    <div className={`flex items-center justify-center bg-zinc-800 font-semibold text-zinc-200 ${box}`}>
+    <div className={`flex items-center justify-center bg-zinc-800 text-xs font-semibold text-zinc-200 ${box}`}>
       {brandInitials(name)}
     </div>
   );

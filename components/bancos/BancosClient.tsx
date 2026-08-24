@@ -315,7 +315,7 @@ export default function BancosClient({
   return (
     <div className="flex flex-col">
       <div>
-        <h1 className="text-4xl font-semibold tracking-tight text-white">Data Passport</h1>
+        <h1 className="text-4xl font-semibold tracking-tight text-white">Bancos</h1>
         <p className="mt-2 text-sm text-zinc-400">
           Inter, Caixa e Nubank no Meu Pluggy precisam de uma autorização cada um neste app.
         </p>

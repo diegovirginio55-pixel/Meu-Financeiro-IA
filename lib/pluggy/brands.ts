@@ -2,15 +2,21 @@ export type BankBrand = {
   bg: string;
   fg: string;
   label: string;
+  logo?: string;
 };
 
 const BRANDS: Record<string, BankBrand> = {
-  Nubank: { bg: "#820AD1", fg: "#FFFFFF", label: "Nubank" },
-  Inter: { bg: "#FF7A00", fg: "#FFFFFF", label: "Inter" },
-  Caixa: { bg: "#1074B2", fg: "#FFFFFF", label: "Caixa Econômica Federal" },
-  "Caixa Econômica Federal": { bg: "#1074B2", fg: "#FFFFFF", label: "Caixa Econômica Federal" },
-  Itaú: { bg: "#EC7000", fg: "#FFFFFF", label: "Itaú" },
-  "Banco do Brasil": { bg: "#F9DD16", fg: "#003DA5", label: "Banco do Brasil" },
+  Nubank: { bg: "#820AD1", fg: "#FFFFFF", label: "Nubank", logo: "/bancos/nubank.svg" },
+  Inter: { bg: "#FF7A00", fg: "#FFFFFF", label: "Inter", logo: "/bancos/inter.svg" },
+  Caixa: { bg: "#1074B2", fg: "#FFFFFF", label: "Caixa Econômica Federal", logo: "/bancos/caixa.svg" },
+  "Caixa Econômica Federal": {
+    bg: "#1074B2",
+    fg: "#FFFFFF",
+    label: "Caixa Econômica Federal",
+    logo: "/bancos/caixa.svg",
+  },
+  Itaú: { bg: "#EC7000", fg: "#FFFFFF", label: "Itaú", logo: "/bancos/itau.svg" },
+  "Banco do Brasil": { bg: "#F9DD16", fg: "#003DA5", label: "Banco do Brasil", logo: "/bancos/bb.svg" },
   Bradesco: { bg: "#CC092F", fg: "#FFFFFF", label: "Bradesco" },
   Santander: { bg: "#EC0000", fg: "#FFFFFF", label: "Santander" },
   "C6 Bank": { bg: "#222222", fg: "#FFFFFF", label: "C6 Bank" },
