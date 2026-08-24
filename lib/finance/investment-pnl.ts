@@ -1,5 +1,6 @@
 import { eachDayOfInterval, format, subDays } from "date-fns";
 import type { BankConnection, Investment, InvestmentSnapshot, InvestmentTxn } from "./types";
+import { institutionFromAssetName, realConnectionId } from "./connection-filter";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 
 export type DailyPnlPoint = {
@@ -26,17 +27,28 @@ export function buildDailyInvestmentPnl({
   transactions: InvestmentTxn[];
   days?: number;
 }): { series: DailyPnlPoint[]; banks: string[]; estimated: boolean } {
-  const bankName = (connectionId: string | null) => {
-    const connection = connections.find((item) => item.id === connectionId);
+  const fallbackByConnection = (connectionId: string | null) => {
+    const connection = connections.find(
+      (item) => item.id === connectionId || realConnectionId(item.id) === connectionId,
+    );
     return officialInstitutionName(connection?.institution_name ?? "Outros");
+  };
+
+  const bankOfInvestment = (investment: Investment) =>
+    institutionFromAssetName(investment.name, fallbackByConnection(investment.bank_connection_id ?? null));
+
+  const bankName = (connectionId: string | null, investmentId?: string | null) => {
+    const investment = investments.find((item) => item.id === investmentId);
+    if (investment) return bankOfInvestment(investment);
+    return fallbackByConnection(connectionId);
   };
 
   const banks = Array.from(
     new Set(
       [
-        ...investments.map((item) => bankName(item.bank_connection_id ?? null)),
-        ...snapshots.map((item) => bankName(item.bank_connection_id)),
-        ...transactions.map((item) => bankName(item.bank_connection_id)),
+        ...investments.map((item) => bankOfInvestment(item)),
+        ...snapshots.map((item) => bankName(item.bank_connection_id, item.investment_id)),
+        ...transactions.map((item) => bankName(item.bank_connection_id, item.investment_id)),
       ].filter(Boolean),
     ),
   );
@@ -71,12 +83,12 @@ export function buildDailyInvestmentPnl({
       for (let i = 1; i < ordered.length; i += 1) {
         const prev = Number(ordered[i - 1].amount_profit ?? 0);
         const current = Number(ordered[i].amount_profit ?? 0);
-        add(toDateKey(ordered[i].snapshot_date), bankName(ordered[i].bank_connection_id), current - prev);
+        add(toDateKey(ordered[i].snapshot_date), bankName(ordered[i].bank_connection_id, ordered[i].investment_id), current - prev);
       }
     });
   } else if (interest.length > 0) {
     interest.forEach((item) => {
-      add(toDateKey(item.date), bankName(item.bank_connection_id), Number(item.amount));
+      add(toDateKey(item.date), bankName(item.bank_connection_id, item.investment_id), Number(item.amount));
     });
   } else if (canDiffSnapshots) {
     byInvestment.forEach((list) => {
@@ -84,7 +96,7 @@ export function buildDailyInvestmentPnl({
       for (let i = 1; i < ordered.length; i += 1) {
         const prev = Number(ordered[i - 1].amount);
         const current = Number(ordered[i].amount);
-        add(toDateKey(ordered[i].snapshot_date), bankName(ordered[i].bank_connection_id), current - prev);
+        add(toDateKey(ordered[i].snapshot_date), bankName(ordered[i].bank_connection_id, ordered[i].investment_id), current - prev);
       }
     });
   }
@@ -103,7 +115,7 @@ export function buildDailyInvestmentPnl({
             ? profit / days
             : 0;
       if (perDay === 0) return;
-      const bank = bankName(investment.bank_connection_id ?? null);
+      const bank = bankOfInvestment(investment);
       interval.forEach((day) => add(format(day, "yyyy-MM-dd"), bank, perDay));
     });
   }

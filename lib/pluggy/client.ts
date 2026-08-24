@@ -117,16 +117,35 @@ export const pluggyApi = {
   async createConnectToken(options: {
     clientUserId: string;
     webhookUrl?: string;
+    oauthRedirectUri?: string;
     avoidDuplicates?: boolean;
+    itemId?: string;
   }) {
+    const payload: Record<string, unknown> = {
+      options: {
+        clientUserId: options.clientUserId,
+        webhookUrl: options.webhookUrl,
+        oauthRedirectUri: options.oauthRedirectUri,
+        avoidDuplicates: options.avoidDuplicates ?? true,
+      },
+    };
+    if (options.itemId) payload.itemId = options.itemId;
+
     const body = await pluggyFetch("/connect_token", {
       method: "POST",
-      body: JSON.stringify({ options }),
+      body: JSON.stringify(payload),
     });
     if (typeof body.accessToken !== "string") {
       throw new Error("A Pluggy não devolveu um connect token.");
     }
     return { accessToken: body.accessToken };
+  },
+
+  async patchItem(itemId: string, payload: Record<string, unknown>) {
+    return pluggyFetch(`/items/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
   },
 
   async fetchItem(itemId: string) {

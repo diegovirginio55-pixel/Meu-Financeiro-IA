@@ -106,15 +106,13 @@ export default function AtivosClient({
   const lucroAcumulado = totalAccumulatedProfit(assets);
 
   const pnl = useMemo(() => {
-    const visibleIds = new Set(visibleConnections.map((connection) => connection.id));
+    const investmentIds = new Set(assets.map((asset) => asset.id));
     return buildDailyInvestmentPnl({
       connections: visibleConnections,
       investments: assets,
-      snapshots: snapshots.filter(
-        (item) => !item.bank_connection_id || visibleIds.has(item.bank_connection_id),
-      ),
+      snapshots: snapshots.filter((item) => investmentIds.has(item.investment_id)),
       transactions: investmentTx.filter(
-        (item) => !item.bank_connection_id || visibleIds.has(item.bank_connection_id),
+        (item) => !item.investment_id || investmentIds.has(item.investment_id),
       ),
     });
   }, [visibleConnections, assets, snapshots, investmentTx]);

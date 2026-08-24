@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { pluggyApi } from "@/lib/pluggy/client";
 import { syncBankConnection } from "@/lib/pluggy/sync";
+import { realConnectionId } from "@/lib/finance/connection-filter";
 
 async function loadOwnedConnection(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -11,7 +12,7 @@ async function loadOwnedConnection(
   const { data } = await supabase
     .from("bank_connections")
     .select("*")
-    .eq("id", id)
+    .eq("id", realConnectionId(id))
     .eq("user_id", userId)
     .single();
   return data;

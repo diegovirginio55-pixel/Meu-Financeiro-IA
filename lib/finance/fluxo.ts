@@ -1,4 +1,5 @@
 import type { Account, Card, Debt, RecurringItem, Transaction } from "./types";
+import { assetMatchesBank, connectionBank, realConnectionId } from "./connection-filter";
 
 export function isGasto(transaction: Transaction): boolean {
   return transaction.type === "saida" && transaction.category !== "Investimentos";
@@ -11,9 +12,13 @@ export function belongsToConnection(
   cards: Card[],
 ): boolean {
   if (connectionId === "all") return true;
+  const realId = realConnectionId(connectionId);
+  const bank = connectionBank(connectionId);
   const account = accounts.find((item) => item.id === transaction.account_id);
   const card = cards.find((item) => item.id === transaction.card_id);
-  return account?.bank_connection_id === connectionId || card?.bank_connection_id === connectionId;
+  const asset = account ?? card;
+  if (!asset || asset.bank_connection_id !== realId) return false;
+  return assetMatchesBank(asset.name, bank);
 }
 
 export type FutureExpense = {

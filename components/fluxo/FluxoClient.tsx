@@ -13,6 +13,7 @@ import {
 import type { Account, BankConnection, Card, Debt, RecurringItem, Transaction } from "@/lib/finance/types";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { FluxoAreaChart, FluxoDonutChart } from "@/components/fluxo/FluxoCharts";
+import { assetMatchesBank, connectionBank, realConnectionId } from "@/lib/finance/connection-filter";
 
 function monthTitle(month: Date): string {
   const raw = format(month, "MMMM 'de' yyyy", { locale: ptBR });
@@ -134,12 +135,18 @@ export default function FluxoClient({
   );
 
   const visibleAccounts = useMemo(() => {
-    const list = accounts.filter((account) =>
-      connectionId === "all" ? true : account.bank_connection_id === connectionId,
-    );
-    const cardList = cards.filter((card) =>
-      connectionId === "all" ? true : card.bank_connection_id === connectionId,
-    );
+    const realId = connectionId === "all" ? null : realConnectionId(connectionId);
+    const bank = connectionId === "all" ? null : connectionBank(connectionId);
+    const list = accounts.filter((account) => {
+      if (!realId) return true;
+      if (account.bank_connection_id !== realId) return false;
+      return assetMatchesBank(account.name, bank);
+    });
+    const cardList = cards.filter((card) => {
+      if (!realId) return true;
+      if (card.bank_connection_id !== realId) return false;
+      return assetMatchesBank(card.name, bank);
+    });
     return { list, cardList };
   }, [accounts, cards, connectionId]);
 

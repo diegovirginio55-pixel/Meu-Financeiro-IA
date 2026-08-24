@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { differenceInCalendarDays, isToday, isYesterday } from "date-fns";
@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
+import { realConnectionId } from "@/lib/finance/connection-filter";
 
 const PluggyConnect = dynamic(
   () => import("react-pluggy-connect").then((mod) => mod.PluggyConnect),
@@ -174,7 +175,7 @@ function DetailsPanel({
             disabled={syncing}
             className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {syncing ? "Sincronizando…" : "Sincronizar agora"}
+            {syncing ? "Atualizando…" : "Atualizar agora"}
           </button>
           <button
             type="button"
@@ -203,6 +204,13 @@ export default function BancosClient({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setConnections(initialConnections);
+  }, [initialConnections]);
+
+  const existingItemId = connections[0]?.pluggy_item_id ?? null;
+  const hasConnection = connections.length > 0;
+
   const selected = useMemo(
     () => connections.find((connection) => connection.id === selectedId) ?? null,
     [connections, selectedId],
@@ -222,7 +230,11 @@ export default function BancosClient({
     setError(null);
     setLoadingToken(true);
     try {
-      const res = await fetch("/api/bank/connect-token", { method: "POST" });
+      const res = await fetch("/api/bank/connect-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(existingItemId ? { itemId: existingItemId } : {}),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Falha ao iniciar conexão.");
       setConnectToken(data.accessToken);
@@ -231,7 +243,7 @@ export default function BancosClient({
     } finally {
       setLoadingToken(false);
     }
-  }, []);
+  }, [existingItemId]);
 
   async function handleSuccess(itemData: { item: unknown }) {
     setConnectToken(null);
@@ -247,24 +259,32 @@ export default function BancosClient({
   }
 
   async function handleSync(id: string) {
+    const realId = realConnectionId(id);
     setSyncingId(id);
     setError(null);
     try {
-      const res = await fetch(`/api/bank/connections/${id}`, { method: "POST" });
+      const res = await fetch(`/api/bank/connections/${realId}`, { method: "POST" });
       if (!res.ok) throw new Error("Falha ao sincronizar.");
       await refreshConnections();
     } catch {
-      setError("Não foi possível sincronizar agora. Tente de novo em alguns minutos.");
+      setError("Não foi possível atualizar agora. Tente de novo em alguns minutos.");
     } finally {
       setSyncingId(null);
     }
   }
 
   async function handleDisconnect(id: string) {
-    if (!confirm("Desconectar este banco? As contas/transações já importadas continuam salvas.")) return;
+    if (
+      !confirm(
+        "Desconectar o Meu Pluggy? Nubank, Inter e os outros bancos dessa autorização saem juntos. As contas já importadas continuam salvas.",
+      )
+    ) {
+      return;
+    }
+    const realId = realConnectionId(id);
     setSyncingId(id);
     try {
-      await fetch(`/api/bank/connections/${id}`, { method: "DELETE" });
+      await fetch(`/api/bank/connections/${realId}`, { method: "DELETE" });
       setSelectedId(null);
       await refreshConnections();
     } finally {
@@ -277,35 +297,25 @@ export default function BancosClient({
       <div>
         <h1 className="text-4xl font-semibold tracking-tight text-white">Data Passport</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Conecte, visualize e gerencie suas conexões financeiras.
+          Os bancos ficam salvos. A atualização roda sozinha quando você abre o app.
         </p>
-        <details className="mt-3 text-sm text-zinc-500">
-          <summary className="cursor-pointer text-zinc-400 hover:text-zinc-200">
-            Como conectar sem pagar
-          </summary>
-          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-zinc-500">
+        <div className="mt-3 rounded-xl border border-zinc-800 bg-[#141414] px-4 py-3 text-sm text-zinc-400">
+          <p className="font-medium text-zinc-200">Para conectar o Inter</p>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5">
             <li>
-              Em{" "}
-              <a href="https://meu.pluggy.ai" target="_blank" rel="noreferrer" className="text-zinc-300 underline">
+              Abra{" "}
+              <a href="https://meu.pluggy.ai" target="_blank" rel="noreferrer" className="text-zinc-200 underline">
                 meu.pluggy.ai
               </a>{" "}
-              conecte Inter, Nubank etc.
+              e conecte o Inter (o Nubank já pode estar lá).
             </li>
             <li>
-              Em{" "}
-              <a
-                href="https://dashboard.pluggy.ai/customization"
-                target="_blank"
-                rel="noreferrer"
-                className="text-zinc-300 underline"
-              >
-                dashboard.pluggy.ai/customization
-              </a>{" "}
-              habilite o conector MeuPluggy.
+              Volte aqui e clique em <span className="text-zinc-200">Atualizar bancos</span>. Não crie uma
+              conexão nova — isso gera o erro que você viu.
             </li>
-            <li>Volte aqui e clique em Conectar banco. Uma autorização por instituição.</li>
+            <li>Autorize o Meu Pluggy de novo. O Inter aparece junto, sem apagar o Nubank.</li>
           </ol>
-        </details>
+        </div>
       </div>
 
       {error && (
@@ -344,11 +354,13 @@ export default function BancosClient({
               +
             </div>
             <p className="mt-6 text-[15px] font-semibold text-white">
-              {loadingToken ? "Abrindo…" : "Conectar banco"}
+              {loadingToken ? "Abrindo…" : hasConnection ? "Atualizar bancos" : "Conectar banco"}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">Via Meu Pluggy, sem custo</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              {hasConnection ? "Puxa o Inter e atualiza o Nubank" : "Via Meu Pluggy, sem custo"}
+            </p>
             <span className="mt-auto border-t border-zinc-800 pt-3 text-xs text-zinc-500">
-              Adicionar &gt;
+              {hasConnection ? "Atualizar >" : "Adicionar >"}
             </span>
           </button>
         </div>
@@ -387,7 +399,15 @@ export default function BancosClient({
           theme="dark"
           forceOauthInBrowser
           onSuccess={handleSuccess}
-          onError={() => setError("A conexão com o Meu Pluggy falhou ou foi cancelada.")}
+          onError={(error) => {
+            const text = JSON.stringify(error ?? {});
+            if (/ALREADY_EXISTS|already exists/i.test(text)) {
+              setConnectToken(null);
+              setError(
+                "O Meu Pluggy já está conectado. Feche e use “Atualizar bancos” depois de conectar o Inter em meu.pluggy.ai.",
+              );
+            }
+          }}
           onClose={() => setConnectToken(null)}
         />
       )}

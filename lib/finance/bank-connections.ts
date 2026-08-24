@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Account, BankConnection, Card, Investment } from "./types";
+import { groupedConnectionId, institutionFromAssetName } from "./connection-filter";
 import { inferInstitutionName, isGenericConnectorName } from "@/lib/pluggy/institution";
 
 export type BankConnectionWithAssets = BankConnection & {
@@ -70,5 +71,50 @@ export async function getBankConnectionsWithAssets(
     }
   }
 
-  return result;
+  return splitConnectionsByInstitution(result);
+}
+
+function splitConnectionsByInstitution(connections: BankConnectionWithAssets[]): BankConnectionWithAssets[] {
+  const exploded: BankConnectionWithAssets[] = [];
+
+  for (const connection of connections) {
+    const fallback = connection.institution_name || "Outros";
+    const groups = new Map<string, { accounts: Account[]; cards: Card[]; investments: Investment[] }>();
+
+    function add(
+      kind: "accounts" | "cards" | "investments",
+      item: Account | Card | Investment,
+    ) {
+      const bank = institutionFromAssetName(item.name, fallback);
+      const group = groups.get(bank) ?? { accounts: [], cards: [], investments: [] };
+      (group[kind] as typeof item[]).push(item);
+      groups.set(bank, group);
+    }
+
+    connection.accounts.forEach((item) => add("accounts", item));
+    connection.cards.forEach((item) => add("cards", item));
+    connection.investments.forEach((item) => add("investments", item));
+
+    if (groups.size <= 1) {
+      const only = groups.keys().next().value as string | undefined;
+      exploded.push({
+        ...connection,
+        institution_name: only ?? connection.institution_name,
+      });
+      continue;
+    }
+
+    for (const [bank, assets] of groups) {
+      exploded.push({
+        ...connection,
+        id: groupedConnectionId(connection.id, bank),
+        institution_name: bank,
+        accounts: assets.accounts,
+        cards: assets.cards,
+        investments: assets.investments,
+      });
+    }
+  }
+
+  return exploded;
 }
