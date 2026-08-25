@@ -18,7 +18,6 @@ import {
   YAxis,
 } from "recharts";
 import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/finance/format";
-import { seriesColor } from "@/components/ativos/LucroDiarioChart";
 import { chartTooltipStyle, compactAxis, compactShort } from "@/components/dashboard/chart-theme";
 import type { AssetPnlRow, YieldPoint } from "@/lib/finance/investment-pnl";
 
@@ -231,29 +230,107 @@ export function MixPizzaChart({
   );
 }
 
+function shortenAssetLabel(name: string, max = 26) {
+  const cleaned = name.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= max) return cleaned;
+  return `${cleaned.slice(0, max - 1).trimEnd()}…`;
+}
+
+function LucroAtivoTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: { nome: string; lucro: number } }>;
+}) {
+  if (!active || !payload?.[0]) return null;
+  const row = payload[0].payload;
+  return (
+    <div className="rounded-2xl border border-zinc-700/70 bg-zinc-950 px-3.5 py-2.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+      <p className="max-w-[240px] text-[11px] leading-snug text-zinc-400">{row.nome}</p>
+      <p className={`mt-1 text-sm font-semibold ${row.lucro >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+        {formatCurrency(row.lucro)}
+      </p>
+      <p className="text-[11px] text-zinc-500">lucro em 30 dias</p>
+    </div>
+  );
+}
+
 export function LucroAtivosBarChart({ rows }: { rows: AssetPnlRow[] }) {
-  const chartData = rows.slice(0, 10).map((row, index) => ({
+  const uid = useId().replace(/:/g, "");
+  const chartData = rows.slice(0, 10).map((row) => ({
     nome: row.label,
+    label: shortenAssetLabel(row.label),
     lucro: Math.abs(row.d30) >= 0.005 ? row.d30 : row.accumulated,
-    fill: seriesColor(row.label, index),
   }));
+  const peak = Math.max(...chartData.map((item) => item.lucro), 0);
+  const height = Math.min(360, Math.max(188, chartData.length * 64 + 36));
 
   if (chartData.length === 0) {
     return <p className="flex h-[280px] items-center justify-center text-sm text-zinc-500">Sem lucro no período.</p>;
   }
 
   return (
-    <div className="h-[280px] w-full lg:h-[340px]">
+    <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} layout="vertical" barCategoryGap="18%" margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
-          <CartesianGrid stroke="#27272a" strokeDasharray="4 8" horizontal={false} />
-          <XAxis type="number" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} tickFormatter={compactAxis} />
-          <YAxis type="category" dataKey="nome" stroke="#a1a1aa" fontSize={11} width={118} tickLine={false} axisLine={false} />
-          <Tooltip contentStyle={chartTooltipStyle} formatter={(value) => formatCurrency(Number(value))} />
-          <Bar dataKey="lucro" name="Lucro 30 dias" radius={[0, 10, 10, 0]} maxBarSize={18}>
-            {chartData.map((entry, index) => (
-              <Cell key={`${entry.nome}-${index}`} fill={entry.lucro >= 0 ? "#34d399" : "#fb7185"} />
-            ))}
+        <BarChart
+          data={chartData}
+          layout="vertical"
+          barCategoryGap="28%"
+          margin={{ top: 8, right: 64, left: 4, bottom: 4 }}
+        >
+          <defs>
+            <linearGradient id={`ativoFill-${uid}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#047857" />
+              <stop offset="55%" stopColor="#34d399" />
+              <stop offset="100%" stopColor="#6ee7b7" />
+            </linearGradient>
+            <linearGradient id={`ativoPeak-${uid}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#059669" />
+              <stop offset="45%" stopColor="#6ee7b7" />
+              <stop offset="100%" stopColor="#d1fae5" />
+            </linearGradient>
+            <linearGradient id={`ativoNeg-${uid}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#e11d48" />
+              <stop offset="100%" stopColor="#fda4af" />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#27272a" strokeDasharray="3 10" horizontal={false} strokeOpacity={0.7} />
+          <XAxis
+            type="number"
+            stroke="#a1a1aa"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={compactAxis}
+          />
+          <YAxis
+            type="category"
+            dataKey="label"
+            stroke="#d4d4d8"
+            fontSize={11}
+            width={132}
+            tickLine={false}
+            axisLine={false}
+            interval={0}
+          />
+          <Tooltip cursor={{ fill: "rgba(52, 211, 153, 0.06)" }} content={<LucroAtivoTooltip />} />
+          <Bar dataKey="lucro" name="Lucro 30 dias" radius={[0, 10, 10, 0]} maxBarSize={26}>
+            <LabelList
+              dataKey="lucro"
+              position="right"
+              formatter={(value) => formatCurrency(Number(value))}
+              fill="#d4d4d8"
+              fontSize={11}
+            />
+            {chartData.map((entry, index) => {
+              const fill = entry.lucro < 0
+                ? `url(#ativoNeg-${uid})`
+                : entry.lucro === peak && peak > 0
+                  ? `url(#ativoPeak-${uid})`
+                  : `url(#ativoFill-${uid})`;
+              return <Cell key={`${entry.nome}-${index}`} fill={fill} />;
+            })}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
