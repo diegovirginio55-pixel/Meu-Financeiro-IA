@@ -3,6 +3,7 @@ import { isInvestmentDescription, promoteInvestmentsFromTransactions } from "@/l
 import { inferCategoryFromDescription } from "@/lib/finance/categories";
 import type { Account, Investment } from "@/lib/finance/types";
 import { pluggyApi, pluggyInvestmentAmount, type PluggyAccount, type PluggyInvestment } from "./client";
+import { officialInstitutionName } from "./brands";
 import {
   bankFromLabel,
   inferInstitutionName,
@@ -11,6 +12,8 @@ import {
   singleInstitutionFromAccounts,
   withInstitutionPrefix,
 } from "./institution";
+import { notifyBankMovements } from "@/lib/push/send";
+import type { MovementNotice } from "@/lib/push/payload";
 
 const TRANSACTIONS_LOOKBACK_DAYS = 90;
 
@@ -60,19 +63,37 @@ function toDateOnly(value: Date | string): string {
   return date.toISOString().slice(0, 10);
 }
 
+async function knownPluggyIds(
+  supabase: SupabaseClient,
+  table: "transactions" | "investment_transactions",
+  ids: string[],
+) {
+  const known = new Set<string>();
+  for (let index = 0; index < ids.length; index += 80) {
+    const chunk = ids.slice(index, index + 80);
+    const { data } = await supabase.from(table).select("pluggy_transaction_id").in("pluggy_transaction_id", chunk);
+    for (const row of data ?? []) {
+      if (row.pluggy_transaction_id) known.add(row.pluggy_transaction_id);
+    }
+  }
+  return known;
+}
+
 async function syncTransactionsForAccount(
   supabase: SupabaseClient,
   userId: string,
   pluggyAccountId: string,
   accountId: string | null,
   cardId: string | null,
-) {
+): Promise<MovementNotice[]> {
   const dateFrom = new Date();
   dateFrom.setDate(dateFrom.getDate() - TRANSACTIONS_LOOKBACK_DAYS);
 
   const transactions = await pluggyApi.fetchAllTransactions(pluggyAccountId, toDateOnly(dateFrom));
+  if (transactions.length === 0) return [];
 
-  if (transactions.length === 0) return;
+  const ids = transactions.map((item) => item.id);
+  const already = await knownPluggyIds(supabase, "transactions", ids);
 
   const rows = transactions.map((t) => ({
     user_id: userId,
@@ -88,6 +109,15 @@ async function syncTransactionsForAccount(
   }));
 
   await supabase.from("transactions").upsert(rows, { onConflict: "pluggy_transaction_id" });
+
+  return rows
+    .filter((row) => !already.has(row.pluggy_transaction_id))
+    .map((row) => ({
+      description: row.description,
+      amount: Number(row.amount),
+      type: row.type,
+      date: row.date,
+    }));
 }
 
 const INVESTMENT_TYPE_LABELS: Record<string, string> = {
@@ -209,6 +239,14 @@ export async function syncBankConnection(
   bankConnectionId: string,
   pluggyItemId: string,
 ) {
+  const { data: connectionState } = await supabase
+    .from("bank_connections")
+    .select("last_synced_at")
+    .eq("id", bankConnectionId)
+    .single();
+  const shouldNotify = Boolean(connectionState?.last_synced_at);
+  const newMovements: MovementNotice[] = [];
+
   const item = await pluggyApi.waitForItemIdle(pluggyItemId);
   const { results: accounts } = await pluggyApi.fetchAccounts(pluggyItemId);
   const onlyBank = singleInstitutionFromAccounts(accounts);
@@ -245,7 +283,8 @@ export async function syncBankConnection(
         .select("id")
         .single();
 
-      await syncTransactionsForAccount(supabase, userId, account.id, accountRow?.id ?? null, null);
+      const created = await syncTransactionsForAccount(supabase, userId, account.id, accountRow?.id ?? null, null);
+      newMovements.push(...created);
     } else if (account.type === "CREDIT") {
       const credit = account.creditData;
       const { data: cardRow } = await supabase
@@ -268,7 +307,8 @@ export async function syncBankConnection(
         .select("id")
         .single();
 
-      await syncTransactionsForAccount(supabase, userId, account.id, null, cardRow?.id ?? null);
+      const created = await syncTransactionsForAccount(supabase, userId, account.id, null, cardRow?.id ?? null);
+      newMovements.push(...created);
     }
   }
 
@@ -395,9 +435,21 @@ export async function syncBankConnection(
               description: transaction.description,
             };
           });
+          const ids = txRows.map((row) => row.pluggy_transaction_id).filter(Boolean) as string[];
+          const already = await knownPluggyIds(supabase, "investment_transactions", ids);
           await supabase.from("investment_transactions").upsert(txRows, {
             onConflict: "pluggy_transaction_id",
           });
+          newMovements.push(
+            ...txRows
+              .filter((row) => row.pluggy_transaction_id && !already.has(row.pluggy_transaction_id))
+              .map((row) => ({
+                description: row.description || (row.type === "INTEREST" ? "Rendimento" : row.type === "BUY" ? "Aplicação" : row.type === "SELL" ? "Resgate" : "Investimento"),
+                amount: Math.abs(Number(row.amount)),
+                type: Number(row.amount) >= 0 && row.type !== "BUY" ? "entrada" : "saida",
+                date: row.date,
+              })),
+          );
         } catch (txError) {
           console.error("Erro ao importar movimentações do investimento:", txError);
         }
@@ -438,9 +490,11 @@ export async function syncBankConnection(
     supabase.from("accounts").select("*"),
     supabase.from("investments").select("*"),
   ]);
-  await promoteInvestmentsFromTransactions(
-    supabase,
-    (dbAccounts ?? []) as Account[],
-    (dbInvestments ?? []) as Investment[],
-  );
+  if (shouldNotify && newMovements.length > 0) {
+    try {
+      await notifyBankMovements(userId, officialInstitutionName(institutionName), newMovements);
+    } catch (error) {
+      console.error("Erro ao enviar notificações de movimentação:", error);
+    }
+  }
 }

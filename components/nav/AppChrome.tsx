@@ -4,6 +4,7 @@ import TabNav from "@/components/nav/TabNav";
 import BottomNav from "@/components/nav/BottomNav";
 import AutoBankSync from "@/components/bancos/AutoBankSync";
 import PrefetchTabs from "@/components/nav/PrefetchTabs";
+import { PushEnable } from "@/components/pwa/PushEnable";
 import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       )}
       <PrefetchTabs />
       <AutoBankSync />
+      <PushEnable />
       <main
         className={
           phone
