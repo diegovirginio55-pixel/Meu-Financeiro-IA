@@ -123,7 +123,13 @@ function accountTypeLabel(subtype?: string) {
 }
 
 function pluggyAccountName(account: { name?: string; marketingName?: string | null; number?: string | null }) {
-  const base = account.marketingName || account.name || "Conta";
+  const raw = account.marketingName || account.name || "Conta";
+  const cleaned = raw
+    .replace(/\bCP\b/gi, " ")
+    .replace(/conta\s*principal/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const base = cleaned || "Conta";
   const digits = account.number?.replace(/\D/g, "") ?? "";
   const last4 = digits.length >= 4 ? digits.slice(-4) : null;
   if (last4 && !base.includes(last4)) return `${base} • ${last4}`;

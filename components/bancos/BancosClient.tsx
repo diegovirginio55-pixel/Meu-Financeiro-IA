@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { differenceInCalendarDays, isToday, isYesterday } from "date-fns";
 import { formatCurrency } from "@/lib/finance/format";
+import { friendlyAccountName } from "@/lib/finance/account-name";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 import { PageHero, PageShell, SectionLabel } from "@/components/ui/page-chrome";
@@ -121,7 +122,7 @@ function DetailsPanel({
             <>
               {connection.accounts.map((account) => (
                 <div key={account.id} className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-300">{account.name}</span>
+                  <span className="text-zinc-300">{friendlyAccountName(account.name, account.type)}</span>
                   <span className="font-medium text-white">{formatCurrency(Number(account.balance))}</span>
                 </div>
               ))}

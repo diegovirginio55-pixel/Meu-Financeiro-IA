@@ -1,6 +1,7 @@
 "use client";
 
 import { CATEGORIES } from "@/lib/finance/categories";
+import { friendlyAccountName } from "@/lib/finance/account-name";
 import type { Account, Card } from "@/lib/finance/types";
 import { chipClass } from "@/components/ui/page-chrome";
 
@@ -90,7 +91,7 @@ export default function TransactionsFilters({
           <option value="">Conta</option>
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.name}
+              {friendlyAccountName(a.name, a.type)}
             </option>
           ))}
         </select>

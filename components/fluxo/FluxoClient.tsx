@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate } from "@/lib/finance/format";
+import { friendlyAccountName } from "@/lib/finance/account-name";
 import { categoryColor } from "@/lib/finance/categories";
 import {
   belongsToConnection,
@@ -285,7 +286,7 @@ export default function FluxoClient({
               <option value="all">Todas contas</option>
               {visibleAccounts.list.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.name}
+                  {friendlyAccountName(account.name, account.type)}
                 </option>
               ))}
               {visibleAccounts.cardList.map((card) => (

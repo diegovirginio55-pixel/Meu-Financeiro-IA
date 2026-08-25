@@ -5,6 +5,7 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency } from "@/lib/finance/format";
+import { friendlyAccountName } from "@/lib/finance/account-name";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
@@ -53,6 +54,7 @@ export default function BankHome({
   const patrimonio = selected
     ? bankBalance + bankInvestments - bankInvoices
     : snapshot.patrimonio;
+  const monthName = format(new Date(), "LLLL", { locale: ptBR });
   const bankLabel = selected ? shortBankName(selected.institution_name) : "visão geral";
   const monthTotal = snapshot.monthEntradas + snapshot.monthDespesas;
   const inShare = monthTotal > 0 ? (snapshot.monthEntradas / monthTotal) * 100 : 50;
@@ -169,7 +171,7 @@ export default function BankHome({
               <div>
                 <div className="mb-2 flex items-end justify-between text-xs">
                   <span className="text-emerald-300">{hidden ? "••••" : formatCurrency(snapshot.monthEntradas)}</span>
-                  <span className="text-zinc-500">fluxo do mês</span>
+                  <span className="text-zinc-500">{monthName}</span>
                   <span className="text-rose-300">{hidden ? "••••" : formatCurrency(snapshot.monthDespesas)}</span>
                 </div>
                 <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
@@ -178,7 +180,7 @@ export default function BankHome({
                 </div>
                 <p className="mt-2 text-center text-[11px] text-zinc-500">
                   {snapshot.economia >= 0 ? "sobrou" : "faltou"}{" "}
-                  {hidden ? "••••" : formatCurrency(Math.abs(snapshot.economia))} neste mês
+                  {hidden ? "••••" : formatCurrency(Math.abs(snapshot.economia))} em {monthName}
                 </p>
               </div>
             )}
@@ -219,7 +221,9 @@ export default function BankHome({
                 }}
               >
                 <BankLogo name={name} imageUrl={connection?.institution_image_url} size="sm" />
-                <p className="mt-6 truncate text-xs text-white/70">{account.name}</p>
+                <p className="mt-6 truncate text-xs text-white/70">
+                  {friendlyAccountName(account.name, account.type)}
+                </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight text-white">
                   {money(hidden, Number(account.balance))}
                 </p>

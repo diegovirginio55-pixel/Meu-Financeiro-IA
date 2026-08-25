@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { eachDayOfInterval, format, parseISO, startOfMonth, subDays, subMonths } from "date-fns";
 import { formatCurrency } from "@/lib/finance/format";
+import { friendlyAccountName } from "@/lib/finance/account-name";
 import { belongsToConnection, isGasto } from "@/lib/finance/fluxo";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
@@ -302,7 +303,7 @@ export default function DashboardClient({
                       <ul className="pb-3 pl-8">
                         {group.accounts.map((account) => (
                           <li key={account.id} className="flex justify-between py-1 text-xs text-zinc-400">
-                            <span>{account.name}</span>
+                            <span>{friendlyAccountName(account.name, account.type)}</span>
                             <span className="text-emerald-400">{formatCurrency(Number(account.balance))}</span>
                           </li>
                         ))}
