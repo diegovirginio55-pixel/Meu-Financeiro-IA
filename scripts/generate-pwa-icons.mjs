@@ -80,9 +80,9 @@ function fillRoundRect(rgba, size, x0, y0, w, h, radius, color) {
 
 function drawIcon(size) {
   const rgba = Buffer.alloc(size * size * 4, 255);
-  const bg = [0, 92, 169];
+  const bg = [9, 9, 11];
   const white = [255, 255, 255];
-  const gold = [243, 146, 0];
+  const gold = [16, 185, 129];
   for (let i = 0; i < size * size; i++) {
     rgba[i * 4] = bg[0];
     rgba[i * 4 + 1] = bg[1];
@@ -93,7 +93,7 @@ function drawIcon(size) {
   const cardX = size * 0.22;
   const cardY = size * 0.28;
   fillRoundRect(rgba, size, cardX, cardY, size * 0.56, size * 0.44, size * 0.06, white);
-  fillRoundRect(rgba, size, cardX, cardY, size * 0.56, size * 0.1, size * 0.06, [16, 116, 178]);
+  fillRoundRect(rgba, size, cardX, cardY, size * 0.56, size * 0.1, size * 0.06, [16, 185, 129]);
   fillCircle(rgba, size, size * 0.62, size * 0.62, size * 0.16, gold);
   fillCircle(rgba, size, size * 0.62, size * 0.62, size * 0.11, white);
   fillRoundRect(rgba, size, size * 0.3, size * 0.52, size * 0.07, size * 0.12, size * 0.015, bg);
@@ -110,4 +110,7 @@ function writePng(file, buffer) {
 
 writePng("public/icons/icon-192.png", drawIcon(192));
 writePng("public/icons/icon-512.png", drawIcon(512));
+writePng("public/icon-192.png", drawIcon(192));
+writePng("public/icon-512.png", drawIcon(512));
+writePng("public/apple-touch-icon.png", drawIcon(180));
 console.log("ícones PWA gerados");
