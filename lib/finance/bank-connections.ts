@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Account, BankConnection, Card, Investment } from "./types";
+import type { Account, BankConnection, Card, Investment, InvestmentSnapshot, InvestmentTxn, Transaction } from "./types";
 import { inferInstitutionName, isGenericConnectorName } from "@/lib/pluggy/institution";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { groupedConnectionId, institutionFromAssetName, realConnectionId } from "./connection-filter";
+import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
 
 export type BankConnectionWithAssets = BankConnection & {
   accounts: Account[];
@@ -13,11 +14,18 @@ export type BankConnectionWithAssets = BankConnection & {
 export async function getBankConnectionsWithAssets(
   supabase: SupabaseClient,
 ): Promise<BankConnectionWithAssets[]> {
-  const [connRes, accRes, cardRes, invRes] = await Promise.all([
+  const lookback = new Date();
+  lookback.setDate(lookback.getDate() - 180);
+  const from = lookback.toISOString().slice(0, 10);
+
+  const [connRes, accRes, cardRes, invRes, snapRes, txRes, appRes] = await Promise.all([
     supabase.from("bank_connections").select("*").order("created_at", { ascending: false }),
     supabase.from("accounts").select("*"),
     supabase.from("cards").select("*"),
     supabase.from("investments").select("*"),
+    supabase.from("investment_snapshots").select("*").gte("snapshot_date", from),
+    supabase.from("investment_transactions").select("*").gte("date", from),
+    supabase.from("transactions").select("id, description, amount, date").eq("type", "saida").gte("date", from),
   ]);
 
   const connections = (connRes.data ?? []) as BankConnection[];
@@ -89,9 +97,15 @@ export async function getBankConnectionsWithAssets(
     usedInvestmentIds.add(investment.id);
   }
 
+  const snapshots = (snapRes.data ?? []) as InvestmentSnapshot[];
+  const investmentTx = [
+    ...((txRes.data ?? []) as InvestmentTxn[]),
+    ...applicationTxAsBuys(investments, (appRes.data ?? []) as Transaction[]),
+  ];
+
   return splitConnectionsByInstitution(result).map((connection) => ({
     ...connection,
-    investments: uniqueInvestments(connection.investments),
+    investments: uniqueInvestments(withAccruedYield(connection.investments, snapshots, investmentTx)),
   }));
 }
 

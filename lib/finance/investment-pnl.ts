@@ -4,6 +4,7 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { BankConnection, Investment, InvestmentSnapshot, InvestmentTxn } from "./types";
 import { institutionFromAssetName, realConnectionId } from "./connection-filter";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
+import { holdingDaysFrom, monthlyYieldPercent } from "./investment-yield";
 
 export type DailyPnlPoint = {
   date: string;
@@ -66,18 +67,7 @@ function holdingDays(
   snapshots: InvestmentSnapshot[],
   transactions: InvestmentTxn[],
 ): number {
-  const today = saoPauloTodayKey();
-  const starts = [
-    ...transactions.filter((item) => item.type === "BUY").map((item) => toDateKey(item.date)),
-    ...snapshots.map((item) => toDateKey(item.snapshot_date)),
-  ]
-    .filter(Boolean)
-    .sort();
-  const start = starts[0] ?? today;
-  return Math.max(
-    1,
-    differenceInCalendarDays(parseISO(`${today}T12:00:00`), parseISO(`${start}T12:00:00`)),
-  );
+  return holdingDaysFrom(snapshots, transactions);
 }
 
 function estimatedDailyProfit(
@@ -85,14 +75,14 @@ function estimatedDailyProfit(
   snapshots: InvestmentSnapshot[],
   transactions: InvestmentTxn[],
 ): number {
-  const amount = Number(investment.amount ?? 0);
-  const rate = Number(investment.last_month_rate ?? 0);
-  if (rate !== 0 && amount !== 0 && Math.abs(rate) <= 5) {
-    return (amount * (rate / 100)) / 30;
+  const principal = Number(investment.amount_original ?? investment.amount ?? 0);
+  const monthly = monthlyYieldPercent(investment);
+  if (principal !== 0 && monthly !== 0) {
+    return (principal * (monthly / 100)) / 30;
   }
   const profit = accumulatedProfit(investment);
-  if (profit === 0) return 0;
-  return profit / holdingDays(snapshots, transactions);
+  if (profit !== 0) return profit / holdingDays(snapshots, transactions);
+  return 0;
 }
 
 function hasMovement(points: Array<{ date: string; value: number }>): boolean {
@@ -214,15 +204,18 @@ function seriesForInvestment({
   const perDay = estimatedDailyProfit(investment, snaps, transactions);
   if (Math.abs(perDay) < 0.005) return { points: [], estimated: false };
 
-  const firstSnap = snaps[0] ? toDateKey(snaps[0].snapshot_date) : dates[0];
+  const profit = accumulatedProfit(investment);
+  const held = holdingDays(snaps, transactions);
+  const implied =
+    Math.abs(perDay) >= 0.005 && profit !== 0 ? Math.max(1, Math.round(Math.abs(profit / perDay))) : held;
+  const daysBack = Math.min(dates.length, Math.max(held, implied, 1));
   const firstBuy = transactions
     .filter((item) => item.type === "BUY")
     .map((item) => toDateKey(item.date))
     .sort()[0];
+  const fromByDate = firstBuy ?? (snaps[0] ? toDateKey(snaps[0].snapshot_date) : null);
   const estimateFrom =
-    dates.find((date) => date >= (firstBuy ?? firstSnap)) ??
-    dates[Math.max(0, dates.length - holdingDays(snaps, transactions))] ??
-    dates[0];
+    (fromByDate && dates.find((date) => date >= fromByDate)) || dates[dates.length - daysBack] || dates[0];
   return {
     points: dates.filter((date) => date >= estimateFrom).map((date) => ({ date, value: perDay })),
     estimated: true,

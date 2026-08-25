@@ -61,6 +61,23 @@ export function investmentTypeFromDescription(description: string): string {
   return "Renda Fixa";
 }
 
+export function investmentNamesMatch(left: string, right: string): boolean {
+  const a = normalizeText(left);
+  const b = normalizeText(right);
+  if (a && b && (a.includes(b) || b.includes(a))) return true;
+  const product = (text: string) => {
+    if (/\blcd\b/.test(text)) return "lcd";
+    if (/\blci\b/.test(text)) return "lci";
+    if (/\blca\b/.test(text)) return "lca";
+    if (/\bcdb\b/.test(text)) return "cdb";
+    if (/tesouro/.test(text)) return "tesouro";
+    return "";
+  };
+  const pa = product(a);
+  const pb = product(b);
+  return Boolean(pa && pa === pb);
+}
+
 function isOfficialPluggyId(id?: string | null) {
   return Boolean(id && !id.startsWith("bank-tx:"));
 }

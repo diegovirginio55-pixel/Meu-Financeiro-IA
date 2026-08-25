@@ -12,6 +12,7 @@ import {
   summarizeAssetPnl,
   totalAccumulatedProfit,
 } from "@/lib/finance/investment-pnl";
+import { withAccruedYield } from "@/lib/finance/investment-yield";
 import { LucroDiarioChart } from "@/components/ativos/LucroDiarioChart";
 import {
   LucroAtivosBarChart,
@@ -34,48 +35,53 @@ export function LucroAtivosPanel({
 }) {
   const [mode, setMode] = useState<ChartMode>("ativos");
 
+  const liveInvestments = useMemo(
+    () => withAccruedYield(investments, snapshots, investmentTx),
+    [investments, snapshots, investmentTx],
+  );
+
   const byBank = useMemo(
     () =>
       buildDailyInvestmentPnl({
         connections,
-        investments,
+        investments: liveInvestments,
         snapshots,
         transactions: investmentTx,
       }),
-    [connections, investments, snapshots, investmentTx],
+    [connections, liveInvestments, snapshots, investmentTx],
   );
 
   const byAsset = useMemo(
     () =>
       buildDailyInvestmentPnlByAsset({
-        investments,
+        investments: liveInvestments,
         snapshots,
         transactions: investmentTx,
       }),
-    [investments, snapshots, investmentTx],
+    [liveInvestments, snapshots, investmentTx],
   );
 
   const rows = useMemo(
-    () => summarizeAssetPnl(byAsset.series, byAsset.keys, investments, byAsset.estimatedIds),
-    [byAsset, investments],
+    () => summarizeAssetPnl(byAsset.series, byAsset.keys, liveInvestments, byAsset.estimatedIds),
+    [byAsset, liveInvestments],
   );
 
   const dailyYield = useMemo(
-    () => buildDailyYieldSeries(byAsset.series, investments, snapshots),
-    [byAsset.series, investments, snapshots],
+    () => buildDailyYieldSeries(byAsset.series, liveInvestments, snapshots),
+    [byAsset.series, liveInvestments, snapshots],
   );
 
   const monthlyYield = useMemo(
     () =>
       buildMonthlyInvestmentYield({
-        investments,
+        investments: liveInvestments,
         snapshots,
         transactions: investmentTx,
       }),
-    [investments, snapshots, investmentTx],
+    [liveInvestments, snapshots, investmentTx],
   );
 
-  const lucroAcumulado = totalAccumulatedProfit(investments);
+  const lucroAcumulado = totalAccumulatedProfit(liveInvestments);
   const lucroPeriodoRaw = byAsset.series.reduce((sum, point) => sum + Number(point.Total), 0);
   const lucroPeriodo = Math.abs(lucroPeriodoRaw) >= 0.005 ? lucroPeriodoRaw : lucroAcumulado;
   const lucroHojeRaw = Number(byAsset.series[byAsset.series.length - 1]?.Total ?? 0);

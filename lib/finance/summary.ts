@@ -20,6 +20,7 @@ import type {
 import { isGasto, isRenda, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange, dailyBudgetFromBalance } from "./fluxo";
 import { resolvedCategory } from "./categories";
 import { uniqueInvestments } from "./bank-connections";
+import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
 
 export interface UpcomingItem {
   description: string;
@@ -97,12 +98,17 @@ export async function getFinancialSnapshot(
 
   const accounts = (accountsRes.data ?? []) as Account[];
   const cards = (cardsRes.data ?? []) as Card[];
-  const investments = uniqueInvestments((investmentsRes.data ?? []) as Investment[]);
   const debts = (debtsRes.data ?? []) as Debt[];
   const goals = (goalsRes.data ?? []) as Goal[];
   const recurringItems = (recurringRes.data ?? []) as RecurringItem[];
   const monthTx = (monthTxRes.data ?? []) as Transaction[];
   const historyTx = (historyTxRes.data ?? []) as Transaction[];
+  const uniqueInv = uniqueInvestments((investmentsRes.data ?? []) as Investment[]);
+  const investments = withAccruedYield(
+    uniqueInv,
+    [],
+    applicationTxAsBuys(uniqueInv, historyTx),
+  );
 
   const totalBalance = accounts.reduce((s, a) => s + Number(a.balance), 0);
   const totalInvoices = cards.reduce(

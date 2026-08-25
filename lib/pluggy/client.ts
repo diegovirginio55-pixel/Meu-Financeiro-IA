@@ -116,8 +116,11 @@ export type PluggyInvestment = {
   taxes?: number | null;
   taxes2?: number | null;
   rate?: number | null;
+  rateType?: string | null;
   annualRate?: number | null;
   fixedAnnualRate?: number | null;
+  purchaseDate?: string | null;
+  date?: string | null;
   institution?: { name?: string | null; number?: string | null; cnpj?: string | null } | null;
 };
 
@@ -289,6 +292,10 @@ export const pluggyApi = {
     }
 
     return { results: [...byId.values()] };
+  },
+
+  async fetchInvestment(id: string) {
+    return (await pluggyFetch(`/investments/${encodeURIComponent(id)}`)) as unknown as PluggyInvestment;
   },
 
   async fetchInvestmentTransactions(investmentId: string) {

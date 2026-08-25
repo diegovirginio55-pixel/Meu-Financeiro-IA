@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isInvestmentDescription, promoteInvestmentsFromTransactions } from "@/lib/finance/investment-movements";
 import { inferCategoryFromDescription } from "@/lib/finance/categories";
 import type { Account, Investment } from "@/lib/finance/types";
+import { CDI_ANNUAL_FALLBACK } from "@/lib/finance/investment-yield";
 import { pluggyApi, pluggyInvestmentAmount, resolvePluggyPosition, type PluggyAccount, type PluggyInvestment } from "./client";
 import { officialInstitutionName } from "./brands";
 import {
@@ -177,30 +178,57 @@ function pluggyAccountName(account: { name?: string; marketingName?: string | nu
   return base;
 }
 
-function monthlyRate(inv: {
-  lastMonthRate?: number | null;
-  lastTwelveMonthsRate?: number | null;
-  annualRate?: number | null;
-  fixedAnnualRate?: number | null;
-}): number | null {
+function monthlyRate(inv: PluggyInvestment): number | null {
   if (inv.lastMonthRate != null && Number(inv.lastMonthRate) !== 0) return Number(inv.lastMonthRate);
+  const share = Number(inv.rate);
+  const isCdi = /cdi/i.test(inv.rateType ?? "") || share > 40;
+  if (Number.isFinite(share) && share > 0 && isCdi) {
+    return Number(((CDI_ANNUAL_FALLBACK * share) / 100 / 12).toFixed(4));
+  }
   if (inv.lastTwelveMonthsRate != null && Number(inv.lastTwelveMonthsRate) !== 0) {
     const yearly = Number(inv.lastTwelveMonthsRate);
     if (yearly > 0 && yearly <= 40) return yearly / 12;
   }
   const annual = Number(inv.annualRate ?? inv.fixedAnnualRate);
-  // 84 no Inter é "% do CDI", não taxa anual real.
+  if (annual > 40 && annual <= 200) {
+    return Number(((CDI_ANNUAL_FALLBACK * annual) / 100 / 12).toFixed(4));
+  }
   if (annual > 0 && annual <= 40) return annual / 12;
   return null;
 }
 
-function investmentProfit(inv: PluggyInvestment, amount: number): number | null {
+function investmentStartDays(inv: PluggyInvestment): number {
+  const raw = inv.purchaseDate || inv.date;
+  if (!raw) return 1;
+  const start = new Date(`${toDateOnly(raw)}T12:00:00`);
+  const today = new Date();
+  const diff = Math.floor((today.getTime() - start.getTime()) / 86_400_000);
+  return Number.isFinite(diff) ? Math.max(1, diff) : 1;
+}
+
+function positionForStorage(inv: PluggyInvestment) {
   const position = resolvePluggyPosition(inv);
-  if (position.profit != null) return position.profit;
-  if (position.original != null && amount !== 0) {
-    return Number((amount - position.original).toFixed(2));
+  const monthly = monthlyRate(inv);
+  const originalMarked = position.original;
+  if (originalMarked != null && Math.abs(position.current - originalMarked) >= 0.02) {
+    return {
+      current: position.current,
+      original: originalMarked,
+      profit: position.profit ?? Number((position.current - originalMarked).toFixed(2)),
+      monthly,
+    };
   }
-  return null;
+  const original = position.original ?? position.current;
+  if (!original || monthly == null) {
+    return { current: position.current, original: position.original, profit: position.profit, monthly };
+  }
+  const profit = Number((original * (monthly / 100) * (investmentStartDays(inv) / 30)).toFixed(2));
+  return {
+    current: Number((original + profit).toFixed(2)),
+    original,
+    profit,
+    monthly,
+  };
 }
 
 function investmentInstitution(
@@ -345,24 +373,34 @@ export async function syncBankConnection(
     const active = merged
       .filter((inv) => inv.status !== "TOTAL_WITHDRAWAL")
       .filter((inv) => pluggyInvestmentAmount(inv) !== 0 || merged.length === 1);
+
+    const detailedActive = await Promise.all(
+      active.map(async (inv) => {
+        if (syntheticIds.has(inv.id)) return inv;
+        try {
+          const extra = await pluggyApi.fetchInvestment(inv.id);
+          return { ...inv, ...extra, id: inv.id };
+        } catch {
+          return inv;
+        }
+      }),
+    );
     if (item.statusDetail?.investments && item.statusDetail.investments.isUpdated === false) {
       console.warn("Pluggy não atualizou investimentos neste sync:", item.statusDetail.investments);
     }
 
-    if (active.length > 0) {
-      const rows = active.map((inv) => {
+    if (detailedActive.length > 0) {
+      const rows = detailedActive.map((inv) => {
         const bank = investmentInstitution(inv, item.connector.name, connectorBank ?? onlyBank, institutionName);
-        const position = resolvePluggyPosition(inv);
-        const amount = position.current;
-        const rate = monthlyRate(inv);
+        const position = positionForStorage(inv);
         return {
           user_id: userId,
           name: withInstitutionPrefix(inv.name || "Investimento", bank),
-          amount,
+          amount: position.current,
           type: investmentLabel(inv.type, inv.subtype, inv.name),
-          amount_profit: position.profit ?? investmentProfit(inv, amount),
+          amount_profit: position.profit,
           amount_original: position.original,
-          last_month_rate: rate == null ? null : Number(rate),
+          last_month_rate: position.monthly == null ? null : Number(position.monthly),
           pluggy_investment_id: inv.id,
           bank_connection_id: bankConnectionId,
           source: "pluggy" as const,
@@ -401,10 +439,10 @@ export async function syncBankConnection(
       );
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
-      const snapshots = active.flatMap((inv) => {
+      const snapshots = detailedActive.flatMap((inv) => {
         const localId = idByPluggy.get(inv.id);
         if (!localId) return [];
-        const position = resolvePluggyPosition(inv);
+        const position = positionForStorage(inv);
         return [
           {
             user_id: userId,
@@ -412,7 +450,7 @@ export async function syncBankConnection(
             bank_connection_id: bankConnectionId,
             snapshot_date: today,
             amount: position.current,
-            amount_profit: position.profit ?? investmentProfit(inv, position.current),
+            amount_profit: position.profit,
           },
         ];
       });
@@ -423,13 +461,12 @@ export async function syncBankConnection(
         if (snapshotError) console.error("Erro ao gravar snapshot de investimentos:", snapshotError);
       }
 
-      for (const inv of active) {
+      for (const inv of detailedActive) {
         if (syntheticIds.has(inv.id)) continue;
         const localId = idByPluggy.get(inv.id);
         if (!localId) continue;
         try {
           const txs = await pluggyApi.fetchInvestmentTransactions(inv.id);
-          if (txs.length === 0) continue;
           const txRows = txs.map((transaction) => {
             const raw = Number(transaction.amount ?? 0);
             const type = transaction.type || "OTHER";
@@ -454,6 +491,21 @@ export async function syncBankConnection(
               description: transaction.description,
             };
           });
+          const position = positionForStorage(inv);
+          const start = inv.purchaseDate || inv.date;
+          if (start && position.original) {
+            txRows.push({
+              user_id: userId,
+              investment_id: localId,
+              bank_connection_id: bankConnectionId,
+              pluggy_transaction_id: `purchase:${inv.id}`,
+              type: "BUY",
+              amount: position.original,
+              date: toDateOnly(start),
+              description: "Aplicação",
+            });
+          }
+          if (txRows.length === 0) continue;
           const ids = txRows.map((row) => row.pluggy_transaction_id).filter(Boolean) as string[];
           const already = await knownPluggyIds(supabase, "investment_transactions", ids);
           await supabase.from("investment_transactions").upsert(txRows, {
