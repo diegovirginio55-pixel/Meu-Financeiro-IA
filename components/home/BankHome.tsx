@@ -244,21 +244,25 @@ export default function BankHome({
             {connectionId === "all" && (
               <div>
                 <div className="mb-1.5 flex items-end justify-between text-xs">
-                  <span className="font-medium text-emerald-300">
-                    {hidden ? "••••" : formatPercent(pctEntradas, 1)}
+                  <span className="text-emerald-300">
+                    {hidden ? "••••" : formatCurrency(snapshot.monthEntradas)}
                   </span>
                   <span className="text-zinc-500">{monthName}</span>
-                  <span className="font-medium text-rose-300">
-                    {hidden ? "••••" : formatPercent(pctSaidas, 1)}
+                  <span className="text-rose-300">
+                    {hidden ? "••••" : formatCurrency(snapshot.monthDespesas)}
                   </span>
                 </div>
                 <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
                   <div className="h-full shrink-0 bg-emerald-400" style={{ width: `${pctEntradas}%` }} />
                   <div className="h-full shrink-0 bg-rose-400" style={{ width: `${pctSaidas}%` }} />
                 </div>
-                <div className="mt-2 flex justify-between text-[11px]">
-                  <span className="text-emerald-300">{hidden ? "••••" : formatCurrency(snapshot.monthEntradas)}</span>
-                  <span className="text-rose-300">{hidden ? "••••" : formatCurrency(snapshot.monthDespesas)}</span>
+                <div className="mt-1.5 flex justify-between text-[11px]">
+                  <span className="font-medium text-emerald-300">
+                    {hidden ? "••••" : formatPercent(pctEntradas, 1)}
+                  </span>
+                  <span className="font-medium text-rose-300">
+                    {hidden ? "••••" : formatPercent(pctSaidas, 1)}
+                  </span>
                 </div>
                 <p className="mt-2 text-center text-[11px] text-zinc-500">
                   líquido da conta {money(hidden, saldoConta)}
