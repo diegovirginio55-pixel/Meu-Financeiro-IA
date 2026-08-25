@@ -174,7 +174,7 @@ export const pluggyApi = {
     });
   },
 
-  async waitForItemIdle(itemId: string, timeoutMs = 45000) {
+  async waitForItemIdle(itemId: string, timeoutMs = 70000) {
     const started = Date.now();
     let item = await this.fetchItem(itemId);
     while (Date.now() - started < timeoutMs) {

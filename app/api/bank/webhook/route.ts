@@ -8,6 +8,9 @@ const SYNC_EVENTS = new Set([
   "item/login_succeeded",
   "transactions/created",
   "transactions/updated",
+  "accounts/updated",
+  "credit_cards/updated",
+  "investments/updated",
 ]);
 
 /**

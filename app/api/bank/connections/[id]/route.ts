@@ -34,9 +34,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const body = (await request.json().catch(() => ({}))) as { trigger?: boolean };
+  const trigger = body.trigger !== false;
 
   try {
-    if (body.trigger) {
+    if (trigger) {
       try {
         await pluggyApi.patchItem(connection.pluggy_item_id, {});
         const item = await pluggyApi.waitForItemIdle(connection.pluggy_item_id);

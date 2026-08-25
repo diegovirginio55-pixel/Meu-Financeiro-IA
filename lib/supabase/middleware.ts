@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/bank/webhook", "/manifest.webmanifest", "/sw.js"];
+const PUBLIC_PATHS = ["/login", "/api/bank/webhook", "/api/bank/cron", "/manifest.webmanifest", "/sw.js"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
