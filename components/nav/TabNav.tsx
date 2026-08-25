@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
@@ -31,10 +32,7 @@ export default function TabNav() {
   return (
     <header className="relative sticky top-0 z-30 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl">
       <div className="flex w-full items-center justify-between gap-6 px-6 py-4 xl:px-10 2xl:px-14">
-        <Link href="/dashboard" prefetch onClick={() => onNavigate("/dashboard")} className="shrink-0">
-          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-emerald-400/90">Meu Financeiro</p>
-          <p className="text-sm font-semibold tracking-tight text-white">IA</p>
-        </Link>
+        <BrandLogo href="/dashboard" onClick={() => onNavigate("/dashboard")} />
 
         <nav className="flex min-w-0 flex-1 items-center justify-center">
           <div className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-zinc-800 bg-zinc-900/70 p-1">

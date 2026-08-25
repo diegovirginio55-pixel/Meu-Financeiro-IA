@@ -24,7 +24,16 @@ export function PageHero({
       <div className="pointer-events-none absolute -right-16 -top-10 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl lg:h-80 lg:w-80" />
       <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
       <header className="relative flex items-center justify-between gap-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">{kicker}</p>
+        <div className="flex items-center gap-2">
+          <img
+            src="/logo.png"
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 rounded-lg object-cover ring-1 ring-emerald-400/25 lg:hidden"
+          />
+          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">{kicker}</p>
+        </div>
         {trailing}
       </header>
       <div className="relative mt-8 lg:mt-10">

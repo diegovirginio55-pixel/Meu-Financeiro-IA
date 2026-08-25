@@ -141,6 +141,13 @@ export default function BankHome({
   if (connections.length === 0) {
     return (
       <div className="flex min-h-[70vh] flex-col justify-end pb-8 lg:justify-center lg:pb-0">
+        <img
+          src="/logo.png"
+          alt="Meu Financeiro IA"
+          width={56}
+          height={56}
+          className="mb-6 h-14 w-14 rounded-2xl object-cover ring-1 ring-emerald-400/30 shadow-[0_0_28px_rgba(16,185,129,0.35)]"
+        />
         <p className="text-sm font-medium tracking-wide text-emerald-400">{greetingForNow()}</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white lg:text-6xl">
           Seu dinheiro,
@@ -169,9 +176,18 @@ export default function BankHome({
         <div className="relative lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-end lg:gap-16 xl:gap-24">
           <div>
             <header className="flex items-center justify-between">
-              <p className="text-sm font-medium tracking-wide text-emerald-400/90">
-                {greetingForNow()}
-              </p>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/logo.png"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-xl object-cover ring-1 ring-emerald-400/25 lg:hidden"
+                />
+                <p className="text-sm font-medium tracking-wide text-emerald-400/90">
+                  {greetingForNow()}
+                </p>
+              </div>
               <div className="flex items-center gap-1 lg:hidden">
                 <ThemeToggle />
                 <button

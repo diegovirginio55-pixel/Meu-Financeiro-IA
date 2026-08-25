@@ -6,6 +6,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
@@ -107,7 +108,8 @@ export default function BottomNav() {
             className="absolute inset-x-0 bottom-16 w-full rounded-t-3xl border-t border-zinc-800 bg-zinc-950 p-5 text-zinc-100 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-zinc-400">Menu</p>
+            <BrandLogo size="menu" />
+            <p className="mt-4 text-sm font-semibold text-zinc-400">Menu</p>
             <div className="mt-3 flex flex-col gap-1">
               {[
                 { href: "/detalhes", label: "Extrato" },

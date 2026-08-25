@@ -1,4 +1,5 @@
 import LoginForm from "@/components/auth/LoginForm";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
@@ -11,8 +12,8 @@ export default function LoginPage() {
         <ThemeToggle />
       </div>
       <div className="relative w-full max-w-md">
-        <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">Meu Financeiro</p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white lg:text-5xl">
+        <BrandLogo size="login" />
+        <h1 className="mt-8 text-4xl font-semibold tracking-tight text-white lg:text-5xl">
           Seu dinheiro,
           <br />
           em um só lugar.
