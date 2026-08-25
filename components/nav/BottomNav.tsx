@@ -9,7 +9,7 @@ import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
   { href: "/dashboard", label: "Início", icon: HomeIcon },
-  { href: "/detalhes", label: "Extrato", icon: ExtratoIcon },
+  { href: "/ativos", label: "Ativos", icon: AtivosIcon },
   { href: "/visao", label: "Dashboard", icon: DashboardIcon },
   { href: "/chat", label: "Chat IA", icon: ChatIcon },
 ] as const;
@@ -28,12 +28,18 @@ function HomeIcon({ active }: { active?: boolean }) {
   );
 }
 
-function ExtratoIcon({ active }: { active?: boolean }) {
+function AtivosIcon({ active }: { active?: boolean }) {
   const color = active ? "#10B981" : "#71717A";
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
-      <rect x="5" y="3.5" width="14" height="17" rx="2" stroke={color} strokeWidth="1.6" />
-      <path d="M8 8h8M8 12h8M8 16h5" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M4 16.5 9.2 11l3.4 3.3L20 7"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M15.5 7H20v4.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -77,7 +83,7 @@ function MenuIcon({ active }: { active?: boolean }) {
   );
 }
 
-const MENU_ROUTES = ["/ativos", "/bancos", "/fluxo"];
+const MENU_ROUTES = ["/detalhes", "/bancos", "/fluxo"];
 
 export default function BottomNav() {
   const router = useRouter();
@@ -103,14 +109,13 @@ export default function BottomNav() {
             <p className="text-sm font-semibold text-zinc-400">Menu</p>
             <div className="mt-3 flex flex-col gap-1">
               {[
-                { href: "/ativos", label: "Investimentos" },
+                { href: "/detalhes", label: "Extrato" },
                 { href: "/bancos", label: "Bancos conectados" },
                 { href: "/fluxo", label: "Fluxo de caixa" },
               ].map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  prefetch={item.href !== "/ativos"}
                   onClick={() => {
                     onNavigate(item.href);
                     setMenuOpen(false);
@@ -142,7 +147,7 @@ export default function BottomNav() {
               <Link
                 key={tab.href}
                 href={tab.href}
-                prefetch={tab.href !== "/visao"}
+                prefetch={tab.href !== "/visao" && tab.href !== "/ativos"}
                 onClick={() => onNavigate(tab.href)}
                 className="flex flex-col items-center gap-0.5 text-[11px]"
               >
