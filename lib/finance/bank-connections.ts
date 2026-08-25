@@ -4,6 +4,7 @@ import { inferInstitutionName, isGenericConnectorName } from "@/lib/pluggy/insti
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { groupedConnectionId, institutionFromAssetName, realConnectionId } from "./connection-filter";
 import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
+import { daysAgoKey } from "./fluxo";
 
 export type BankConnectionWithAssets = BankConnection & {
   accounts: Account[];
@@ -14,9 +15,7 @@ export type BankConnectionWithAssets = BankConnection & {
 export async function getBankConnectionsWithAssets(
   supabase: SupabaseClient,
 ): Promise<BankConnectionWithAssets[]> {
-  const lookback = new Date();
-  lookback.setDate(lookback.getDate() - 180);
-  const from = lookback.toISOString().slice(0, 10);
+  const from = daysAgoKey(180);
 
   const [connRes, accRes, cardRes, invRes, snapRes, txRes, appRes] = await Promise.all([
     supabase.from("bank_connections").select("*").order("created_at", { ascending: false }),

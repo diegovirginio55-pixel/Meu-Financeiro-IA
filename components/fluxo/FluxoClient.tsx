@@ -11,6 +11,7 @@ import {
   futureExpensesInMonth,
   isGasto,
   isRenda,
+  saoPauloMonthKey,
 } from "@/lib/finance/fluxo";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Account, Card, Debt, RecurringItem, Transaction } from "@/lib/finance/types";
@@ -60,7 +61,7 @@ export default function FluxoClient({
 }) {
   const connectionIds = useMemo(() => connections.map((connection) => connection.id), [connections]);
   const [connectionId, setConnectionId] = useConnectionFilter(connectionIds);
-  const [monthKey, setMonthKey] = usePersistedState("mf-fluxo-month", format(startOfMonth(new Date()), "yyyy-MM"));
+  const [monthKey, setMonthKey] = usePersistedState("mf-fluxo-month", saoPauloMonthKey());
   const [accountId, setAccountId] = usePersistedState("mf-fluxo-account", "all");
   const [type, setType] = usePersistedState<"todos" | "entrada" | "saida">("mf-fluxo-type", "todos");
   const [search, setSearch] = usePersistedState("mf-fluxo-search", "");

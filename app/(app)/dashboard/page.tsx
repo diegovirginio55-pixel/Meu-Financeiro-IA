@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getFinancialSnapshot } from "@/lib/finance/summary";
 import { getBankConnectionsWithAssets } from "@/lib/finance/bank-connections";
-import { saoPauloWeekStartKey } from "@/lib/finance/fluxo";
+import { saoPauloMonthStartKey } from "@/lib/finance/fluxo";
 import HomeSwitch from "@/components/home/HomeSwitch";
 import type { Transaction } from "@/lib/finance/types";
 
@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   const [snapshot, connections, historyRes] = await Promise.all([
     getFinancialSnapshot(supabase),
     getBankConnectionsWithAssets(supabase),
-    supabase.from("transactions").select("*").gte("date", saoPauloWeekStartKey()),
+    supabase.from("transactions").select("*").gte("date", saoPauloMonthStartKey()),
   ]);
 
   return (

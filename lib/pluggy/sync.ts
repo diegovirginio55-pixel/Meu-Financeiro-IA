@@ -15,6 +15,7 @@ import {
 } from "./institution";
 import { notifyBankMovements } from "@/lib/push/send";
 import { isRecentMovementDate, recentMovements, type MovementNotice } from "@/lib/push/payload";
+import { daysAgoKey, toSaoPauloDateOnly } from "@/lib/finance/fluxo";
 
 const TRANSACTIONS_LOOKBACK_DAYS = 90;
 
@@ -59,11 +60,6 @@ function mapCategory(
   return isCredit ? "Salário" : "Outros";
 }
 
-function toDateOnly(value: Date | string): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  return date.toISOString().slice(0, 10);
-}
-
 async function knownPluggyIds(
   supabase: SupabaseClient,
   table: "transactions" | "investment_transactions",
@@ -87,10 +83,7 @@ async function syncTransactionsForAccount(
   accountId: string | null,
   cardId: string | null,
 ): Promise<MovementNotice[]> {
-  const dateFrom = new Date();
-  dateFrom.setDate(dateFrom.getDate() - TRANSACTIONS_LOOKBACK_DAYS);
-
-  const transactions = await pluggyApi.fetchAllTransactions(pluggyAccountId, toDateOnly(dateFrom));
+  const transactions = await pluggyApi.fetchAllTransactions(pluggyAccountId, daysAgoKey(TRANSACTIONS_LOOKBACK_DAYS));
   if (transactions.length === 0) return [];
 
   const ids = transactions.map((item) => item.id);
@@ -102,7 +95,7 @@ async function syncTransactionsForAccount(
     amount: Math.abs(t.amount),
     type: t.type === "CREDIT" ? "entrada" : "saida",
     category: mapCategory(t.category, t.type === "CREDIT", t.description),
-    date: toDateOnly(t.date),
+    date: toSaoPauloDateOnly(t.date),
     account_id: accountId,
     card_id: cardId,
     pluggy_transaction_id: t.id,
@@ -201,7 +194,7 @@ function monthlyRate(inv: PluggyInvestment): number | null {
 function investmentStartDays(inv: PluggyInvestment): number {
   const raw = inv.purchaseDate || inv.date;
   if (!raw) return 1;
-  const start = new Date(`${toDateOnly(raw)}T12:00:00`);
+  const start = new Date(`${toSaoPauloDateOnly(raw)}T12:00:00`);
   const today = new Date();
   const diff = Math.floor((today.getTime() - start.getTime()) / 86_400_000);
   return Number.isFinite(diff) ? Math.max(1, diff) : 1;
@@ -488,7 +481,7 @@ export async function syncBankConnection(
               pluggy_transaction_id: transaction.id,
               type,
               amount: signed,
-              date: toDateOnly(transaction.date),
+              date: toSaoPauloDateOnly(transaction.date),
               description: transaction.description,
             };
           });
@@ -502,7 +495,7 @@ export async function syncBankConnection(
               pluggy_transaction_id: `purchase:${inv.id}`,
               type: "BUY",
               amount: position.original,
-              date: toDateOnly(start),
+              date: toSaoPauloDateOnly(start),
               description: "Aplicação",
             });
           }

@@ -9,7 +9,7 @@ import { friendlyAccountName, isPlaceholderAccount } from "@/lib/finance/account
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
-import { belongsToConnection, dailyBudgetFromBalance, greetingForNow, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
+import { belongsToConnection, dailyBudgetFromBalance, greetingForNow, isGasto, isRenda, saoPauloMonthKey, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
 import { institutionFromAssetName, realConnectionId } from "@/lib/finance/connection-filter";
 import type { Transaction } from "@/lib/finance/types";
 import { CATEGORY_ICONS, categoryColor } from "@/lib/finance/categories";
@@ -113,20 +113,24 @@ export default function BankHome({
   const saldoConta = bankBalance;
   const saldoTotal = bankBalance + bankInvestments;
   const displayedBalance = balanceView === "total" ? saldoTotal : saldoConta;
-  const monthName = format(new Date(), "LLLL", { locale: ptBR });
+  const monthKey = saoPauloMonthKey();
+  const monthName = format(parseISO(`${monthKey}-01`), "LLLL", { locale: ptBR });
   const bankLabel = selected ? shortBankName(selected.institution_name) : "visão geral";
-  const monthTotal = snapshot.monthEntradas + snapshot.monthDespesas;
-  const pctEntradas = monthTotal > 0 ? (snapshot.monthEntradas / monthTotal) * 100 : 0;
-  const pctSaidas = monthTotal > 0 ? (snapshot.monthDespesas / monthTotal) * 100 : 0;
-  const spendingCategories = snapshot.gastosPorCategoria;
-  const spendingTotal = spendingCategories.reduce((sum, item) => sum + item.total, 0);
-  const maxCategory = spendingCategories[0]?.total ?? 0;
   const todayKey = saoPauloTodayKey();
   const weekStart = saoPauloWeekStartKey();
   const scopedTx = useMemo(
     () => historyTx.filter((transaction) => belongsToConnection(transaction, connectionId, snapshot.accounts, snapshot.cards)),
     [historyTx, connectionId, snapshot.accounts, snapshot.cards],
   );
+  const monthTx = scopedTx.filter((transaction) => transaction.date.startsWith(monthKey));
+  const monthEntradas = monthTx.filter(isRenda).reduce((sum, item) => sum + Number(item.amount), 0);
+  const monthDespesas = monthTx.filter(isGasto).reduce((sum, item) => sum + Number(item.amount), 0);
+  const monthTotal = monthEntradas + monthDespesas;
+  const pctEntradas = monthTotal > 0 ? (monthEntradas / monthTotal) * 100 : 0;
+  const pctSaidas = monthTotal > 0 ? (monthDespesas / monthTotal) * 100 : 0;
+  const spendingCategories = snapshot.gastosPorCategoria;
+  const spendingTotal = spendingCategories.reduce((sum, item) => sum + item.total, 0);
+  const maxCategory = spendingCategories[0]?.total ?? 0;
   const gastosHoje =
     historyTx.length > 0 ? sumGastosInRange(scopedTx, todayKey, todayKey) : snapshot.gastosHoje;
   const gastosSemana =
@@ -249,11 +253,11 @@ export default function BankHome({
               <div>
                 <div className="mb-1.5 flex items-end justify-between text-xs">
                   <span className="text-emerald-300">
-                    {hidden ? "••••" : formatCurrency(snapshot.monthEntradas)}
+                    {hidden ? "••••" : formatCurrency(monthEntradas)}
                   </span>
                   <span className="text-zinc-500">{monthName}</span>
                   <span className="text-rose-300">
-                    {hidden ? "••••" : formatCurrency(snapshot.monthDespesas)}
+                    {hidden ? "••••" : formatCurrency(monthDespesas)}
                   </span>
                 </div>
                 <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">

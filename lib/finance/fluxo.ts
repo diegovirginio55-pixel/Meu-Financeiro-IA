@@ -2,7 +2,7 @@ import type { Account, Card, Debt, RecurringItem, Transaction } from "./types";
 import { assetMatchesBank, connectionBank, realConnectionId } from "./connection-filter";
 import { isInvestmentMovement } from "./investment-movements";
 import { isTransferDescription } from "./categories";
-import { differenceInCalendarDays, format, parseISO, startOfWeek, subDays } from "date-fns";
+import { differenceInCalendarDays, format, parseISO, subDays } from "date-fns";
 
 export function isGasto(transaction: Transaction): boolean {
   return (
@@ -24,8 +24,43 @@ export function saoPauloTodayKey(date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
+export function toSaoPauloDateOnly(value: Date | string): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) return trimmed.slice(0, 10);
+    return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  }
+  return value.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
 export function saoPauloMonthKey(date = new Date()): string {
   return saoPauloTodayKey(date).slice(0, 7);
+}
+
+export function saoPauloMonthStartKey(date = new Date()): string {
+  return `${saoPauloMonthKey(date)}-01`;
+}
+
+export function saoPauloMonthEndKey(date = new Date()): string {
+  const monthKey = saoPauloMonthKey(date);
+  const [year, month] = monthKey.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${monthKey}-${String(lastDay).padStart(2, "0")}`;
+}
+
+export function saoPauloYearStartKey(date = new Date()): string {
+  return `${saoPauloTodayKey(date).slice(0, 4)}-01-01`;
+}
+
+export function daysAgoKey(days: number, date = new Date()): string {
+  const [year, month, day] = saoPauloTodayKey(date).split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day - days)).toISOString().slice(0, 10);
+}
+
+export function daysAheadKey(days: number, date = new Date()): string {
+  return daysAgoKey(-days, date);
 }
 
 export function shiftMonthKey(monthKey: string, delta: number): string {
@@ -61,7 +96,10 @@ export function greetingForNow(date = new Date()): string {
 }
 
 export function saoPauloWeekStartKey(date = new Date()): string {
-  return format(startOfWeek(parseISO(saoPauloTodayKey(date)), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const [year, month, day] = saoPauloTodayKey(date).split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const daysFromMonday = (weekday + 6) % 7;
+  return new Date(Date.UTC(year, month - 1, day - daysFromMonday)).toISOString().slice(0, 10);
 }
 
 export function sumGastosInRange(transactions: Transaction[], from: string, to: string): number {

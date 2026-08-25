@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FunctionDeclaration } from "@google/genai";
 import { CATEGORIES } from "@/lib/finance/categories";
 import { getFinancialSnapshot } from "@/lib/finance/summary";
+import { saoPauloTodayKey } from "@/lib/finance/fluxo";
 import type { Account, Card } from "@/lib/finance/types";
 
 /**
@@ -227,7 +228,7 @@ export async function executeTool(
           amount,
           type,
           category,
-          date: date ?? new Date().toISOString().slice(0, 10),
+          date: date ?? saoPauloTodayKey(),
           account_id: accountId,
           card_id: cardId,
           source: "chat",

@@ -1,13 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  startOfMonth,
-  endOfMonth,
-  subMonths,
-  addMonths,
-  addDays,
-  format,
-  setDate,
-} from "date-fns";
 import type {
   Account,
   Card,
@@ -16,8 +7,23 @@ import type {
   Debt,
   Goal,
   Investment,
+  InvestmentSnapshot,
+  InvestmentTxn,
 } from "./types";
-import { isGasto, isRenda, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange, dailyBudgetFromBalance } from "./fluxo";
+import {
+  daysAheadKey,
+  isGasto,
+  isRenda,
+  lastNMonthKeys,
+  saoPauloMonthEndKey,
+  saoPauloMonthKey,
+  saoPauloMonthStartKey,
+  saoPauloTodayKey,
+  saoPauloWeekStartKey,
+  shiftMonthKey,
+  sumGastosInRange,
+  dailyBudgetFromBalance,
+} from "./fluxo";
 import { resolvedCategory } from "./categories";
 import { uniqueInvestments } from "./bank-connections";
 import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
@@ -65,9 +71,9 @@ export async function getFinancialSnapshot(
   supabase: SupabaseClient,
 ): Promise<FinancialSnapshot> {
   const now = new Date();
-  const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
-  const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
-  const sixMonthsAgo = format(startOfMonth(subMonths(now, 5)), "yyyy-MM-dd");
+  const monthStart = saoPauloMonthStartKey(now);
+  const monthEnd = saoPauloMonthEndKey(now);
+  const sixMonthsAgo = `${lastNMonthKeys(6, saoPauloMonthKey(now))[0]}-01`;
 
   const [
     accountsRes,
@@ -78,6 +84,8 @@ export async function getFinancialSnapshot(
     recurringRes,
     monthTxRes,
     historyTxRes,
+    snapRes,
+    invTxRes,
   ] = await Promise.all([
     supabase.from("accounts").select("*").order("created_at"),
     supabase.from("cards").select("*").order("created_at"),
@@ -94,6 +102,8 @@ export async function getFinancialSnapshot(
       .gte("date", monthStart)
       .lte("date", monthEnd),
     supabase.from("transactions").select("*").gte("date", sixMonthsAgo),
+    supabase.from("investment_snapshots").select("*").gte("snapshot_date", sixMonthsAgo),
+    supabase.from("investment_transactions").select("*").gte("date", sixMonthsAgo),
   ]);
 
   const accounts = (accountsRes.data ?? []) as Account[];
@@ -106,8 +116,11 @@ export async function getFinancialSnapshot(
   const uniqueInv = uniqueInvestments((investmentsRes.data ?? []) as Investment[]);
   const investments = withAccruedYield(
     uniqueInv,
-    [],
-    applicationTxAsBuys(uniqueInv, historyTx),
+    (snapRes.data ?? []) as InvestmentSnapshot[],
+    [
+      ...((invTxRes.data ?? []) as InvestmentTxn[]),
+      ...applicationTxAsBuys(uniqueInv, historyTx),
+    ],
   );
 
   const totalBalance = accounts.reduce((s, a) => s + Number(a.balance), 0);
@@ -155,21 +168,23 @@ export async function getFinancialSnapshot(
     .sort((a, b) => Number(b.amount) - Number(a.amount))
     .slice(0, 5);
 
-  const todayStr = format(now, "yyyy-MM-dd");
-  const limitDate = addDays(now, 30);
+  const todayStr = saoPauloTodayKey(now);
+  const limitStr = daysAheadKey(30, now);
   const proximos30Dias: UpcomingItem[] = [];
+  const thisMonth = saoPauloMonthKey(now);
 
   recurringItems.forEach((item) => {
-    let occurrence = setDate(now, item.day_of_month);
-    if (format(occurrence, "yyyy-MM-dd") < todayStr) {
-      occurrence = setDate(addMonths(now, 1), item.day_of_month);
+    const day = Math.min(Math.max(1, item.day_of_month), 28);
+    let occurrence = `${thisMonth}-${String(day).padStart(2, "0")}`;
+    if (occurrence < todayStr) {
+      occurrence = `${shiftMonthKey(thisMonth, 1)}-${String(day).padStart(2, "0")}`;
     }
-    if (occurrence <= limitDate) {
+    if (occurrence <= limitStr) {
       proximos30Dias.push({
         description: item.description,
         amount: Number(item.amount),
         type: item.type,
-        date: format(occurrence, "yyyy-MM-dd"),
+        date: occurrence,
         origem: "recorrente",
       });
     }
@@ -178,13 +193,13 @@ export async function getFinancialSnapshot(
   debts
     .filter((d) => !d.paid && d.due_date)
     .forEach((d) => {
-      const due = new Date(d.due_date as string);
-      if (due <= limitDate) {
+      const due = d.due_date as string;
+      if (due >= todayStr && due <= limitStr) {
         proximos30Dias.push({
           description: `Dívida: ${d.description}${d.person ? ` (${d.person})` : ""}`,
           amount: Number(d.amount),
           type: "saida",
-          date: d.due_date as string,
+          date: due,
           origem: "divida",
         });
       }
@@ -200,8 +215,7 @@ export async function getFinancialSnapshot(
     );
 
   const evolucaoMap = new Map<string, { entradas: number; despesas: number }>();
-  for (let i = 5; i >= 0; i--) {
-    const key = format(startOfMonth(subMonths(now, i)), "yyyy-MM");
+  for (const key of lastNMonthKeys(6, saoPauloMonthKey(now))) {
     evolucaoMap.set(key, { entradas: 0, despesas: 0 });
   }
   historyTx.forEach((t) => {

@@ -70,5 +70,5 @@ ${dividasResumo}
 Próximos 30 dias:
 ${proximosResumo}
 
-Data de hoje: ${new Date().toLocaleDateString("pt-BR")}`;
+Data de hoje: ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
 }

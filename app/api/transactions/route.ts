@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
-import { startOfDay, startOfWeek, startOfMonth, startOfYear, format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
+import {
+  saoPauloMonthStartKey,
+  saoPauloTodayKey,
+  saoPauloWeekStartKey,
+  saoPauloYearStartKey,
+} from "@/lib/finance/fluxo";
 
 function resolveDateFrom(period: string | null): string | null {
-  const now = new Date();
   switch (period) {
     case "hoje":
-      return format(startOfDay(now), "yyyy-MM-dd");
+      return saoPauloTodayKey();
     case "semana":
-      return format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      return saoPauloWeekStartKey();
     case "mes":
-      return format(startOfMonth(now), "yyyy-MM-dd");
+      return saoPauloMonthStartKey();
     case "ano":
-      return format(startOfYear(now), "yyyy-MM-dd");
+      return saoPauloYearStartKey();
     default:
       return null;
   }

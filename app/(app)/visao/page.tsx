@@ -1,8 +1,7 @@
-import { format, parseISO, startOfMonth, subMonths } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { getFinancialSnapshot } from "@/lib/finance/summary";
 import { getBankConnectionsWithAssets } from "@/lib/finance/bank-connections";
-import { saoPauloTodayKey } from "@/lib/finance/fluxo";
+import { lastNMonthKeys } from "@/lib/finance/fluxo";
 import DashboardClient from "@/components/dashboard/DashboardClient";
 import type { InvestmentSnapshot, InvestmentTxn, Transaction } from "@/lib/finance/types";
 
@@ -10,8 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function VisaoPage() {
   const supabase = await createClient();
-  const today = saoPauloTodayKey();
-  const from = format(startOfMonth(subMonths(parseISO(`${today}T12:00:00`), 11)), "yyyy-MM-dd");
+  const from = `${lastNMonthKeys(12)[0]}-01`;
 
   const [snapshot, connections] = await Promise.all([
     getFinancialSnapshot(supabase),
