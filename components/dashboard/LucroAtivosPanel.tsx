@@ -96,7 +96,40 @@ export function LucroAtivosPanel({
 
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-zinc-200">Rendimento diário</h3>
+              <p className="mt-1 text-[11px] text-zinc-500">Lucro do dia dividido pelo patrimônio investido.</p>
+            </div>
+            <p className={`text-sm font-semibold ${rendimentoHoje >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {formatPercent(rendimentoHoje, 3)}
+            </p>
+          </div>
+          <p className="mt-2 text-[11px] text-zinc-500">30 dias: {formatPercent(rendimento30d)}</p>
+          <div className="mt-2">
+            <RendimentoDiarioChart data={dailyYield} />
+          </div>
+        </div>
+        <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-zinc-200">Rendimento mensal</h3>
+              <p className="mt-1 text-[11px] text-zinc-500">Lucro do mês sobre o saldo médio investido.</p>
+            </div>
+            <p className={`text-sm font-semibold ${rendimentoMes >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {formatPercent(rendimentoMes)}
+            </p>
+          </div>
+          <p className="mt-2 text-[11px] text-zinc-500">Últimos 12 meses</p>
+          <div className="mt-2">
+            <RendimentoMensalChart data={monthlyYield.series} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-medium text-zinc-200">Lucro diário dos investimentos</h2>
           <p className="mt-1 text-xs text-zinc-500">
@@ -174,39 +207,6 @@ export function LucroAtivosPanel({
           O gráfico mostra os 12 primeiros; a tabela abaixo tem todos os {byAsset.keys.length} investimentos.
         </p>
       )}
-
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium text-zinc-200">Rendimento diário</h3>
-              <p className="mt-1 text-[11px] text-zinc-500">Lucro do dia dividido pelo patrimônio investido.</p>
-            </div>
-            <p className={`text-sm font-semibold ${rendimentoHoje >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {formatPercent(rendimentoHoje, 3)}
-            </p>
-          </div>
-          <p className="mt-2 text-[11px] text-zinc-500">30 dias: {formatPercent(rendimento30d)}</p>
-          <div className="mt-2">
-            <RendimentoDiarioChart data={dailyYield} />
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium text-zinc-200">Rendimento mensal</h3>
-              <p className="mt-1 text-[11px] text-zinc-500">Lucro do mês sobre o saldo médio investido.</p>
-            </div>
-            <p className={`text-sm font-semibold ${rendimentoMes >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {formatPercent(rendimentoMes)}
-            </p>
-          </div>
-          <p className="mt-2 text-[11px] text-zinc-500">Últimos 12 meses</p>
-          <div className="mt-2">
-            <RendimentoMensalChart data={monthlyYield.series} />
-          </div>
-        </div>
-      </div>
 
       <div className="mt-5">
         <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
