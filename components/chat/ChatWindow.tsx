@@ -116,24 +116,28 @@ export default function ChatWindow() {
     }
   }
 
+  const canClear = messages.length > 0 && !loadingHistory;
+
   return (
     <PageShell>
       <PageHero
         kicker="IA"
-        title="Conversa"
-        subtitle="Pergunte sobre gastos, saldo e investimentos"
-        trailing={
-          messages.length > 0 ? (
+        title={
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h1 className="text-[34px] font-semibold leading-[1.05] tracking-tight text-white lg:text-5xl">
+              Conversa
+            </h1>
             <button
               type="button"
               onClick={() => void handleClear()}
-              disabled={clearing}
-              className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 disabled:opacity-50"
+              disabled={!canClear || clearing}
+              className="relative z-10 mb-1 shrink-0 rounded-full bg-white px-4 py-2 text-sm font-medium text-zinc-950 disabled:opacity-40"
             >
-              {clearing ? "Apagando..." : "Limpar conversa"}
+              {clearing ? "Apagando..." : "Apagar conversa"}
             </button>
-          ) : null
+          </div>
         }
+        subtitle="Pergunte sobre gastos, saldo e investimentos"
       />
       <div className="flex h-[calc(100vh-15rem)] flex-col px-4 lg:h-[calc(100vh-12rem)] lg:px-6 xl:px-10 2xl:px-14">
         <div className="flex-1 space-y-3 overflow-y-auto pb-3">
@@ -147,6 +151,16 @@ export default function ChatWindow() {
             messages.map((m) => <ChatBubble key={m.id} message={m} />)
           )}
           <div ref={bottomRef} />
+        </div>
+        <div className="mb-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => void handleClear()}
+            disabled={!canClear || clearing}
+            className="rounded-full px-3 py-1.5 text-sm font-medium text-zinc-300 underline underline-offset-4 disabled:opacity-40"
+          >
+            {clearing ? "Apagando..." : "Apagar conversa"}
+          </button>
         </div>
         <ChatInput disabled={sending} onSend={handleSend} />
       </div>
