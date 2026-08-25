@@ -9,7 +9,9 @@ import { friendlyAccountName } from "@/lib/finance/account-name";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
-import { BankLogo } from "@/components/bancos/BankLogo";
+import { belongsToConnection, dailyBudgetFromBalance, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
+import type { Transaction } from "@/lib/finance/types";
+import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -33,12 +35,15 @@ function shortBankName(name: string) {
 export default function BankHome({
   snapshot,
   connections,
+  historyTx = [],
 }: {
   snapshot: FinancialSnapshot;
   connections: BankConnectionWithAssets[];
+  historyTx?: Transaction[];
 }) {
   const [connectionId, setConnectionId] = useState("all");
   const [hidden, setHidden] = useState(true);
+  const [balanceView, setBalanceView] = useBalanceView();
 
   const selected = useMemo(
     () => connections.find((connection) => connection.id === connectionId) ?? null,
@@ -50,15 +55,26 @@ export default function BankHome({
   const investments = selected?.investments ?? snapshot.investments;
   const bankBalance = accounts.reduce((sum, item) => sum + Number(item.balance), 0);
   const bankInvestments = investments.reduce((sum, item) => sum + Number(item.amount), 0);
-  const bankInvoices = cards.reduce((sum, item) => sum + Number(item.current_invoice), 0);
-  const patrimonio = selected
-    ? bankBalance + bankInvestments - bankInvoices
-    : snapshot.patrimonio;
+  const saldoConta = bankBalance;
+  const saldoTotal = bankBalance + bankInvestments;
+  const displayedBalance = balanceView === "total" ? saldoTotal : saldoConta;
   const monthName = format(new Date(), "LLLL", { locale: ptBR });
   const bankLabel = selected ? shortBankName(selected.institution_name) : "visão geral";
   const monthTotal = snapshot.monthEntradas + snapshot.monthDespesas;
   const inShare = monthTotal > 0 ? (snapshot.monthEntradas / monthTotal) * 100 : 50;
   const maxCategory = snapshot.gastosPorCategoria[0]?.total ?? 0;
+  const todayKey = saoPauloTodayKey();
+  const weekStart = saoPauloWeekStartKey();
+  const scopedTx = useMemo(
+    () => historyTx.filter((transaction) => belongsToConnection(transaction, connectionId, snapshot.accounts, snapshot.cards)),
+    [historyTx, connectionId, snapshot.accounts, snapshot.cards],
+  );
+  const gastosHoje =
+    historyTx.length > 0 ? sumGastosInRange(scopedTx, todayKey, todayKey) : snapshot.gastosHoje;
+  const gastosSemana =
+    historyTx.length > 0 ? sumGastosInRange(scopedTx, weekStart, todayKey) : snapshot.gastosSemana;
+  const dailyBudget = dailyBudgetFromBalance(saldoConta, todayKey);
+  const dailyUntilLabel = format(parseISO(`${dailyBudget.until}T12:00:00`), "d 'de' MMMM", { locale: ptBR });
 
   if (connections.length === 0) {
     return (
@@ -115,9 +131,11 @@ export default function BankHome({
 
             <p className="mt-8 text-sm text-zinc-500 lg:mt-10">{bankLabel}</p>
             <p className="mt-1 text-[44px] font-semibold leading-none tracking-tight text-white lg:text-[64px]">
-              {money(hidden, patrimonio)}
+              {money(hidden, displayedBalance)}
             </p>
-            <p className="mt-2 text-xs text-zinc-500">patrimônio líquido</p>
+            <div className="mt-4">
+              <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
+            </div>
 
             <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-1">
               <button
@@ -195,6 +213,33 @@ export default function BankHome({
             </Link>
           </div>
         </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 px-4 lg:px-6">
+        <Link href="/fluxo" className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">Gastos de hoje</p>
+          <p className="mt-2 text-xl font-semibold tracking-tight text-rose-300 lg:text-2xl">
+            {money(hidden, gastosHoje)}
+          </p>
+        </Link>
+        <Link href="/fluxo" className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">Gastos da semana</p>
+          <p className="mt-2 text-xl font-semibold tracking-tight text-rose-300 lg:text-2xl">
+            {money(hidden, gastosSemana)}
+          </p>
+        </Link>
+      </section>
+
+      <section className="mt-3 px-4 lg:px-6">
+        <article className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">Pode gastar por dia</p>
+          <p className="mt-2 text-xl font-semibold tracking-tight text-white lg:text-2xl">
+            {money(hidden, dailyBudget.perDay)}
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            até {dailyUntilLabel} · {dailyBudget.days} {dailyBudget.days === 1 ? "dia" : "dias"} · saldo em conta
+          </p>
+        </article>
       </section>
 
       <section className="mt-2 lg:mt-4">

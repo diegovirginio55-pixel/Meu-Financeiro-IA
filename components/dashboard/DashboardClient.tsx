@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { eachDayOfInterval, format, parseISO, startOfMonth, subDays, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { formatCurrency } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
-import { belongsToConnection, isGasto, isRenda } from "@/lib/finance/fluxo";
+import { belongsToConnection, dailyBudgetFromBalance, isGasto, isRenda, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Transaction } from "@/lib/finance/types";
@@ -20,7 +21,7 @@ import { EconomiaMensalChart, FluxoDiarioChart, MixPizzaChart, SemanaGastosChart
 import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
 import { GoalsProgress, MaioresGastos, ProximasContas } from "@/components/dashboard/ListPanels";
 import type { InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
-import { HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
+import { BalanceViewToggle, HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel, useBalanceView } from "@/components/ui/page-chrome";
 
 function CardIcon() {
   return (
@@ -56,6 +57,7 @@ export default function DashboardClient({
   const [connectionId, setConnectionId] = useState("all");
   const [openBanks, setOpenBanks] = useState<Set<string>>(new Set());
   const [investTab, setInvestTab] = useState<"classes" | "instituicoes">("classes");
+  const [balanceView, setBalanceView] = useBalanceView();
 
   const visibleConnections = useMemo(() => {
     if (connectionId === "all") return connections;
@@ -83,8 +85,16 @@ export default function DashboardClient({
     .filter(isRenda)
     .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
   const monthDespesas = monthTx.filter(isGasto).reduce((sum, transaction) => sum + Number(transaction.amount), 0);
-  const economia = monthEntradas - monthDespesas;
+  const todayKey = saoPauloTodayKey();
+  const weekStart = saoPauloWeekStartKey();
+  const gastosHoje = sumGastosInRange(scopedTx, todayKey, todayKey);
+  const gastosSemana = sumGastosInRange(scopedTx, weekStart, todayKey);
   const patrimonio = totalBalance + totalInvestments - totalInvoices - snapshot.totalDebts;
+  const saldoConta = totalBalance;
+  const saldoTotal = totalBalance + totalInvestments;
+  const displayedBalance = balanceView === "total" ? saldoTotal : saldoConta;
+  const dailyBudget = dailyBudgetFromBalance(saldoConta, todayKey);
+  const dailyUntilLabel = format(parseISO(`${dailyBudget.until}T12:00:00`), "d 'de' MMMM", { locale: ptBR });
 
   const gastosPorCategoria = useMemo(() => {
     const map = new Map<string, number>();
@@ -229,8 +239,8 @@ export default function DashboardClient({
     <PageShell>
       <PageHero
         kicker="Visão geral"
-        title={<HeroAmount>{formatCurrency(patrimonio)}</HeroAmount>}
-        subtitle="patrimônio líquido · gráficos e detalhes abaixo"
+        title={<HeroAmount>{formatCurrency(displayedBalance)}</HeroAmount>}
+        subtitle={<BalanceViewToggle value={balanceView} onChange={setBalanceView} />}
         trailing={
           <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
             <select
@@ -258,10 +268,10 @@ export default function DashboardClient({
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          ["Contas", totalBalance, "text-white"],
+          ["Gastos de hoje", gastosHoje, "text-rose-300"],
+          ["Gastos da semana", gastosSemana, "text-rose-300"],
           ["Entradas", monthEntradas, "text-emerald-400"],
-          ["Despesas", monthDespesas, "text-rose-300"],
-          ["Mês", economia, economia >= 0 ? "text-emerald-400" : "text-rose-300"],
+          ["Despesas do mês", monthDespesas, "text-rose-300"],
         ].map(([label, value, tone]) => (
           <SoftPanel key={String(label)} className="px-4 py-3">
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
@@ -269,6 +279,14 @@ export default function DashboardClient({
           </SoftPanel>
         ))}
       </div>
+
+      <SoftPanel className="px-4 py-4">
+        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Pode gastar por dia</p>
+        <p className="mt-1 text-2xl font-semibold text-white">{formatCurrency(dailyBudget.perDay)}</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          até {dailyUntilLabel} · {dailyBudget.days} {dailyBudget.days === 1 ? "dia" : "dias"} · saldo em conta
+        </p>
+      </SoftPanel>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">

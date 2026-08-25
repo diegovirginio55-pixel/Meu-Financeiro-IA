@@ -8,6 +8,7 @@ import type { InvestmentSnapshot, InvestmentTxn, Transaction } from "@/lib/finan
 export default function HomeSwitch({
   snapshot,
   connections,
+  historyTx = [],
 }: {
   snapshot: FinancialSnapshot;
   connections: BankConnectionWithAssets[];
@@ -15,5 +16,5 @@ export default function HomeSwitch({
   snapshots?: InvestmentSnapshot[];
   investmentTx?: InvestmentTxn[];
 }) {
-  return <BankHome snapshot={snapshot} connections={connections} />;
+  return <BankHome snapshot={snapshot} connections={connections} historyTx={historyTx} />;
 }

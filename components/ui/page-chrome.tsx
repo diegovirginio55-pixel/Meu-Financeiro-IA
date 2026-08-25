@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 export function PageShell({ children }: { children: React.ReactNode }) {
   return <div className="-mx-4 pb-6 text-zinc-100 lg:-mx-6 lg:pb-8">{children}</div>;
 }
@@ -79,4 +83,55 @@ export function chipClass(active: boolean) {
   return `shrink-0 rounded-full px-3 py-1.5 text-sm ${
     active ? "bg-white text-zinc-950" : "border border-zinc-800 bg-zinc-900 text-zinc-300"
   }`;
+}
+
+export type BalanceView = "total" | "conta";
+
+const BALANCE_VIEW_KEY = "mf-balance-view";
+
+export function useBalanceView() {
+  const [value, setValue] = useState<BalanceView>("total");
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(BALANCE_VIEW_KEY);
+    if (stored === "conta" || stored === "total") setValue(stored);
+  }, []);
+
+  function onChange(next: BalanceView) {
+    setValue(next);
+    window.localStorage.setItem(BALANCE_VIEW_KEY, next);
+  }
+
+  return [value, onChange] as const;
+}
+
+export function BalanceViewToggle({
+  value,
+  onChange,
+}: {
+  value: BalanceView;
+  onChange: (value: BalanceView) => void;
+}) {
+  return (
+    <div className="flex gap-2" role="tablist" aria-label="Tipo de saldo">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={value === "total"}
+        onClick={() => onChange("total")}
+        className={chipClass(value === "total")}
+      >
+        Saldo total
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={value === "conta"}
+        onClick={() => onChange("conta")}
+        className={chipClass(value === "conta")}
+      >
+        Saldo em conta
+      </button>
+    </div>
+  );
 }

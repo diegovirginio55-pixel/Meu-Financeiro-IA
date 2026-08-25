@@ -17,7 +17,7 @@ import type {
   Goal,
   Investment,
 } from "./types";
-import { isGasto, isRenda } from "./fluxo";
+import { isGasto, isRenda, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange, dailyBudgetFromBalance } from "./fluxo";
 import { promoteInvestmentsFromTransactions } from "./investment-movements";
 
 export interface UpcomingItem {
@@ -42,6 +42,11 @@ export interface FinancialSnapshot {
   monthEntradas: number;
   monthDespesas: number;
   economia: number;
+  gastosHoje: number;
+  gastosSemana: number;
+  gastoDiarioAteDia5: number;
+  diasAteDia5: number;
+  dataLimiteDia5: string;
   gastosPorCategoria: { category: string; total: number }[];
   maioresGastos: Transaction[];
   proximos30Dias: UpcomingItem[];
@@ -124,6 +129,12 @@ export async function getFinancialSnapshot(
     .filter(isGasto)
     .reduce((s, t) => s + Number(t.amount), 0);
   const economia = monthEntradas - monthDespesas;
+
+  const todayKey = saoPauloTodayKey(now);
+  const weekStart = saoPauloWeekStartKey(now);
+  const gastosHoje = sumGastosInRange(historyTx, todayKey, todayKey);
+  const gastosSemana = sumGastosInRange(historyTx, weekStart, todayKey);
+  const dailyBudget = dailyBudgetFromBalance(totalBalance, todayKey);
 
   const categoriaMap = new Map<string, number>();
   monthTx
@@ -217,6 +228,11 @@ export async function getFinancialSnapshot(
     monthEntradas,
     monthDespesas,
     economia,
+    gastosHoje,
+    gastosSemana,
+    gastoDiarioAteDia5: dailyBudget.perDay,
+    diasAteDia5: dailyBudget.days,
+    dataLimiteDia5: dailyBudget.until,
     gastosPorCategoria,
     maioresGastos,
     proximos30Dias,
