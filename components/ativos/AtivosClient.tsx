@@ -12,7 +12,6 @@ import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
 import { HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
-import { useConnectionFilter } from "@/lib/ui/use-persisted-state";
 
 type AssetRow = Investment & {
   bankName: string;
@@ -52,6 +51,10 @@ function displayName(name: string, bankName: string): string {
   return name.replace(prefix, "").trim() || name;
 }
 
+function isInterConnection(connection: BankConnectionWithAssets) {
+  return officialInstitutionName(connection.institution_name) === "Inter";
+}
+
 export default function AtivosClient({
   connections,
   snapshots = [],
@@ -62,9 +65,19 @@ export default function AtivosClient({
   investmentTx?: InvestmentTxn[];
 }) {
   const connectionIds = useMemo(() => connections.map((connection) => connection.id), [connections]);
-  const [connectionId, setConnectionId] = useConnectionFilter(connectionIds);
+  const interId = useMemo(
+    () => connections.find(isInterConnection)?.id ?? "all",
+    [connections],
+  );
+  const [connectionId, setConnectionId] = useState(interId);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const router = useRouter();
+
+  useEffect(() => {
+    if (connectionId !== "all" && !connectionIds.includes(connectionId)) {
+      setConnectionId(interId);
+    }
+  }, [connectionId, connectionIds, interId]);
 
   useEffect(() => {
     function onVisible() {
