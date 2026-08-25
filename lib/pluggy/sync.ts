@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pluggyApi } from "./client";
+import { pluggyApi, pluggyInvestmentAmount, type PluggyAccount, type PluggyInvestment } from "./client";
 import {
   bankFromLabel,
   inferInstitutionName,
@@ -87,19 +87,34 @@ const INVESTMENT_TYPE_LABELS: Record<string, string> = {
   EQUITY: "Renda variável",
   ETF: "ETF",
   COE: "COE",
+  OTHER: "Investimento",
   CDB: "CDB",
   LCI: "LCI",
   LCA: "LCA",
+  LC: "LC",
+  LF: "LF",
   TREASURY: "Tesouro",
   CRI: "CRI",
   CRA: "CRA",
   DEBENTURES: "Debênture",
+  CORPORATE_DEBT: "Debênture",
 };
 
-function investmentLabel(type?: string, subtype?: string | null) {
+function investmentLabel(type?: string, subtype?: string | null, name?: string | null) {
+  const haystack = `${name ?? ""} ${subtype ?? ""} ${type ?? ""}`.toUpperCase();
+  if (haystack.includes("LCI")) return "LCI";
+  if (haystack.includes("LCA")) return "LCA";
+  if (/\bCDB\b/.test(haystack)) return "CDB";
+  if (haystack.includes("TESOURO")) return "Tesouro";
   if (subtype && INVESTMENT_TYPE_LABELS[subtype]) return INVESTMENT_TYPE_LABELS[subtype];
   if (type && INVESTMENT_TYPE_LABELS[type]) return INVESTMENT_TYPE_LABELS[type];
   return type || "Investimento";
+}
+
+function isInvestmentLikeAccount(account: PluggyAccount) {
+  if (account.type === "INVESTMENT") return true;
+  const haystack = `${account.name ?? ""} ${account.marketingName ?? ""} ${account.subtype ?? ""}`;
+  return /\b(lci|lca|cdb|cri|cra|tesouro|deb[eê]nture|renda\s*fixa)\b/i.test(haystack);
 }
 
 function accountTypeLabel(subtype?: string) {
@@ -180,7 +195,7 @@ export async function syncBankConnection(
     const institution = institutionForAccount(account, institutionName);
     const rawName = pluggyAccountName(account);
 
-    if (account.type === "BANK") {
+    if (account.type === "BANK" && !isInvestmentLikeAccount(account)) {
       const { data: accountRow } = await supabase
         .from("accounts")
         .upsert(
@@ -228,19 +243,52 @@ export async function syncBankConnection(
 
   try {
     const connectorBank = bankFromLabel(item.connector.name);
-    const { results: investments } = await pluggyApi.fetchInvestments(pluggyItemId);
-    const active = investments.filter((inv) => inv.status !== "TOTAL_WITHDRAWAL");
+    let { results: investments } = await pluggyApi.fetchInvestments(pluggyItemId);
+    if (investments.length === 0 && item.status === "UPDATING") {
+      await new Promise((resolve) => setTimeout(resolve, 8000));
+      investments = (await pluggyApi.fetchInvestments(pluggyItemId)).results;
+    }
+
+    const syntheticIds = new Set<string>();
+    const fromAccounts: PluggyInvestment[] = accounts.filter(isInvestmentLikeAccount).map((account) => {
+      syntheticIds.add(account.id);
+      const label = `${account.marketingName || account.name || "Investimento"}`;
+      return {
+        id: account.id,
+        name: label,
+        type: "FIXED_INCOME",
+        subtype: investmentLabel("FIXED_INCOME", null, label),
+        balance: account.balance,
+        amount: account.balance,
+        institution: { name: institutionForAccount(account, institutionName) },
+        status: "ACTIVE",
+      };
+    });
+
+    const merged = [...investments];
+    fromAccounts.forEach((candidate) => {
+      const amount = pluggyInvestmentAmount(candidate);
+      const already = merged.some((inv) => Math.abs(pluggyInvestmentAmount(inv) - amount) < 1 && amount !== 0);
+      if (!already) merged.push(candidate);
+    });
+
+    const active = merged
+      .filter((inv) => inv.status !== "TOTAL_WITHDRAWAL")
+      .filter((inv) => pluggyInvestmentAmount(inv) !== 0 || merged.length === 1);
+    if (item.statusDetail?.investments && item.statusDetail.investments.isUpdated === false) {
+      console.warn("Pluggy não atualizou investimentos neste sync:", item.statusDetail.investments);
+    }
 
     if (active.length > 0) {
       const rows = active.map((inv) => {
         const bank = investmentInstitution(inv, item.connector.name, connectorBank ?? onlyBank, institutionName);
-        const amount = Number(inv.balance ?? inv.amount ?? inv.value ?? 0);
+        const amount = pluggyInvestmentAmount(inv);
         const rate = monthlyRate(inv);
         return {
           user_id: userId,
           name: withInstitutionPrefix(inv.name || "Investimento", bank),
           amount,
-          type: investmentLabel(inv.type, inv.subtype),
+          type: investmentLabel(inv.type, inv.subtype, inv.name),
           amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
           amount_original: inv.amountOriginal == null ? null : Number(inv.amountOriginal),
           last_month_rate: rate == null ? null : Number(rate),
@@ -273,7 +321,7 @@ export async function syncBankConnection(
             investment_id: localId,
             bank_connection_id: bankConnectionId,
             snapshot_date: today,
-            amount: Number(inv.balance ?? inv.amount ?? inv.value ?? 0),
+            amount: pluggyInvestmentAmount(inv),
             amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
           },
         ];
@@ -286,6 +334,7 @@ export async function syncBankConnection(
       }
 
       for (const inv of active) {
+        if (syntheticIds.has(inv.id)) continue;
         const localId = idByPluggy.get(inv.id);
         if (!localId) continue;
         try {

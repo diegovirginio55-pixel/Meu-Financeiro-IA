@@ -78,7 +78,11 @@ export type PluggyAccount = {
 export type PluggyItem = {
   id: string;
   status: string;
-  statusDetail?: unknown;
+  executionStatus?: string | null;
+  statusDetail?: {
+    investments?: { isUpdated?: boolean; lastUpdatedAt?: string | null; warnings?: unknown[] } | null;
+    accounts?: { isUpdated?: boolean; lastUpdatedAt?: string | null } | null;
+  } | null;
   connector: { name: string; imageUrl?: string | null };
 };
 
@@ -96,8 +100,8 @@ export type PluggyInvestment = {
   name?: string;
   type?: string;
   subtype?: string | null;
-  balance?: number;
-  amount?: number;
+  balance?: number | null;
+  amount?: number | null;
   amountProfit?: number | null;
   amountOriginal?: number | null;
   lastMonthRate?: number | null;
@@ -108,11 +112,22 @@ export type PluggyInvestment = {
   code?: string | null;
   number?: string | null;
   value?: number | null;
+  quantity?: number | null;
   rate?: number | null;
   annualRate?: number | null;
   fixedAnnualRate?: number | null;
   institution?: { name?: string | null; number?: string | null; cnpj?: string | null } | null;
 };
+
+export function pluggyInvestmentAmount(inv: PluggyInvestment): number {
+  const fromQuantity =
+    inv.quantity != null && inv.value != null ? Number(inv.quantity) * Number(inv.value) : NaN;
+  for (const candidate of [inv.amount, inv.balance, fromQuantity, inv.value, inv.amountOriginal]) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value !== 0) return value;
+  }
+  return 0;
+}
 
 export type PluggyInvestmentTransaction = {
   id: string;
@@ -137,6 +152,7 @@ export const pluggyApi = {
         webhookUrl: options.webhookUrl,
         oauthRedirectUri: options.oauthRedirectUri,
         avoidDuplicates: options.itemId ? false : (options.avoidDuplicates ?? true),
+        products: ["ACCOUNTS", "CREDIT_CARDS", "TRANSACTIONS", "INVESTMENTS"],
       },
     };
     if (options.itemId) payload.itemId = options.itemId;
@@ -158,12 +174,12 @@ export const pluggyApi = {
     });
   },
 
-  async waitForItemIdle(itemId: string, timeoutMs = 40000) {
+  async waitForItemIdle(itemId: string, timeoutMs = 45000) {
     const started = Date.now();
     let item = await this.fetchItem(itemId);
     while (Date.now() - started < timeoutMs) {
       if (item.status !== "UPDATING") return item;
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2500));
       item = await this.fetchItem(itemId);
     }
     return item;
@@ -179,24 +195,42 @@ export const pluggyApi = {
   },
 
   async fetchInvestments(itemId: string) {
-    const results: PluggyInvestment[] = [];
-    let page = 1;
+    const byId = new Map<string, PluggyInvestment>();
+    const types = ["FIXED_INCOME", "MUTUAL_FUND", "EQUITY", "ETF", "SECURITY", "COE", "OTHER"];
 
-    for (let i = 0; i < 20; i++) {
-      const params = new URLSearchParams({
-        itemId,
-        page: String(page),
-        pageSize: "50",
-      });
-      const body = await pluggyFetch(`/investments?${params.toString()}`);
-      results.push(...((body.results ?? []) as PluggyInvestment[]));
-
-      const totalPages = Number(body.totalPages ?? 1);
-      if (page >= totalPages) break;
-      page += 1;
+    async function collect(type?: string) {
+      let page = 1;
+      for (let i = 0; i < 20; i++) {
+        const params = new URLSearchParams({
+          itemId,
+          page: String(page),
+          pageSize: "50",
+        });
+        if (type) params.set("type", type);
+        const body = await pluggyFetch(`/investments?${params.toString()}`);
+        const batch = (body.results ?? []) as PluggyInvestment[];
+        batch.forEach((investment) => byId.set(investment.id, investment));
+        const totalPages = Number(body.totalPages ?? 1);
+        if (page >= totalPages || batch.length < 50) break;
+        page += 1;
+      }
     }
 
-    return { results };
+    try {
+      await collect();
+    } catch (error) {
+      console.error("Erro ao listar investimentos da Pluggy:", error);
+    }
+
+    for (const type of types) {
+      try {
+        await collect(type);
+      } catch (error) {
+        console.error(`Erro ao listar investimentos ${type} da Pluggy:`, error);
+      }
+    }
+
+    return { results: [...byId.values()] };
   },
 
   async fetchInvestmentTransactions(investmentId: string) {

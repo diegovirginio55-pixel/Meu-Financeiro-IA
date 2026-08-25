@@ -25,7 +25,7 @@ const COMPE_BANKS: Record<string, string> = {
 
 const NAME_HINTS: Array<[RegExp, string]> = [
   [/nubank|\bnubank\b|\broxinho\b|\bnuconta\b|\bnu conta\b/i, "Nubank"],
-  [/\binter\b/i, "Inter"],
+  [/\binter\b|intermedium|banco\s*inter/i, "Inter"],
   [/\bita[uú]\b/i, "Itaú"],
   [/bradesco/i, "Bradesco"],
   [/santander/i, "Santander"],
