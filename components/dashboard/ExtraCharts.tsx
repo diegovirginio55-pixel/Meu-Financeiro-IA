@@ -10,8 +10,6 @@ import {
   Cell,
   LabelList,
   Legend,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -268,7 +266,6 @@ function formatAxisPercent(value: number): string {
 }
 
 export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
-  const uid = useId().replace(/:/g, "");
   const hasValues = data.some((point) => point.rendimento !== 0);
   return (
     <div className="relative h-[240px] w-full lg:h-[280px]">
@@ -278,13 +275,7 @@ export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
         </p>
       )}
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 12, right: 8, left: 4, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`yieldStroke-${uid}`} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#6ee7b7" />
-              <stop offset="100%" stopColor="#34d399" />
-            </linearGradient>
-          </defs>
+        <BarChart data={data} barCategoryGap="12%" maxBarSize={14} margin={{ top: 12, right: 8, left: 4, bottom: 0 }}>
           <CartesianGrid stroke="#27272a" strokeDasharray="4 8" vertical={false} />
           <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} dy={8} />
           <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisPercent} />
@@ -297,16 +288,12 @@ export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
               return `${label} · ${formatCurrency(row.lucro)}`;
             }}
           />
-          <Line
-            type="monotone"
-            dataKey="rendimento"
-            name="rendimento"
-            stroke={`url(#yieldStroke-${uid})`}
-            strokeWidth={2.6}
-            dot={false}
-            activeDot={{ r: 5, fill: "#34d399", stroke: "#09090b", strokeWidth: 2 }}
-          />
-        </LineChart>
+          <Bar dataKey="rendimento" name="rendimento" radius={[4, 4, 0, 0]}>
+            {data.map((entry) => (
+              <Cell key={entry.date} fill={entry.rendimento >= 0 ? "#34d399" : "#fb7185"} />
+            ))}
+          </Bar>
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
