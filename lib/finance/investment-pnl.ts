@@ -76,14 +76,17 @@ function estimatedDailyProfit(
   transactions: InvestmentTxn[],
   days?: number,
 ): number {
-  const span = Math.max(1, days ?? holdingDays(snapshots, transactions));
-  const profit = accumulatedProfit(investment);
-  if (profit !== 0) return profit / span;
-  const principal = Number(investment.amount_original ?? investment.amount ?? 0);
+  // Projeção com a taxa atual sobre o saldo atual (o que o investimento rende "hoje" no
+  // ritmo dele), igual ao cálculo que qualquer banco mostra. Só cai para a média do lucro
+  // já realizado dividido pelos dias quando não há saldo/taxa conhecidos.
+  const principal = Number(investment.amount ?? investment.amount_original ?? 0);
   const monthly = monthlyYieldPercent(investment);
   if (principal !== 0 && monthly !== 0) {
     return (principal * (monthly / 100)) / 30;
   }
+  const span = Math.max(1, days ?? holdingDays(snapshots, transactions));
+  const profit = accumulatedProfit(investment);
+  if (profit !== 0) return profit / span;
   return 0;
 }
 
