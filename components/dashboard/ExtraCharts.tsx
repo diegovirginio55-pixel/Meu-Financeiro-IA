@@ -453,7 +453,7 @@ export function RendimentoMensalChart({ data }: { data: YieldPoint[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} barCategoryGap="24%" maxBarSize={36} margin={{ top: 24, right: 8, left: 4, bottom: 0 }}>
           <CartesianGrid stroke="#27272a" strokeDasharray="4 8" vertical={false} />
-          <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} dy={8} />
+          <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} dy={8} interval={0} />
           <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} width={56} tickFormatter={compactAxis} />
           <Tooltip
             contentStyle={chartTooltipStyle}

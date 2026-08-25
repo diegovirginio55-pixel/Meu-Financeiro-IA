@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatCurrency, formatPercent } from "@/lib/finance/format";
+import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/finance/format";
+import { saoPauloMonthKey } from "@/lib/finance/fluxo";
 import type { BankConnection, Investment, InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 import {
   buildDailyInvestmentPnlByAsset,
   buildDailyYieldSeries,
   buildMonthlyInvestmentYield,
-  periodYield,
   summarizeAssetPnl,
   totalAccumulatedProfit,
 } from "@/lib/finance/investment-pnl";
@@ -59,6 +59,7 @@ export function LucroAtivosPanel({
         investments: liveInvestments,
         snapshots,
         transactions: investmentTx,
+        months: 6,
       }),
     [liveInvestments, snapshots, investmentTx],
   );
@@ -69,8 +70,12 @@ export function LucroAtivosPanel({
   const lucroHojeRaw = Number(byAsset.series[byAsset.series.length - 1]?.Total ?? 0);
   const lucroHoje = Math.abs(lucroHojeRaw) >= 0.005 ? lucroHojeRaw : 0;
   const rendimentoHoje = dailyYield[dailyYield.length - 1]?.rendimento ?? 0;
-  const rendimento30d = periodYield(dailyYield);
   const lucroDia = dailyYield[dailyYield.length - 1]?.lucro ?? lucroHoje;
+  const monthKey = saoPauloMonthKey();
+  const monthPoint =
+    monthlyYield.series.find((point) => point.date === monthKey) ?? monthlyYield.series.at(-1);
+  const lucroMes = monthPoint?.lucro ?? 0;
+  const rendimentoMes = monthPoint?.rendimento ?? 0;
 
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
@@ -107,13 +112,15 @@ export function LucroAtivosPanel({
         </div>
         <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
           <h3 className="text-sm font-medium text-zinc-200">Rendimento mensal</h3>
-          <p className="mt-1 text-[11px] text-zinc-500">Lucro do mês sobre o saldo médio investido.</p>
+          <p className="mt-1 text-[11px] text-zinc-500">Lucro deste mês sobre o saldo médio investido.</p>
           <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950/50 px-3 py-2.5">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">30 dias</p>
-            <p className={`mt-1 text-2xl font-semibold ${lucroPeriodo >= 0 ? "text-emerald-400" : "text-rose-300"}`}>
-              {formatCurrency(lucroPeriodo)}
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">
+              {formatMonthLabel(monthPoint?.date ?? monthKey)}
             </p>
-            <p className="mt-1 text-[11px] text-zinc-500">{formatPercent(rendimento30d)}</p>
+            <p className={`mt-1 text-2xl font-semibold ${lucroMes >= 0 ? "text-emerald-400" : "text-rose-300"}`}>
+              {formatCurrency(lucroMes)}
+            </p>
+            <p className="mt-1 text-[11px] text-zinc-500">{formatPercent(rendimentoMes)}</p>
           </div>
           <div className="mt-3">
             <RendimentoMensalChart data={monthlyYield.series} />

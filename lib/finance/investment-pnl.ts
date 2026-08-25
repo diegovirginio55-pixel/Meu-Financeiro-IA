@@ -74,14 +74,16 @@ function estimatedDailyProfit(
   investment: Investment,
   snapshots: InvestmentSnapshot[],
   transactions: InvestmentTxn[],
+  days?: number,
 ): number {
+  const span = Math.max(1, days ?? holdingDays(snapshots, transactions));
+  const profit = accumulatedProfit(investment);
+  if (profit !== 0) return profit / span;
   const principal = Number(investment.amount_original ?? investment.amount ?? 0);
   const monthly = monthlyYieldPercent(investment);
   if (principal !== 0 && monthly !== 0) {
     return (principal * (monthly / 100)) / 30;
   }
-  const profit = accumulatedProfit(investment);
-  if (profit !== 0) return profit / holdingDays(snapshots, transactions);
   return 0;
 }
 
@@ -201,23 +203,21 @@ function seriesForInvestment({
     }
   }
 
-  const perDay = estimatedDailyProfit(investment, snaps, transactions);
-  if (Math.abs(perDay) < 0.005) return { points: [], estimated: false };
-
-  const profit = accumulatedProfit(investment);
-  const held = holdingDays(snaps, transactions);
-  const implied =
-    Math.abs(perDay) >= 0.005 && profit !== 0 ? Math.max(1, Math.round(Math.abs(profit / perDay))) : held;
-  const daysBack = Math.min(dates.length, Math.max(held, implied, 1));
   const firstBuy = transactions
     .filter((item) => item.type === "BUY")
     .map((item) => toDateKey(item.date))
     .sort()[0];
   const fromByDate = firstBuy ?? (snaps[0] ? toDateKey(snaps[0].snapshot_date) : null);
+  const held = holdingDays(snaps, transactions);
   const estimateFrom =
-    (fromByDate && dates.find((date) => date >= fromByDate)) || dates[dates.length - daysBack] || dates[0];
+    (fromByDate && dates.find((date) => date >= fromByDate)) ||
+    dates[dates.length - Math.min(dates.length, held)] ||
+    dates[0];
+  const span = dates.filter((date) => date >= estimateFrom);
+  const perDay = estimatedDailyProfit(investment, snaps, transactions, span.length);
+  if (Math.abs(perDay) < 0.005) return { points: [], estimated: false };
   return {
-    points: dates.filter((date) => date >= estimateFrom).map((date) => ({ date, value: perDay })),
+    points: span.map((date) => ({ date, value: perDay })),
     estimated: true,
   };
 }
