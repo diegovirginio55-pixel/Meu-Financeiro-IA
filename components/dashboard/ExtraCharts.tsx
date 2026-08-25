@@ -18,7 +18,7 @@ import {
   YAxis,
 } from "recharts";
 import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/finance/format";
-import { barPercentLabel, chartTooltipStyle, compactAxis, compactShort } from "@/components/dashboard/chart-theme";
+import { barMoneyLabel, chartTooltipStyle, compactAxis, compactShort } from "@/components/dashboard/chart-theme";
 import type { AssetPnlRow, YieldPoint } from "@/lib/finance/investment-pnl";
 
 export function EconomiaMensalChart({
@@ -338,10 +338,6 @@ export function LucroAtivosBarChart({ rows }: { rows: AssetPnlRow[] }) {
   );
 }
 
-function formatAxisPercent(value: number): string {
-  return `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
-}
-
 function YieldTooltip({
   active,
   payload,
@@ -367,9 +363,9 @@ function YieldTooltip({
 
 export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
   const uid = useId().replace(/:/g, "");
-  const hasValues = data.some((point) => point.rendimento !== 0);
+  const hasValues = data.some((point) => point.lucro !== 0 || point.rendimento !== 0);
   const peak = data.reduce(
-    (best, item) => (item.rendimento > best.rendimento ? item : best),
+    (best, item) => (item.lucro > best.lucro ? item : best),
     data[0] ?? { date: "", label: "", lucro: 0, capital: 0, rendimento: 0 },
   );
 
@@ -414,24 +410,24 @@ export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
             fontSize={11}
             tickLine={false}
             axisLine={false}
-            width={48}
-            tickFormatter={formatAxisPercent}
+            width={56}
+            tickFormatter={compactAxis}
           />
           <Tooltip cursor={{ fill: "rgba(52, 211, 153, 0.08)" }} content={<YieldTooltip />} />
-          <Bar dataKey="rendimento" name="Rendimento" radius={[7, 7, 3, 3]} maxBarSize={16}>
+          <Bar dataKey="lucro" name="Lucro" radius={[7, 7, 3, 3]} maxBarSize={16}>
             <LabelList
-              dataKey="rendimento"
+              dataKey="lucro"
               position="top"
-              formatter={(value) => barPercentLabel(value, 3)}
+              formatter={barMoneyLabel}
               fill="#d4d4d8"
               fontSize={8}
               offset={4}
               angle={data.length > 14 ? -70 : 0}
             />
             {data.map((entry) => {
-              const empty = Math.abs(entry.rendimento) < 0.0005;
+              const empty = Math.abs(entry.lucro) < 0.005;
               const isPeak = !empty && entry.date === peak.date;
-              const fill = entry.rendimento < 0
+              const fill = entry.lucro < 0
                 ? `url(#yieldNeg-${uid})`
                 : isPeak
                   ? `url(#yieldPeak-${uid})`
@@ -458,27 +454,30 @@ export function RendimentoMensalChart({ data }: { data: YieldPoint[] }) {
         <BarChart data={data} barCategoryGap="24%" maxBarSize={36} margin={{ top: 24, right: 8, left: 4, bottom: 0 }}>
           <CartesianGrid stroke="#27272a" strokeDasharray="4 8" vertical={false} />
           <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} dy={8} />
-          <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisPercent} />
+          <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} width={56} tickFormatter={compactAxis} />
           <Tooltip
             contentStyle={chartTooltipStyle}
-            formatter={(value) => [formatPercent(Number(value), 2), "Rendimento"]}
+            formatter={(value, _name, item) => {
+              const row = item?.payload as YieldPoint | undefined;
+              return [formatCurrency(Number(row?.lucro ?? value)), "Lucro"];
+            }}
             labelFormatter={(label, payload) => {
               const row = payload?.[0]?.payload as YieldPoint | undefined;
               if (!row) return String(label);
-              return `${label} · ${formatCurrency(row.lucro)}`;
+              return `${label} · ${formatPercent(row.rendimento, 2)}`;
             }}
           />
-          <Bar dataKey="rendimento" name="rendimento" radius={[10, 10, 4, 4]}>
+          <Bar dataKey="lucro" name="lucro" radius={[10, 10, 4, 4]}>
             <LabelList
-              dataKey="rendimento"
+              dataKey="lucro"
               position="top"
-              formatter={(value) => barPercentLabel(value, 2)}
+              formatter={barMoneyLabel}
               fill="#d4d4d8"
               fontSize={11}
               offset={6}
             />
             {data.map((entry) => (
-              <Cell key={entry.date} fill={entry.rendimento >= 0 ? "#34d399" : "#fb7185"} />
+              <Cell key={entry.date} fill={entry.lucro >= 0 ? "#34d399" : "#fb7185"} />
             ))}
           </Bar>
         </BarChart>
