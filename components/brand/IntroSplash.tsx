@@ -1,0 +1,61 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+export default function IntroSplash() {
+  const [phase, setPhase] = useState<"visible" | "leaving" | "done">("visible");
+
+  useEffect(() => {
+    const leave = setTimeout(() => setPhase("leaving"), 1300);
+    const done = setTimeout(() => setPhase("done"), 1750);
+    return () => {
+      clearTimeout(leave);
+      clearTimeout(done);
+    };
+  }, []);
+
+  if (phase === "done") return null;
+
+  return (
+    <div
+      aria-hidden
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-zinc-950 transition-opacity duration-500 ease-out ${
+        phase === "leaving" ? "opacity-0" : "opacity-100"
+      }`}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,_rgba(16,185,129,0.18),_transparent_62%)]" />
+
+      <div className="relative flex items-center justify-center">
+        <div
+          className="intro-anim absolute -inset-6 rounded-[2.2rem] bg-emerald-400/25 blur-2xl"
+          style={{ animation: "intro-pulse 1.8s ease-in-out infinite" }}
+        />
+        <img
+          src="/logo.png?v=2"
+          alt=""
+          width={96}
+          height={96}
+          className="intro-anim relative h-24 w-24 rounded-[1.7rem] shadow-[0_0_60px_rgba(16,185,129,0.45)]"
+          style={{ animation: "intro-pop 700ms cubic-bezier(0.16,1,0.3,1) both" }}
+        />
+      </div>
+
+      <div
+        className="intro-anim flex flex-col items-center gap-1"
+        style={{ animation: "intro-fade-up 600ms ease-out 220ms both" }}
+      >
+        <span className="text-[11px] font-medium uppercase tracking-[0.35em] text-emerald-400/90">
+          Meu Financeiro
+        </span>
+        <span className="text-2xl font-semibold tracking-tight text-white">IA</span>
+      </div>
+
+      <div className="relative mt-1 h-1 w-32 overflow-hidden rounded-full bg-zinc-800">
+        <div
+          className="intro-anim h-full w-full origin-left rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400"
+          style={{ animation: "intro-bar 1.05s ease-in-out 150ms both" }}
+        />
+      </div>
+    </div>
+  );
+}

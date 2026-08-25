@@ -6,6 +6,7 @@ import AutoBankSync from "@/components/bancos/AutoBankSync";
 import PrefetchTabs from "@/components/nav/PrefetchTabs";
 import SaveLastPath from "@/components/nav/SaveLastPath";
 import { PushEnable } from "@/components/pwa/PushEnable";
+import IntroSplash from "@/components/brand/IntroSplash";
 import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
@@ -13,6 +14,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative min-h-screen bg-zinc-950 text-zinc-100">
+      <IntroSplash />
       {!phone && (
         <>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.12),_transparent_60%)]" />
