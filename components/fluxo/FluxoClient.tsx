@@ -5,7 +5,7 @@ import { addMonths, eachDayOfInterval, endOfMonth, format, startOfMonth } from "
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
-import { categoryColor, resolvedCategory } from "@/lib/finance/categories";
+import { CATEGORY_ICONS, categoryColor, resolvedCategory } from "@/lib/finance/categories";
 import {
   belongsToConnection,
   futureExpensesInMonth,
@@ -201,11 +201,11 @@ export default function FluxoClient({
 
       <div className="flex flex-col gap-6 px-4 pb-2 lg:gap-8 lg:px-6 xl:px-10 2xl:px-14">
       <div className="grid gap-4 lg:grid-cols-3">
-        <SoftPanel className="p-4 lg:col-span-2">
+        <SoftPanel className="p-4 lg:col-span-2 lg:p-6">
           <SectionLabel>Movimentação do mês</SectionLabel>
           <FluxoAreaChart data={daily} />
         </SoftPanel>
-        <SoftPanel className="p-4">
+        <SoftPanel className="p-4 lg:p-6">
           <SectionLabel>Composição das despesas</SectionLabel>
           <FluxoDonutChart data={categorias} />
         </SoftPanel>
@@ -221,12 +221,21 @@ export default function FluxoClient({
               <p className="text-sm text-zinc-500">Nenhuma despesa neste mês.</p>
             ) : (
               categorias.map((item) => {
-                const width = despesas > 0 ? Math.max(6, (item.total / despesas) * 100) : 0;
+                const share = despesas > 0 ? (item.total / despesas) * 100 : 0;
+                const width = Math.max(6, share);
                 return (
                   <div key={item.category}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="text-zinc-300">{item.category}</span>
-                      <span className="text-zinc-200">{formatCurrency(item.total)}</span>
+                    <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                      <span className="flex min-w-0 items-center gap-2 text-zinc-200">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-sm">
+                          {CATEGORY_ICONS[item.category] ?? "🔖"}
+                        </span>
+                        <span className="truncate">{item.category}</span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block font-medium text-zinc-100">{formatCurrency(item.total)}</span>
+                        <span className="text-[11px] text-zinc-500">{share.toFixed(0)}%</span>
+                      </span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
                       <div
@@ -353,7 +362,7 @@ export default function FluxoClient({
                 <div className="min-w-0">
                   <p className="truncate text-zinc-100">{transaction.description}</p>
                   <p className="text-xs text-zinc-500">
-                    {formatDate(transaction.date)} · {transaction.category}
+                    {formatDate(transaction.date)} · {resolvedCategory(transaction)}
                   </p>
                 </div>
                 <span
