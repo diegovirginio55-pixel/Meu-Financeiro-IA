@@ -83,7 +83,6 @@ export async function getBankConnectionsWithAssets(
           (connection.id === investment.bank_connection_id ||
             realConnectionId(connection.id) === investment.bank_connection_id),
       ) ??
-      result.find((connection) => /inter/i.test(connection.institution_name)) ??
       result[0];
     if (!target) continue;
     target.investments.push(investment);
@@ -119,8 +118,8 @@ function splitConnectionsByInstitution(connections: BankConnectionWithAssets[]):
     if (pending) {
       groups.delete("__pending__");
       const targetBank =
-        [...groups.keys()].find((name) => /inter/i.test(name)) ??
-        (/inter/i.test(fallback) ? fallback : [...groups.keys()][0]) ??
+        (!isGenericConnectorName(fallback) ? fallback : null) ??
+        [...groups.keys()][0] ??
         fallback;
       const target = groups.get(targetBank) ?? { accounts: [], cards: [], investments: [] };
       target.investments.push(...pending.investments);

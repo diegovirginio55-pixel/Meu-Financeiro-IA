@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Investment, InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
+import { accumulatedProfit } from "@/lib/finance/investment-pnl";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
@@ -178,6 +179,8 @@ export default function AtivosClient({
                     {group.items.map((asset) => {
                       const open = openIds.has(asset.id);
                       const amount = Number(asset.amount);
+                      const applied = Number(asset.amount_original ?? 0);
+                      const profit = accumulatedProfit(asset);
                       const share = total > 0 ? (amount / total) * 100 : 0;
                       const kind = productKind(asset.name, asset.type);
                       return (
@@ -203,14 +206,14 @@ export default function AtivosClient({
                               <span className="block text-sm font-medium text-emerald-400">
                                 {formatCurrency(amount)}
                               </span>
-                              {asset.amount_profit != null ? (
+                              {profit !== 0 ? (
                                 <span
                                   className={`text-xs ${
-                                    Number(asset.amount_profit) >= 0 ? "text-emerald-500/80" : "text-red-400"
+                                    profit >= 0 ? "text-emerald-500/80" : "text-red-400"
                                   }`}
                                 >
-                                  {Number(asset.amount_profit) >= 0 ? "+" : ""}
-                                  {formatCurrency(Number(asset.amount_profit))}
+                                  {profit >= 0 ? "↑ " : "↓ "}
+                                  {formatCurrency(Math.abs(profit))}
                                 </span>
                               ) : (
                                 <span className="text-xs text-zinc-500">{share.toFixed(1)}%</span>
@@ -221,19 +224,22 @@ export default function AtivosClient({
                             </span>
                           </button>
                           {open && (
-                            <div className="pb-3 pl-11 text-xs text-zinc-500">
-                              Tipo: {asset.type || "Investimento"} · Parte da carteira: {share.toFixed(1)}%
-                              {asset.amount_profit != null && (
-                                <>
-                                  {" "}
-                                  · Lucro acumulado:{" "}
-                                  <span className={Number(asset.amount_profit) >= 0 ? "text-emerald-400" : "text-red-400"}>
-                                    {formatCurrency(Number(asset.amount_profit))}
+                            <div className="grid gap-1 pb-3 pl-11 text-xs text-zinc-500">
+                              <p>Valor bruto: {formatCurrency(amount)}</p>
+                              {applied !== 0 && <p>Valor aplicado: {formatCurrency(applied)}</p>}
+                              {profit !== 0 && (
+                                <p>
+                                  Ganhos/Perdas:{" "}
+                                  <span className={profit >= 0 ? "text-emerald-400" : "text-red-400"}>
+                                    {profit >= 0 ? "+" : "−"} {formatCurrency(Math.abs(profit))}
                                   </span>
-                                </>
+                                </p>
                               )}
+                              <p>
+                                Tipo: {asset.type || "Investimento"} · Parte da carteira: {share.toFixed(1)}%
+                              </p>
                               {asset.last_month_rate != null && Number(asset.last_month_rate) !== 0 && (
-                                <> · Taxa último mês: {Number(asset.last_month_rate).toFixed(2)}%</>
+                                <p>Taxa último mês: {Number(asset.last_month_rate).toFixed(2)}%</p>
                               )}
                             </div>
                           )}

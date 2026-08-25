@@ -54,11 +54,11 @@ function addTo(daily: Map<string, Map<string, number>>, date: string, key: strin
 }
 
 export function accumulatedProfit(investment: Investment): number {
-  const explicit = Number(investment.amount_profit);
-  if (Number.isFinite(explicit) && explicit !== 0) return explicit;
   const amount = Number(investment.amount ?? 0);
   const original = Number(investment.amount_original ?? 0);
   if (amount !== 0 && original !== 0) return Number((amount - original).toFixed(2));
+  const explicit = Number(investment.amount_profit);
+  if (Number.isFinite(explicit) && explicit !== 0) return explicit;
   return 0;
 }
 

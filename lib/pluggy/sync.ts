@@ -193,13 +193,13 @@ function monthlyRate(inv: {
 }
 
 function investmentProfit(inv: PluggyInvestment, amount: number): number | null {
-  if (inv.amountProfit != null && Number(inv.amountProfit) !== 0) {
-    return Number(inv.amountProfit);
+  const original = Number(inv.amountOriginal);
+  if (Number.isFinite(original) && original !== 0 && amount !== 0) {
+    return Number((amount - original).toFixed(2));
   }
-  if (inv.amountOriginal != null && Number(inv.amountOriginal) !== 0 && amount !== 0) {
-    return Number((amount - Number(inv.amountOriginal)).toFixed(2));
-  }
-  return inv.amountProfit == null ? null : Number(inv.amountProfit);
+  if (inv.amountProfit == null) return null;
+  const profit = Number(inv.amountProfit);
+  return Number.isFinite(profit) ? profit : null;
 }
 
 function investmentInstitution(
@@ -337,11 +337,9 @@ export async function syncBankConnection(
     });
 
     const merged = [...investments];
-    fromAccounts.forEach((candidate) => {
-      const amount = pluggyInvestmentAmount(candidate);
-      const already = merged.some((inv) => Math.abs(pluggyInvestmentAmount(inv) - amount) < 1 && amount !== 0);
-      if (!already) merged.push(candidate);
-    });
+    if (merged.length === 0) {
+      merged.push(...fromAccounts);
+    }
 
     const active = merged
       .filter((inv) => inv.status !== "TOTAL_WITHDRAWAL")
@@ -373,6 +371,24 @@ export async function syncBankConnection(
         .from("investments")
         .upsert(rows, { onConflict: "pluggy_investment_id" });
       if (error) throw error;
+
+      const keepIds = new Set(active.map((inv) => inv.id));
+      const { data: existingInvestments } = await supabase
+        .from("investments")
+        .select("id, pluggy_investment_id")
+        .eq("bank_connection_id", bankConnectionId)
+        .eq("source", "pluggy");
+      const staleIds = (existingInvestments ?? [])
+        .filter((row) => {
+          const pluggyId = row.pluggy_investment_id as string | null;
+          if (!pluggyId || keepIds.has(pluggyId)) return false;
+          return true;
+        })
+        .map((row) => row.id as string);
+      if (staleIds.length > 0) {
+        const { error: pruneError } = await supabase.from("investments").delete().in("id", staleIds);
+        if (pruneError) console.error("Erro ao limpar investimentos desatualizados:", pruneError);
+      }
 
       const { data: localRows } = await supabase
         .from("investments")
@@ -490,6 +506,15 @@ export async function syncBankConnection(
     supabase.from("accounts").select("*"),
     supabase.from("investments").select("*"),
   ]);
+  try {
+    await promoteInvestmentsFromTransactions(
+      supabase,
+      (dbAccounts ?? []) as Account[],
+      (dbInvestments ?? []) as Investment[],
+    );
+  } catch (error) {
+    console.error("Erro ao reconciliar investimentos do extrato:", error);
+  }
   if (shouldNotify && newMovements.length > 0) {
     try {
       await notifyBankMovements(userId, officialInstitutionName(institutionName), newMovements);

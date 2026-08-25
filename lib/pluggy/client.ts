@@ -113,20 +113,36 @@ export type PluggyInvestment = {
   number?: string | null;
   value?: number | null;
   quantity?: number | null;
+  taxes?: number | null;
+  taxes2?: number | null;
   rate?: number | null;
   annualRate?: number | null;
   fixedAnnualRate?: number | null;
   institution?: { name?: string | null; number?: string | null; cnpj?: string | null } | null;
 };
 
+function finiteMoney(value: unknown): number | null {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount === 0) return null;
+  return amount;
+}
+
+/** Valor bruto atual — o mesmo número da lista "Total investido" do Inter. */
 export function pluggyInvestmentAmount(inv: PluggyInvestment): number {
+  const gross = finiteMoney(inv.amount);
+  if (gross != null) return gross;
+
+  const net = finiteMoney(inv.balance);
+  if (net != null) {
+    const taxes = Math.abs(Number(inv.taxes) || 0) + Math.abs(Number(inv.taxes2) || 0);
+    return taxes > 0 ? Number((net + taxes).toFixed(2)) : net;
+  }
+
   const fromQuantity =
     inv.quantity != null && inv.value != null ? Number(inv.quantity) * Number(inv.value) : NaN;
-  for (const candidate of [inv.amount, inv.balance, fromQuantity, inv.value, inv.amountOriginal]) {
-    const value = Number(candidate);
-    if (Number.isFinite(value) && value !== 0) return value;
-  }
-  return 0;
+  if (Number.isFinite(fromQuantity) && fromQuantity !== 0) return fromQuantity;
+
+  return finiteMoney(inv.value) ?? 0;
 }
 
 export type PluggyInvestmentTransaction = {
