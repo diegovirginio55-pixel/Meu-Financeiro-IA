@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Account, BankConnection, Card, Investment } from "./types";
-import { groupedConnectionId, institutionFromAssetName } from "./connection-filter";
 import { inferInstitutionName, isGenericConnectorName } from "@/lib/pluggy/institution";
+import { officialInstitutionName } from "@/lib/pluggy/brands";
+import { groupedConnectionId, institutionFromAssetName, realConnectionId } from "./connection-filter";
 
 export type BankConnectionWithAssets = BankConnection & {
   accounts: Account[];
@@ -57,18 +58,36 @@ export async function getBankConnectionsWithAssets(
       (a) => a.source === "pluggy" && !usedAccountIds.has(a.id),
     );
     const leftoversCards = cards.filter((c) => c.source === "pluggy" && !usedCardIds.has(c.id));
-    const leftoversInvestments = investments.filter(
-      (i) => i.source === "pluggy" && !usedInvestmentIds.has(i.id),
-    );
     result[0].accounts.push(...leftoversAccounts);
     result[0].cards.push(...leftoversCards);
-    result[0].investments.push(...leftoversInvestments);
+    leftoversAccounts.forEach((item) => usedAccountIds.add(item.id));
+    leftoversCards.forEach((item) => usedCardIds.add(item.id));
     if (isGenericConnectorName(result[0].institution_name)) {
       result[0].institution_name = inferInstitutionName(
         [...result[0].accounts, ...result[0].cards, ...result[0].investments].map((item) => item.name),
         result[0].institution_name,
       );
     }
+  }
+
+  const leftoverInvestments = investments.filter((item) => !usedInvestmentIds.has(item.id));
+  for (const investment of leftoverInvestments) {
+    const inferred = institutionFromAssetName(investment.name, "");
+    const target =
+      (inferred
+        ? result.find((connection) => officialInstitutionName(connection.institution_name) === inferred)
+        : undefined) ??
+      result.find(
+        (connection) =>
+          investment.bank_connection_id &&
+          (connection.id === investment.bank_connection_id ||
+            realConnectionId(connection.id) === investment.bank_connection_id),
+      ) ??
+      result.find((connection) => /inter/i.test(connection.institution_name)) ??
+      result[0];
+    if (!target) continue;
+    target.investments.push(investment);
+    usedInvestmentIds.add(investment.id);
   }
 
   return splitConnectionsByInstitution(result);
@@ -85,7 +104,8 @@ function splitConnectionsByInstitution(connections: BankConnectionWithAssets[]):
       kind: "accounts" | "cards" | "investments",
       item: Account | Card | Investment,
     ) {
-      const bank = institutionFromAssetName(item.name, fallback);
+      const inferred = institutionFromAssetName(item.name, "");
+      const bank = inferred || (kind === "investments" ? "__pending__" : fallback);
       const group = groups.get(bank) ?? { accounts: [], cards: [], investments: [] };
       (group[kind] as typeof item[]).push(item);
       groups.set(bank, group);
@@ -94,6 +114,18 @@ function splitConnectionsByInstitution(connections: BankConnectionWithAssets[]):
     connection.accounts.forEach((item) => add("accounts", item));
     connection.cards.forEach((item) => add("cards", item));
     connection.investments.forEach((item) => add("investments", item));
+
+    const pending = groups.get("__pending__");
+    if (pending) {
+      groups.delete("__pending__");
+      const targetBank =
+        [...groups.keys()].find((name) => /inter/i.test(name)) ??
+        (/inter/i.test(fallback) ? fallback : [...groups.keys()][0]) ??
+        fallback;
+      const target = groups.get(targetBank) ?? { accounts: [], cards: [], investments: [] };
+      target.investments.push(...pending.investments);
+      groups.set(targetBank, target);
+    }
 
     if (groups.size <= 1) {
       const only = groups.keys().next().value as string | undefined;

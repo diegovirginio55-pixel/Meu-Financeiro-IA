@@ -101,10 +101,17 @@ export type PluggyInvestment = {
   amountProfit?: number | null;
   amountOriginal?: number | null;
   lastMonthRate?: number | null;
+  lastTwelveMonthsRate?: number | null;
   status?: string;
   issuer?: string | null;
+  issuerCNPJ?: string | null;
   code?: string | null;
-  institution?: { name?: string | null; number?: string | null } | null;
+  number?: string | null;
+  value?: number | null;
+  rate?: number | null;
+  annualRate?: number | null;
+  fixedAnnualRate?: number | null;
+  institution?: { name?: string | null; number?: string | null; cnpj?: string | null } | null;
 };
 
 export type PluggyInvestmentTransaction = {

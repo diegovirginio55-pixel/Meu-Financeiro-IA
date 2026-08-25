@@ -1,16 +1,23 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatCurrency } from "@/lib/finance/format";
+import { formatCurrency, formatPercent } from "@/lib/finance/format";
 import type { BankConnection, Investment, InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 import {
   buildDailyInvestmentPnl,
   buildDailyInvestmentPnlByAsset,
+  buildDailyYieldSeries,
+  buildMonthlyInvestmentYield,
+  periodYield,
   summarizeAssetPnl,
   totalAccumulatedProfit,
 } from "@/lib/finance/investment-pnl";
 import { LucroDiarioChart } from "@/components/ativos/LucroDiarioChart";
-import { LucroAtivosBarChart } from "@/components/dashboard/ExtraCharts";
+import {
+  LucroAtivosBarChart,
+  RendimentoDiarioChart,
+  RendimentoMensalChart,
+} from "@/components/dashboard/ExtraCharts";
 
 type ChartMode = "juntos" | "bancos" | "ativos";
 
@@ -49,15 +56,33 @@ export function LucroAtivosPanel({
   );
 
   const rows = useMemo(
-    () => summarizeAssetPnl(byAsset.series, byAsset.keys, investments),
+    () => summarizeAssetPnl(byAsset.series, byAsset.keys, investments, byAsset.estimatedIds),
     [byAsset, investments],
+  );
+
+  const dailyYield = useMemo(
+    () => buildDailyYieldSeries(byAsset.series, investments, snapshots),
+    [byAsset.series, investments, snapshots],
+  );
+
+  const monthlyYield = useMemo(
+    () =>
+      buildMonthlyInvestmentYield({
+        investments,
+        snapshots,
+        transactions: investmentTx,
+      }),
+    [investments, snapshots, investmentTx],
   );
 
   const lucroAcumulado = totalAccumulatedProfit(investments);
   const lucroPeriodo = byAsset.series.reduce((sum, point) => sum + Number(point.Total), 0);
   const lucroHoje = Number(byAsset.series[byAsset.series.length - 1]?.Total ?? 0);
   const estimated = mode === "bancos" ? byBank.estimated : byAsset.estimated;
-  const visibleKeys = byAsset.keys.slice(0, 12);
+  const visibleKeys = rows.slice(0, 12).map((row) => ({ key: row.key, label: row.label }));
+  const rendimentoHoje = dailyYield[dailyYield.length - 1]?.rendimento ?? 0;
+  const rendimento30d = periodYield(dailyYield);
+  const rendimentoMes = monthlyYield.series[monthlyYield.series.length - 1]?.rendimento ?? 0;
 
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
@@ -66,7 +91,9 @@ export function LucroAtivosPanel({
           <h2 className="text-sm font-medium text-zinc-200">Lucro diário dos investimentos</h2>
           <p className="mt-1 text-xs text-zinc-500">
             Cada ativo, cada banco e o total dos últimos 30 dias.
-            {estimated ? " Valores estimados pela taxa do último mês até haver histórico de sincronização." : ""}
+            {estimated
+              ? " Ativos sem histórico (como CDBs do Inter com um único dia gravado) usam a taxa do último mês ou o lucro acumulado até a próxima sincronização."
+              : ""}
           </p>
         </div>
         <div className="flex rounded-full bg-zinc-900 p-0.5 text-[11px]">
@@ -109,6 +136,39 @@ export function LucroAtivosPanel({
         </p>
       )}
 
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-zinc-200">Rendimento diário</h3>
+              <p className="mt-1 text-[11px] text-zinc-500">Lucro do dia dividido pelo patrimônio investido.</p>
+            </div>
+            <p className={`text-sm font-semibold ${rendimentoHoje >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {formatPercent(rendimentoHoje, 3)}
+            </p>
+          </div>
+          <p className="mt-2 text-[11px] text-zinc-500">30 dias: {formatPercent(rendimento30d)}</p>
+          <div className="mt-2">
+            <RendimentoDiarioChart data={dailyYield} />
+          </div>
+        </div>
+        <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-zinc-200">Rendimento mensal</h3>
+              <p className="mt-1 text-[11px] text-zinc-500">Lucro do mês sobre o saldo médio investido.</p>
+            </div>
+            <p className={`text-sm font-semibold ${rendimentoMes >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {formatPercent(rendimentoMes)}
+            </p>
+          </div>
+          <p className="mt-2 text-[11px] text-zinc-500">Últimos 12 meses</p>
+          <div className="mt-2">
+            <RendimentoMensalChart data={monthlyYield.series} />
+          </div>
+        </div>
+      </div>
+
       <div className="mt-5">
         <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
           Lucro de cada investimento
@@ -142,6 +202,7 @@ export function LucroAtivosPanel({
                     <p className="text-[11px] text-zinc-500">
                       {formatCurrency(row.amount)}
                       {row.rate != null && Number(row.rate) !== 0 ? ` · ${row.rate.toFixed(2)}% no mês` : ""}
+                      {row.estimated ? " · estimado" : ""}
                     </p>
                   </td>
                   <MoneyCell value={row.today} />

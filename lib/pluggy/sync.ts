@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pluggyApi } from "./client";
 import {
+  bankFromLabel,
   inferInstitutionName,
   institutionForAccount,
   isGenericConnectorName,
@@ -114,20 +115,46 @@ function pluggyAccountName(account: { name?: string; marketingName?: string | nu
   return base;
 }
 
+function monthlyRate(inv: {
+  lastMonthRate?: number | null;
+  annualRate?: number | null;
+  fixedAnnualRate?: number | null;
+}): number | null {
+  if (inv.lastMonthRate != null && Number(inv.lastMonthRate) !== 0) return Number(inv.lastMonthRate);
+  if (inv.annualRate != null && Number(inv.annualRate) !== 0) return Number(inv.annualRate) / 12;
+  if (inv.fixedAnnualRate != null && Number(inv.fixedAnnualRate) !== 0) return Number(inv.fixedAnnualRate) / 12;
+  return null;
+}
+
 function investmentInstitution(
   inv: {
     name?: string;
     issuer?: string | null;
+    issuerCNPJ?: string | null;
     code?: string | null;
-    institution?: { name?: string | null; number?: string | null } | null;
+    number?: string | null;
+    institution?: { name?: string | null; number?: string | null; cnpj?: string | null } | null;
   },
+  connectorName: string,
   accountsFallback: string | null,
   itemFallback: string,
 ) {
-  return inferInstitutionName(
-    [inv.institution?.name, inv.issuer, inv.name, inv.institution?.number, inv.code],
-    accountsFallback ?? itemFallback,
+  const inferred = inferInstitutionName(
+    [
+      inv.institution?.name,
+      inv.issuer,
+      inv.issuerCNPJ,
+      inv.institution?.cnpj,
+      inv.name,
+      inv.institution?.number,
+      inv.code,
+      inv.number,
+    ],
+    "",
   );
+  if (inferred) return inferred;
+  if (isGenericConnectorName(connectorName)) return "";
+  return accountsFallback ?? itemFallback;
 }
 
 export async function syncBankConnection(
@@ -200,26 +227,29 @@ export async function syncBankConnection(
   }
 
   try {
+    const connectorBank = bankFromLabel(item.connector.name);
     const { results: investments } = await pluggyApi.fetchInvestments(pluggyItemId);
     const active = investments.filter((inv) => inv.status !== "TOTAL_WITHDRAWAL");
 
     if (active.length > 0) {
-      const rows = active.map((inv) => ({
-        user_id: userId,
-        name: withInstitutionPrefix(
-          inv.name || "Investimento",
-          investmentInstitution(inv, onlyBank, institutionName),
-        ),
-        amount: Number(inv.balance ?? inv.amount ?? 0),
-        type: investmentLabel(inv.type, inv.subtype),
-        amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
-        amount_original: inv.amountOriginal == null ? null : Number(inv.amountOriginal),
-        last_month_rate: inv.lastMonthRate == null ? null : Number(inv.lastMonthRate),
-        pluggy_investment_id: inv.id,
-        bank_connection_id: bankConnectionId,
-        source: "pluggy" as const,
-        updated_at: new Date().toISOString(),
-      }));
+      const rows = active.map((inv) => {
+        const bank = investmentInstitution(inv, item.connector.name, connectorBank ?? onlyBank, institutionName);
+        const amount = Number(inv.balance ?? inv.amount ?? inv.value ?? 0);
+        const rate = monthlyRate(inv);
+        return {
+          user_id: userId,
+          name: withInstitutionPrefix(inv.name || "Investimento", bank),
+          amount,
+          type: investmentLabel(inv.type, inv.subtype),
+          amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
+          amount_original: inv.amountOriginal == null ? null : Number(inv.amountOriginal),
+          last_month_rate: rate == null ? null : Number(rate),
+          pluggy_investment_id: inv.id,
+          bank_connection_id: bankConnectionId,
+          source: "pluggy" as const,
+          updated_at: new Date().toISOString(),
+        };
+      });
       const { error } = await supabase
         .from("investments")
         .upsert(rows, { onConflict: "pluggy_investment_id" });
@@ -243,7 +273,7 @@ export async function syncBankConnection(
             investment_id: localId,
             bank_connection_id: bankConnectionId,
             snapshot_date: today,
-            amount: Number(inv.balance ?? inv.amount ?? 0),
+            amount: Number(inv.balance ?? inv.amount ?? inv.value ?? 0),
             amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
           },
         ];

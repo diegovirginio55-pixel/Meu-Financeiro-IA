@@ -14,9 +14,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatCurrency, formatMonthLabel } from "@/lib/finance/format";
+import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/finance/format";
 import { seriesColor } from "@/components/ativos/LucroDiarioChart";
-import type { AssetPnlRow } from "@/lib/finance/investment-pnl";
+import type { AssetPnlRow, YieldPoint } from "@/lib/finance/investment-pnl";
 
 const tooltipStyle = {
   background: "#141414",
@@ -167,6 +167,88 @@ export function LucroAtivosBarChart({ rows }: { rows: AssetPnlRow[] }) {
           <Bar dataKey="lucro" name="Lucro 30 dias" radius={[0, 6, 6, 0]}>
             {chartData.map((entry, index) => (
               <Cell key={`${entry.nome}-${index}`} fill={entry.lucro >= 0 ? "#34d399" : "#f87171"} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function formatAxisPercent(value: number): string {
+  return `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+}
+
+export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
+  const hasValues = data.some((point) => point.rendimento !== 0);
+  return (
+    <div className="relative h-[240px] w-full lg:h-[280px]">
+      {!hasValues && (
+        <p className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 px-6 text-center text-sm text-zinc-500">
+          Sem rendimento diário ainda. Sincronize os bancos para começar o histórico.
+        </p>
+      )}
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#27272a" strokeDasharray="3 6" vertical={false} />
+          <XAxis dataKey="label" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false} />
+          <YAxis
+            stroke="#52525b"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            width={52}
+            tickFormatter={formatAxisPercent}
+          />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            formatter={(value) => [formatPercent(Number(value), 3), "Rendimento"]}
+            labelFormatter={(label, payload) => {
+              const row = payload?.[0]?.payload as YieldPoint | undefined;
+              if (!row) return String(label);
+              return `${label} · ${formatCurrency(row.lucro)}`;
+            }}
+          />
+          <Line type="monotone" dataKey="rendimento" name="rendimento" stroke="#34d399" strokeWidth={2.4} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function RendimentoMensalChart({ data }: { data: YieldPoint[] }) {
+  const hasValues = data.some((point) => point.rendimento !== 0 || point.lucro !== 0);
+  return (
+    <div className="relative h-[240px] w-full lg:h-[280px]">
+      {!hasValues && (
+        <p className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 px-6 text-center text-sm text-zinc-500">
+          Sem rendimento mensal ainda. Os meses vão preenchendo a cada sincronização.
+        </p>
+      )}
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#27272a" strokeDasharray="3 6" vertical={false} />
+          <XAxis dataKey="label" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false} />
+          <YAxis
+            stroke="#52525b"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            width={52}
+            tickFormatter={formatAxisPercent}
+          />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            formatter={(value) => [formatPercent(Number(value), 2), "Rendimento"]}
+            labelFormatter={(label, payload) => {
+              const row = payload?.[0]?.payload as YieldPoint | undefined;
+              if (!row) return String(label);
+              return `${label} · ${formatCurrency(row.lucro)}`;
+            }}
+          />
+          <Bar dataKey="rendimento" name="rendimento" radius={[6, 6, 0, 0]}>
+            {data.map((entry) => (
+              <Cell key={entry.date} fill={entry.rendimento >= 0 ? "#34d399" : "#f87171"} />
             ))}
           </Bar>
         </BarChart>

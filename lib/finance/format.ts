@@ -8,6 +8,13 @@ export function formatDate(value: string): string {
   return `${day}/${month}/${year}`;
 }
 
+export function formatPercent(value: number, digits = 2): string {
+  return `${value.toLocaleString("pt-BR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}%`;
+}
+
 export function formatMonthLabel(monthKey: string): string {
   const [year, month] = monthKey.split("-");
   const date = new Date(Number(year), Number(month) - 1, 1);
