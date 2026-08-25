@@ -2,9 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const HOLD_MS = 1300;
-const FADE_MS = 450;
+const HOLD_MS = 2300;
+const FADE_MS = 550;
 const RESUME_THRESHOLD_MS = 8000;
+
+const EQ_BARS = [
+  { delay: "0ms", duration: "820ms" },
+  { delay: "120ms", duration: "760ms" },
+  { delay: "60ms", duration: "900ms" },
+  { delay: "200ms", duration: "700ms" },
+  { delay: "150ms", duration: "860ms" },
+];
 
 export default function IntroSplash() {
   const [phase, setPhase] = useState<"visible" | "leaving" | "done">("visible");
@@ -63,30 +71,51 @@ export default function IntroSplash() {
     <div
       key={runId}
       aria-hidden
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-zinc-950 transition-opacity duration-500 ease-out ${
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-7 bg-zinc-950 transition-opacity duration-500 ease-out ${
         phase === "leaving" ? "opacity-0" : "opacity-100"
       }`}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,_rgba(16,185,129,0.18),_transparent_62%)]" />
+      <div
+        className="intro-anim pointer-events-none absolute inset-0"
+        style={{
+          background: "radial-gradient(circle at 50% 38%, rgba(16,185,129,0.2), transparent 62%)",
+          animation: "intro-pulse 3.2s ease-in-out infinite",
+        }}
+      />
 
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex h-44 w-44 items-center justify-center">
         <div
-          className="intro-anim absolute -inset-6 rounded-[2.2rem] bg-emerald-400/25 blur-2xl"
-          style={{ animation: "intro-pulse 1.8s ease-in-out infinite" }}
+          className="intro-anim absolute inset-0 rounded-full opacity-80 blur-[2px]"
+          style={{
+            background:
+              "conic-gradient(from 0deg, rgba(16,185,129,0) 0deg, rgba(16,185,129,0.9) 90deg, rgba(34,211,238,0.85) 180deg, rgba(16,185,129,0) 260deg, rgba(16,185,129,0) 360deg)",
+            animation: "intro-spin 2.8s linear infinite",
+          }}
         />
+        <div
+          className="intro-anim absolute rounded-full opacity-60 blur-[1px]"
+          style={{
+            inset: "10px",
+            background:
+              "conic-gradient(from 180deg, rgba(34,211,238,0) 0deg, rgba(34,211,238,0.7) 110deg, rgba(16,185,129,0) 200deg)",
+            animation: "intro-spin-reverse 3.6s linear infinite",
+          }}
+        />
+        <div className="absolute rounded-full bg-zinc-950" style={{ inset: "22px" }} />
+
         <img
           src="/logo.png?v=2"
           alt=""
-          width={96}
-          height={96}
-          className="intro-anim relative h-24 w-24 rounded-[1.7rem] shadow-[0_0_60px_rgba(16,185,129,0.45)]"
-          style={{ animation: "intro-pop 700ms cubic-bezier(0.16,1,0.3,1) both" }}
+          width={92}
+          height={92}
+          className="intro-anim relative h-[5.75rem] w-[5.75rem] rounded-[1.6rem]"
+          style={{ animation: "intro-breathe 2.2s ease-in-out infinite" }}
         />
       </div>
 
       <div
-        className="intro-anim flex flex-col items-center gap-1"
-        style={{ animation: "intro-fade-up 600ms ease-out 220ms both" }}
+        className="intro-anim flex flex-col items-center gap-1.5"
+        style={{ animation: "intro-fade-up 650ms ease-out 200ms both" }}
       >
         <span className="text-[11px] font-medium uppercase tracking-[0.35em] text-emerald-400/90">
           Meu Financeiro
@@ -94,10 +123,23 @@ export default function IntroSplash() {
         <span className="text-2xl font-semibold tracking-tight text-white">IA</span>
       </div>
 
-      <div className="relative mt-1 h-1 w-32 overflow-hidden rounded-full bg-zinc-800">
+      <div
+        className="intro-anim flex items-end gap-1.5"
+        style={{ animation: "intro-fade-up 650ms ease-out 350ms both" }}
+      >
+        {EQ_BARS.map((bar, index) => (
+          <span
+            key={index}
+            className="intro-anim block h-6 w-1.5 origin-bottom rounded-full bg-gradient-to-t from-emerald-500 to-cyan-300"
+            style={{ animation: `intro-eq ${bar.duration} ease-in-out ${bar.delay} infinite` }}
+          />
+        ))}
+      </div>
+
+      <div className="relative mt-1 h-1 w-40 overflow-hidden rounded-full bg-zinc-800">
         <div
           className="intro-anim h-full w-full origin-left rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400"
-          style={{ animation: "intro-bar 1.05s ease-in-out 150ms both" }}
+          style={{ animation: `intro-bar ${HOLD_MS - 150}ms ease-in-out 150ms both` }}
         />
       </div>
     </div>
