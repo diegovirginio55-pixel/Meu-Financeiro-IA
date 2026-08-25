@@ -113,7 +113,8 @@ export default function BankHome({
   const monthName = format(new Date(), "LLLL", { locale: ptBR });
   const bankLabel = selected ? shortBankName(selected.institution_name) : "visão geral";
   const monthTotal = snapshot.monthEntradas + snapshot.monthDespesas;
-  const inShare = monthTotal > 0 ? (snapshot.monthEntradas / monthTotal) * 100 : 50;
+  const pctEntradas = monthTotal > 0 ? (snapshot.monthEntradas / monthTotal) * 100 : 0;
+  const pctSaidas = monthTotal > 0 ? (snapshot.monthDespesas / monthTotal) * 100 : 0;
   const spendingCategories = snapshot.gastosPorCategoria;
   const spendingTotal = spendingCategories.reduce((sum, item) => sum + item.total, 0);
   const maxCategory = spendingCategories[0]?.total ?? 0;
@@ -243,13 +244,17 @@ export default function BankHome({
             {connectionId === "all" && (
               <div>
                 <div className="mb-2 flex items-end justify-between text-xs">
-                  <span className="text-emerald-300">{hidden ? "••••" : formatCurrency(snapshot.monthEntradas)}</span>
+                  <span className="text-emerald-300">
+                    {hidden ? "••••" : `${formatCurrency(snapshot.monthEntradas)} · ${formatPercent(pctEntradas, 1)}`}
+                  </span>
                   <span className="text-zinc-500">{monthName}</span>
-                  <span className="text-rose-300">{hidden ? "••••" : formatCurrency(snapshot.monthDespesas)}</span>
+                  <span className="text-rose-300">
+                    {hidden ? "••••" : `${formatCurrency(snapshot.monthDespesas)} · ${formatPercent(pctSaidas, 1)}`}
+                  </span>
                 </div>
-                <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                  <div className="bg-emerald-400" style={{ width: `${inShare}%` }} />
-                  <div className="bg-rose-400/80" style={{ width: `${100 - inShare}%` }} />
+                <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
+                  <div className="h-full shrink-0 bg-emerald-400" style={{ width: `${pctEntradas}%` }} />
+                  <div className="h-full shrink-0 bg-rose-400" style={{ width: `${pctSaidas}%` }} />
                 </div>
                 <p className="mt-2 text-center text-[11px] text-zinc-500">
                   líquido da conta {money(hidden, saldoConta)}
