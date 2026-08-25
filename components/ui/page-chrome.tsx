@@ -87,17 +87,17 @@ export function chipClass(active: boolean) {
 
 export type BalanceView = "total" | "conta";
 
-const BALANCE_VIEW_KEY = "mf-balance-view";
+const BALANCE_VIEW_KEY = "mf-balance-view-v2";
 const BALANCE_VIEW_EVENT = "mf-balance-view";
 
 function readBalanceView(): BalanceView {
-  if (typeof window === "undefined") return "total";
+  if (typeof window === "undefined") return "conta";
   const stored = window.localStorage.getItem(BALANCE_VIEW_KEY);
-  return stored === "conta" || stored === "total" ? stored : "total";
+  return stored === "conta" || stored === "total" ? stored : "conta";
 }
 
 export function useBalanceView() {
-  const [value, setValue] = useState<BalanceView>("total");
+  const [value, setValue] = useState<BalanceView>("conta");
 
   useEffect(() => {
     setValue(readBalanceView());
