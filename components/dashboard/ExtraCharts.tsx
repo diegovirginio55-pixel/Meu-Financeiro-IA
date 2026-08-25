@@ -236,7 +236,7 @@ export function MixPizzaChart({
 export function LucroAtivosBarChart({ rows }: { rows: AssetPnlRow[] }) {
   const chartData = rows.slice(0, 10).map((row, index) => ({
     nome: row.label,
-    lucro: row.d30,
+    lucro: Math.abs(row.d30) >= 0.005 ? row.d30 : row.accumulated,
     fill: seriesColor(row.label, index),
   }));
 

@@ -89,7 +89,35 @@ export async function getBankConnectionsWithAssets(
     usedInvestmentIds.add(investment.id);
   }
 
-  return splitConnectionsByInstitution(result);
+  return splitConnectionsByInstitution(result).map((connection) => ({
+    ...connection,
+    investments: uniqueInvestments(connection.investments),
+  }));
+}
+
+function investmentDedupeKey(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/^[^·•]+[·•]\s*/, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function uniqueInvestments(investments: Investment[]): Investment[] {
+  const bestByName = new Map<string, Investment>();
+  for (const item of investments) {
+    const key = investmentDedupeKey(item.name) || item.id;
+    const existing = bestByName.get(key);
+    if (!existing || Number(item.amount) > Number(existing.amount)) {
+      bestByName.set(key, item);
+    }
+  }
+  return investments.filter((item) => {
+    const key = investmentDedupeKey(item.name) || item.id;
+    return bestByName.get(key)?.id === item.id;
+  });
 }
 
 function splitConnectionsByInstitution(connections: BankConnectionWithAssets[]): BankConnectionWithAssets[] {

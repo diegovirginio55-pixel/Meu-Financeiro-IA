@@ -88,9 +88,9 @@ export default function BankHome({
     [connectionId, connections],
   );
 
-  const accounts = selected?.accounts ?? snapshot.accounts;
-  const cards = selected?.cards ?? snapshot.cards;
-  const investments = selected?.investments ?? snapshot.investments;
+  const accounts = selected?.accounts ?? connections.flatMap((connection) => connection.accounts);
+  const cards = selected?.cards ?? connections.flatMap((connection) => connection.cards);
+  const investments = selected?.investments ?? connections.flatMap((connection) => connection.investments);
   const walletAccounts = [...accounts]
     .filter((account) => !isPlaceholderAccount(account))
     .sort((left, right) => Number(right.balance) - Number(left.balance));
@@ -334,7 +334,15 @@ export default function BankHome({
             <Link href="/ativos" className={`${walletTileClass} bg-gradient-to-br from-emerald-700 via-emerald-900 to-zinc-950`}>
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-emerald-200/80">Investido</p>
               <p className="mt-8 text-sm text-white/75">
-                {investments.length} {investments.length === 1 ? "ativo" : "ativos"}
+                {connectionId === "all"
+                  ? connections
+                      .filter((connection) => connection.investments.length > 0)
+                      .map(
+                        (connection) =>
+                          `${connection.investments.length} no ${shortBankName(connection.institution_name)}`,
+                      )
+                      .join(" · ") || `${investments.length} ativos`
+                  : `${investments.length} ${investments.length === 1 ? "ativo" : "ativos"}`}
               </p>
               <p className="mt-1 text-2xl font-semibold tracking-tight text-white">
                 {money(hidden, bankInvestments)}

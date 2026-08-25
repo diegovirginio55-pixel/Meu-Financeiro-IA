@@ -19,6 +19,7 @@ import type {
 } from "./types";
 import { isGasto, isRenda, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange, dailyBudgetFromBalance } from "./fluxo";
 import { resolvedCategory } from "./categories";
+import { uniqueInvestments } from "./bank-connections";
 
 export interface UpcomingItem {
   description: string;
@@ -96,7 +97,7 @@ export async function getFinancialSnapshot(
 
   const accounts = (accountsRes.data ?? []) as Account[];
   const cards = (cardsRes.data ?? []) as Card[];
-  const investments = (investmentsRes.data ?? []) as Investment[];
+  const investments = uniqueInvestments((investmentsRes.data ?? []) as Investment[]);
   const debts = (debtsRes.data ?? []) as Debt[];
   const goals = (goalsRes.data ?? []) as Goal[];
   const recurringItems = (recurringRes.data ?? []) as RecurringItem[];

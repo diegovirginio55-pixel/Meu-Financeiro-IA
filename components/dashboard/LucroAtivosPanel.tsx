@@ -76,8 +76,10 @@ export function LucroAtivosPanel({
   );
 
   const lucroAcumulado = totalAccumulatedProfit(investments);
-  const lucroPeriodo = byAsset.series.reduce((sum, point) => sum + Number(point.Total), 0);
-  const lucroHoje = Number(byAsset.series[byAsset.series.length - 1]?.Total ?? 0);
+  const lucroPeriodoRaw = byAsset.series.reduce((sum, point) => sum + Number(point.Total), 0);
+  const lucroPeriodo = Math.abs(lucroPeriodoRaw) >= 0.005 ? lucroPeriodoRaw : lucroAcumulado;
+  const lucroHojeRaw = Number(byAsset.series[byAsset.series.length - 1]?.Total ?? 0);
+  const lucroHoje = Math.abs(lucroHojeRaw) >= 0.005 ? lucroHojeRaw : 0;
   const estimated = mode === "bancos" ? byBank.estimated : byAsset.estimated;
   const visibleKeys = rows.slice(0, 12).map((row) => ({ key: row.key, label: row.label }));
   const rendimentoHoje = dailyYield[dailyYield.length - 1]?.rendimento ?? 0;

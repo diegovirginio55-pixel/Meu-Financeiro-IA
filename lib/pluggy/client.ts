@@ -127,22 +127,64 @@ function finiteMoney(value: unknown): number | null {
   return amount;
 }
 
+function nearlyEqual(left: number, right: number, tolerance = 0.02) {
+  return Math.abs(left - right) < tolerance;
+}
+
+export type PluggyPosition = {
+  current: number;
+  original: number | null;
+  profit: number | null;
+};
+
+/**
+ * Inter lista o valor bruto atual (LCI 12.043,70 + LCD 5.119,94).
+ * No Open Finance a Pluggy às vezes manda `amount` = valor aplicado e `balance` = líquido.
+ */
+export function resolvePluggyPosition(inv: PluggyInvestment): PluggyPosition {
+  const original = finiteMoney(inv.amountOriginal);
+  const amount = finiteMoney(inv.amount);
+  const balance = finiteMoney(inv.balance);
+  const profitRaw = Number(inv.amountProfit);
+  const profit =
+    inv.amountProfit == null || !Number.isFinite(profitRaw) || profitRaw === 0 ? null : profitRaw;
+  const taxes = Math.abs(Number(inv.taxes) || 0) + Math.abs(Number(inv.taxes2) || 0);
+  const quantityValue =
+    inv.quantity != null && inv.value != null ? Number(inv.quantity) * Number(inv.value) : NaN;
+  const fromQuantity = Number.isFinite(quantityValue) && quantityValue !== 0 ? Number(quantityValue.toFixed(2)) : null;
+
+  const amountIsPrincipal =
+    (amount != null && original != null && nearlyEqual(amount, original)) ||
+    (amount != null && original == null && balance != null && amount < balance - 0.005);
+
+  let current: number | null = null;
+  if (amount != null && !amountIsPrincipal) current = amount;
+  else if (balance != null && taxes > 0) current = Number((balance + taxes).toFixed(2));
+  else if (fromQuantity != null && (original == null || !nearlyEqual(fromQuantity, original))) current = fromQuantity;
+  else if (original != null && profit != null) current = Number((original + profit).toFixed(2));
+  else if (amount != null && amountIsPrincipal && profit != null) current = Number((amount + profit).toFixed(2));
+  else if (balance != null) current = balance;
+  else if (fromQuantity != null) current = fromQuantity;
+  else if (amount != null) current = amount;
+  else if (original != null) current = original;
+  else current = 0;
+
+  const resolvedOriginal =
+    original ??
+    (amountIsPrincipal ? amount : null) ??
+    (amount != null && current > amount + 0.005 ? amount : null);
+
+  const resolvedProfit =
+    resolvedOriginal != null && current !== 0
+      ? Number((current - resolvedOriginal).toFixed(2))
+      : profit;
+
+  return { current, original: resolvedOriginal, profit: resolvedProfit };
+}
+
 /** Valor bruto atual — o mesmo número da lista "Total investido" do Inter. */
 export function pluggyInvestmentAmount(inv: PluggyInvestment): number {
-  const gross = finiteMoney(inv.amount);
-  if (gross != null) return gross;
-
-  const net = finiteMoney(inv.balance);
-  if (net != null) {
-    const taxes = Math.abs(Number(inv.taxes) || 0) + Math.abs(Number(inv.taxes2) || 0);
-    return taxes > 0 ? Number((net + taxes).toFixed(2)) : net;
-  }
-
-  const fromQuantity =
-    inv.quantity != null && inv.value != null ? Number(inv.quantity) * Number(inv.value) : NaN;
-  if (Number.isFinite(fromQuantity) && fromQuantity !== 0) return fromQuantity;
-
-  return finiteMoney(inv.value) ?? 0;
+  return resolvePluggyPosition(inv).current;
 }
 
 export type PluggyInvestmentTransaction = {

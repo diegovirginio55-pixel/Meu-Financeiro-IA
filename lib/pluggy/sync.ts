@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isInvestmentDescription, promoteInvestmentsFromTransactions } from "@/lib/finance/investment-movements";
 import { inferCategoryFromDescription } from "@/lib/finance/categories";
 import type { Account, Investment } from "@/lib/finance/types";
-import { pluggyApi, pluggyInvestmentAmount, type PluggyAccount, type PluggyInvestment } from "./client";
+import { pluggyApi, pluggyInvestmentAmount, resolvePluggyPosition, type PluggyAccount, type PluggyInvestment } from "./client";
 import { officialInstitutionName } from "./brands";
 import {
   bankFromLabel,
@@ -185,21 +185,22 @@ function monthlyRate(inv: {
 }): number | null {
   if (inv.lastMonthRate != null && Number(inv.lastMonthRate) !== 0) return Number(inv.lastMonthRate);
   if (inv.lastTwelveMonthsRate != null && Number(inv.lastTwelveMonthsRate) !== 0) {
-    return Number(inv.lastTwelveMonthsRate) / 12;
+    const yearly = Number(inv.lastTwelveMonthsRate);
+    if (yearly > 0 && yearly <= 40) return yearly / 12;
   }
-  if (inv.annualRate != null && Number(inv.annualRate) !== 0) return Number(inv.annualRate) / 12;
-  if (inv.fixedAnnualRate != null && Number(inv.fixedAnnualRate) !== 0) return Number(inv.fixedAnnualRate) / 12;
+  const annual = Number(inv.annualRate ?? inv.fixedAnnualRate);
+  // 84 no Inter é "% do CDI", não taxa anual real.
+  if (annual > 0 && annual <= 40) return annual / 12;
   return null;
 }
 
 function investmentProfit(inv: PluggyInvestment, amount: number): number | null {
-  const original = Number(inv.amountOriginal);
-  if (Number.isFinite(original) && original !== 0 && amount !== 0) {
-    return Number((amount - original).toFixed(2));
+  const position = resolvePluggyPosition(inv);
+  if (position.profit != null) return position.profit;
+  if (position.original != null && amount !== 0) {
+    return Number((amount - position.original).toFixed(2));
   }
-  if (inv.amountProfit == null) return null;
-  const profit = Number(inv.amountProfit);
-  return Number.isFinite(profit) ? profit : null;
+  return null;
 }
 
 function investmentInstitution(
@@ -351,15 +352,16 @@ export async function syncBankConnection(
     if (active.length > 0) {
       const rows = active.map((inv) => {
         const bank = investmentInstitution(inv, item.connector.name, connectorBank ?? onlyBank, institutionName);
-        const amount = pluggyInvestmentAmount(inv);
+        const position = resolvePluggyPosition(inv);
+        const amount = position.current;
         const rate = monthlyRate(inv);
         return {
           user_id: userId,
           name: withInstitutionPrefix(inv.name || "Investimento", bank),
           amount,
           type: investmentLabel(inv.type, inv.subtype, inv.name),
-          amount_profit: investmentProfit(inv, amount),
-          amount_original: inv.amountOriginal == null ? null : Number(inv.amountOriginal),
+          amount_profit: position.profit ?? investmentProfit(inv, amount),
+          amount_original: position.original,
           last_month_rate: rate == null ? null : Number(rate),
           pluggy_investment_id: inv.id,
           bank_connection_id: bankConnectionId,
@@ -402,14 +404,15 @@ export async function syncBankConnection(
       const snapshots = active.flatMap((inv) => {
         const localId = idByPluggy.get(inv.id);
         if (!localId) return [];
+        const position = resolvePluggyPosition(inv);
         return [
           {
             user_id: userId,
             investment_id: localId,
             bank_connection_id: bankConnectionId,
             snapshot_date: today,
-            amount: pluggyInvestmentAmount(inv),
-            amount_profit: investmentProfit(inv, pluggyInvestmentAmount(inv)),
+            amount: position.current,
+            amount_profit: position.profit ?? investmentProfit(inv, position.current),
           },
         ];
       });
