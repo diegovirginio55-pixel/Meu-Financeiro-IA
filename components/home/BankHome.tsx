@@ -170,8 +170,9 @@ export default function BankHome({
               <button
                 type="button"
                 onClick={() => setHidden((value) => !value)}
-                className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300"
+                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300"
               >
+                {hidden ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
                 {hidden ? "Mostrar valores" : "Ocultar valores"}
               </button>
               <Link
@@ -367,9 +368,9 @@ export default function BankHome({
   );
 }
 
-function EyeIcon() {
+function EyeIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden>
       <path
         d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z"
         stroke="currentColor"
@@ -380,9 +381,9 @@ function EyeIcon() {
   );
 }
 
-function EyeOffIcon() {
+function EyeOffIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden>
       <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       <path
         d="M9.5 6.3A10.5 10.5 0 0 1 12 5c6 0 9.5 7 9.5 7a16 16 0 0 1-3.2 3.9M6.6 8.2A16 16 0 0 0 2.5 12s3.5 7 9.5 7c1.4 0 2.7-.3 3.8-.8"
