@@ -1,5 +1,11 @@
-const CACHE = "financeiro-shell-v10";
-const SHELL = ["/logo.png?v=2", "/icon-192.png?v=2", "/icon-512.png?v=2", "/apple-touch-icon.png?v=2"];
+const CACHE = "financeiro-shell-v11";
+const SHELL = [
+  "/logo.png?v=2",
+  "/icon-192.png?v=2",
+  "/icon-512.png?v=2",
+  "/apple-touch-icon.png?v=2",
+  "/icons/icon-512-maskable.png",
+];
 const SHELL_PATHS = new Set(SHELL.map((item) => item.split("?")[0]));
 
 self.addEventListener("install", (event) => {
