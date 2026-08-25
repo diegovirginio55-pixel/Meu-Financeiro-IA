@@ -35,6 +35,7 @@ function productKind(name: string, type: string | null): string {
   if (haystack.includes("CDB")) return "CDB";
   if (haystack.includes("LCI")) return "LCI";
   if (haystack.includes("LCA")) return "LCA";
+  if (haystack.includes("LCD")) return "LCD";
   if (haystack.includes("TESOURO")) return "Tesouro";
   if (haystack.includes("CRI")) return "CRI";
   if (haystack.includes("CRA")) return "CRA";

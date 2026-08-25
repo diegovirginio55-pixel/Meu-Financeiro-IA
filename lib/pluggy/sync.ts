@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isInvestmentDescription } from "@/lib/finance/investment-movements";
 import { pluggyApi, pluggyInvestmentAmount, type PluggyAccount, type PluggyInvestment } from "./client";
 import {
   bankFromLabel,
@@ -37,7 +38,12 @@ const CATEGORY_MAP: Record<string, string> = {
   income: "Salário",
 };
 
-function mapCategory(pluggyCategory: string | null | undefined, isCredit: boolean): string {
+function mapCategory(
+  pluggyCategory: string | null | undefined,
+  isCredit: boolean,
+  description?: string | null,
+): string {
+  if (description && isInvestmentDescription(description)) return "Investimentos";
   if (pluggyCategory) {
     const mapped = CATEGORY_MAP[pluggyCategory.toLowerCase()];
     if (mapped) return mapped;
@@ -69,7 +75,7 @@ async function syncTransactionsForAccount(
     description: t.description || "Transação importada",
     amount: Math.abs(t.amount),
     type: t.type === "CREDIT" ? "entrada" : "saida",
-    category: mapCategory(t.category, t.type === "CREDIT"),
+    category: mapCategory(t.category, t.type === "CREDIT", t.description),
     date: toDateOnly(t.date),
     account_id: accountId,
     card_id: cardId,
@@ -104,6 +110,7 @@ function investmentLabel(type?: string, subtype?: string | null, name?: string |
   const haystack = `${name ?? ""} ${subtype ?? ""} ${type ?? ""}`.toUpperCase();
   if (haystack.includes("LCI")) return "LCI";
   if (haystack.includes("LCA")) return "LCA";
+  if (haystack.includes("LCD")) return "LCD";
   if (/\bCDB\b/.test(haystack)) return "CDB";
   if (haystack.includes("TESOURO")) return "Tesouro";
   if (subtype && INVESTMENT_TYPE_LABELS[subtype]) return INVESTMENT_TYPE_LABELS[subtype];
@@ -114,7 +121,7 @@ function investmentLabel(type?: string, subtype?: string | null, name?: string |
 function isInvestmentLikeAccount(account: PluggyAccount) {
   if (account.type === "INVESTMENT") return true;
   const haystack = `${account.name ?? ""} ${account.marketingName ?? ""} ${account.subtype ?? ""}`;
-  return /\b(lci|lca|cdb|cri|cra|tesouro|deb[eê]nture|renda\s*fixa)\b/i.test(haystack);
+  return /\b(lci|lca|cdb|lcd|cri|cra|tesouro|deb[eê]nture|renda\s*fixa)\b/i.test(haystack);
 }
 
 function accountTypeLabel(subtype?: string) {

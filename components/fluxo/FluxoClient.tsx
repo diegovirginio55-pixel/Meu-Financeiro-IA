@@ -10,6 +10,7 @@ import {
   belongsToConnection,
   futureExpensesInMonth,
   isGasto,
+  isRenda,
 } from "@/lib/finance/fluxo";
 import type { Account, BankConnection, Card, Debt, RecurringItem, Transaction } from "@/lib/finance/types";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
@@ -73,7 +74,7 @@ export default function FluxoClient({
   }, [transactions, monthKey, connectionId, accounts, cards, accountId, type, search]);
 
   const entradas = scoped
-    .filter((transaction) => transaction.type === "entrada")
+    .filter(isRenda)
     .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
   const despesas = scoped
     .filter(isGasto)
@@ -95,7 +96,7 @@ export default function FluxoClient({
     scoped.forEach((transaction) => {
       const bucket = buckets.get(transaction.date);
       if (!bucket) return;
-      if (transaction.type === "entrada") bucket.entradas += Number(transaction.amount);
+      if (isRenda(transaction)) bucket.entradas += Number(transaction.amount);
       else if (isGasto(transaction)) bucket.despesas += Number(transaction.amount);
     });
     return days.map((day) => {

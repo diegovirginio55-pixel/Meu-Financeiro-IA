@@ -17,6 +17,8 @@ import type {
   Goal,
   Investment,
 } from "./types";
+import { isGasto, isRenda } from "./fluxo";
+import { promoteInvestmentsFromTransactions } from "./investment-movements";
 
 export interface UpcomingItem {
   description: string;
@@ -89,7 +91,11 @@ export async function getFinancialSnapshot(
 
   const accounts = (accountsRes.data ?? []) as Account[];
   const cards = (cardsRes.data ?? []) as Card[];
-  const investments = (investmentsRes.data ?? []) as Investment[];
+  const investments = await promoteInvestmentsFromTransactions(
+    supabase,
+    accounts,
+    (investmentsRes.data ?? []) as Investment[],
+  );
   const debts = (debtsRes.data ?? []) as Debt[];
   const goals = (goalsRes.data ?? []) as Goal[];
   const recurringItems = (recurringRes.data ?? []) as RecurringItem[];
@@ -111,10 +117,8 @@ export async function getFinancialSnapshot(
   const patrimonio =
     totalBalance + totalInvestments - totalInvoices - totalDebts;
 
-  const isGasto = (t: Transaction) => t.type === "saida" && t.category !== "Investimentos";
-
   const monthEntradas = monthTx
-    .filter((t) => t.type === "entrada")
+    .filter(isRenda)
     .reduce((s, t) => s + Number(t.amount), 0);
   const monthDespesas = monthTx
     .filter(isGasto)
@@ -192,8 +196,8 @@ export async function getFinancialSnapshot(
     const key = t.date.slice(0, 7);
     const bucket = evolucaoMap.get(key);
     if (!bucket) return;
-    if (t.type === "entrada") bucket.entradas += Number(t.amount);
-    else if (t.category !== "Investimentos") bucket.despesas += Number(t.amount);
+    if (isRenda(t)) bucket.entradas += Number(t.amount);
+    else if (isGasto(t)) bucket.despesas += Number(t.amount);
   });
   const evolucaoMensal = Array.from(evolucaoMap.entries()).map(
     ([mes, v]) => ({ mes, ...v }),

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { eachDayOfInterval, format, parseISO, startOfMonth, subDays, subMonths } from "date-fns";
 import { formatCurrency } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
-import { belongsToConnection, isGasto } from "@/lib/finance/fluxo";
+import { belongsToConnection, isGasto, isRenda } from "@/lib/finance/fluxo";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Transaction } from "@/lib/finance/types";
@@ -80,7 +80,7 @@ export default function DashboardClient({
   const monthKey = format(startOfMonth(new Date()), "yyyy-MM");
   const monthTx = scopedTx.filter((transaction) => transaction.date.startsWith(monthKey));
   const monthEntradas = monthTx
-    .filter((transaction) => transaction.type === "entrada")
+    .filter(isRenda)
     .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
   const monthDespesas = monthTx.filter(isGasto).reduce((sum, transaction) => sum + Number(transaction.amount), 0);
   const economia = monthEntradas - monthDespesas;
@@ -105,7 +105,7 @@ export default function DashboardClient({
     scopedTx.forEach((transaction) => {
       const bucket = map.get(transaction.date.slice(0, 7));
       if (!bucket) return;
-      if (transaction.type === "entrada") bucket.entradas += Number(transaction.amount);
+      if (isRenda(transaction)) bucket.entradas += Number(transaction.amount);
       else if (isGasto(transaction)) bucket.despesas += Number(transaction.amount);
     });
     return Array.from(map.entries()).map(([mes, values]) => ({ mes, ...values }));
@@ -193,9 +193,7 @@ export default function DashboardClient({
       const dayTx = scopedTx.filter((transaction) => transaction.date === key);
       return {
         dia: format(day, "dd/MM"),
-        entradas: dayTx
-          .filter((transaction) => transaction.type === "entrada")
-          .reduce((sum, transaction) => sum + Number(transaction.amount), 0),
+        entradas: dayTx.filter(isRenda).reduce((sum, transaction) => sum + Number(transaction.amount), 0),
         despesas: dayTx.filter(isGasto).reduce((sum, transaction) => sum + Number(transaction.amount), 0),
       };
     });

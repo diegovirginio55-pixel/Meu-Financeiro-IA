@@ -3,6 +3,7 @@ import type { Account, BankConnection, Card, Investment } from "./types";
 import { inferInstitutionName, isGenericConnectorName } from "@/lib/pluggy/institution";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { groupedConnectionId, institutionFromAssetName, realConnectionId } from "./connection-filter";
+import { promoteInvestmentsFromTransactions } from "./investment-movements";
 
 export type BankConnectionWithAssets = BankConnection & {
   accounts: Account[];
@@ -23,7 +24,11 @@ export async function getBankConnectionsWithAssets(
   const connections = (connRes.data ?? []) as BankConnection[];
   const accounts = (accRes.data ?? []) as Account[];
   const cards = (cardRes.data ?? []) as Card[];
-  const investments = (invRes.data ?? []) as Investment[];
+  const investments = await promoteInvestmentsFromTransactions(
+    supabase,
+    accounts,
+    (invRes.data ?? []) as Investment[],
+  );
 
   const usedAccountIds = new Set<string>();
   const usedCardIds = new Set<string>();

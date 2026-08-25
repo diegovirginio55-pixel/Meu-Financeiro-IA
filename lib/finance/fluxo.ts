@@ -1,8 +1,13 @@
 import type { Account, Card, Debt, RecurringItem, Transaction } from "./types";
 import { assetMatchesBank, connectionBank, realConnectionId } from "./connection-filter";
+import { isInvestmentMovement } from "./investment-movements";
 
 export function isGasto(transaction: Transaction): boolean {
-  return transaction.type === "saida" && transaction.category !== "Investimentos";
+  return transaction.type === "saida" && !isInvestmentMovement(transaction);
+}
+
+export function isRenda(transaction: Transaction): boolean {
+  return transaction.type === "entrada" && !isInvestmentMovement(transaction);
 }
 
 export function belongsToConnection(
