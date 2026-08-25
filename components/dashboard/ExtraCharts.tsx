@@ -18,7 +18,7 @@ import {
   YAxis,
 } from "recharts";
 import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/finance/format";
-import { chartTooltipStyle, compactAxis, compactShort } from "@/components/dashboard/chart-theme";
+import { barPercentLabel, chartTooltipStyle, compactAxis, compactShort } from "@/components/dashboard/chart-theme";
 import type { AssetPnlRow, YieldPoint } from "@/lib/finance/investment-pnl";
 
 export function EconomiaMensalChart({
@@ -374,14 +374,14 @@ export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
   );
 
   return (
-    <div className="relative h-[248px] w-full lg:h-[292px]">
+    <div className="relative h-[268px] w-full lg:h-[312px]">
       {!hasValues && (
         <p className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 px-6 text-center text-sm text-zinc-500">
           Sem rendimento diário ainda. Sincronize os bancos para começar o histórico.
         </p>
       )}
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} barCategoryGap="22%" margin={{ top: 10, right: 6, left: 0, bottom: 0 }}>
+        <BarChart data={data} barCategoryGap="22%" margin={{ top: 26, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id={`yieldFill-${uid}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#6ee7b7" />
@@ -419,6 +419,15 @@ export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
           />
           <Tooltip cursor={{ fill: "rgba(52, 211, 153, 0.08)" }} content={<YieldTooltip />} />
           <Bar dataKey="rendimento" name="Rendimento" radius={[7, 7, 3, 3]} maxBarSize={16}>
+            <LabelList
+              dataKey="rendimento"
+              position="top"
+              formatter={(value) => barPercentLabel(value, 3)}
+              fill="#d4d4d8"
+              fontSize={8}
+              offset={4}
+              angle={data.length > 14 ? -70 : 0}
+            />
             {data.map((entry) => {
               const empty = Math.abs(entry.rendimento) < 0.0005;
               const isPeak = !empty && entry.date === peak.date;
@@ -439,14 +448,14 @@ export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
 export function RendimentoMensalChart({ data }: { data: YieldPoint[] }) {
   const hasValues = data.some((point) => point.rendimento !== 0 || point.lucro !== 0);
   return (
-    <div className="relative h-[240px] w-full lg:h-[280px]">
+    <div className="relative h-[256px] w-full lg:h-[296px]">
       {!hasValues && (
         <p className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 px-6 text-center text-sm text-zinc-500">
           Sem rendimento mensal ainda. Os meses vão preenchendo a cada sincronização.
         </p>
       )}
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} barCategoryGap="24%" maxBarSize={36} margin={{ top: 12, right: 8, left: 4, bottom: 0 }}>
+        <BarChart data={data} barCategoryGap="24%" maxBarSize={36} margin={{ top: 24, right: 8, left: 4, bottom: 0 }}>
           <CartesianGrid stroke="#27272a" strokeDasharray="4 8" vertical={false} />
           <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} dy={8} />
           <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisPercent} />
@@ -460,6 +469,14 @@ export function RendimentoMensalChart({ data }: { data: YieldPoint[] }) {
             }}
           />
           <Bar dataKey="rendimento" name="rendimento" radius={[10, 10, 4, 4]}>
+            <LabelList
+              dataKey="rendimento"
+              position="top"
+              formatter={(value) => barPercentLabel(value, 2)}
+              fill="#d4d4d8"
+              fontSize={11}
+              offset={6}
+            />
             {data.map((entry) => (
               <Cell key={entry.date} fill={entry.rendimento >= 0 ? "#34d399" : "#fb7185"} />
             ))}

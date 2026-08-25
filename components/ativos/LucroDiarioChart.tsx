@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
+  LabelList,
   Legend,
   Line,
   ResponsiveContainer,
@@ -17,7 +18,7 @@ import {
 } from "recharts";
 import { formatCurrency } from "@/lib/finance/format";
 import { getBankBrand } from "@/lib/pluggy/brands";
-import { compactAxis } from "@/components/dashboard/chart-theme";
+import { barMoneyLabel, compactAxis } from "@/components/dashboard/chart-theme";
 import type { DailyPnlPoint, PnlSeriesKey } from "@/lib/finance/investment-pnl";
 
 const FALLBACK_COLORS = [
@@ -80,7 +81,7 @@ export function LucroDiarioChart({
       )}
       <ResponsiveContainer width="100%" height="100%">
         {variant === "bar" ? (
-          <BarChart data={data} barCategoryGap="18%" margin={{ top: 12, right: 8, left: 4, bottom: 0 }}>
+          <BarChart data={data} barCategoryGap="18%" margin={{ top: 24, right: 8, left: 4, bottom: 0 }}>
             <defs>
               <linearGradient id={`lucroFill-${uid}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#6ee7b7" />
@@ -128,6 +129,15 @@ export function LucroDiarioChart({
             )}
             {barKeys.length === 1 ? (
               <Bar dataKey={barKeys[0].key} name={barKeys[0].label} radius={[7, 7, 3, 3]} maxBarSize={16}>
+                <LabelList
+                  dataKey={barKeys[0].key}
+                  position="top"
+                  formatter={barMoneyLabel}
+                  fill="#d4d4d8"
+                  fontSize={8}
+                  offset={4}
+                  angle={data.length > 14 ? -70 : 0}
+                />
                 {data.map((entry) => {
                   const value = Number(entry[barKeys[0].key] ?? 0);
                   const empty = Math.abs(value) < 0.005;
@@ -158,7 +168,37 @@ export function LucroDiarioChart({
                           ? [0, 0, 3, 3]
                           : 0
                   }
-                />
+                >
+                  {index === barKeys.length - 1 ? (
+                    <LabelList
+                      position="top"
+                      fill="#d4d4d8"
+                      fontSize={8}
+                      offset={4}
+                      content={(props) => {
+                        const { x, y, width, index: rowIndex } = props as {
+                          x?: number;
+                          y?: number;
+                          width?: number;
+                          index?: number;
+                        };
+                        const total = Number(data[rowIndex ?? 0]?.Total ?? 0);
+                        if (x == null || y == null || Math.abs(total) < 0.005) return null;
+                        return (
+                          <text
+                            x={Number(x) + Number(width ?? 0) / 2}
+                            y={Number(y) - 6}
+                            textAnchor="middle"
+                            fill="#d4d4d8"
+                            fontSize={8}
+                          >
+                            {barMoneyLabel(total)}
+                          </text>
+                        );
+                      }}
+                    />
+                  ) : null}
+                </Bar>
               ))
             )}
           </BarChart>

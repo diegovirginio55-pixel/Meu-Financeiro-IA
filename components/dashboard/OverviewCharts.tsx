@@ -8,6 +8,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Pie,
   PieChart,
@@ -18,7 +19,7 @@ import {
 } from "recharts";
 import { formatCurrency, formatMonthLabel } from "@/lib/finance/format";
 import { categoryColor } from "@/lib/finance/categories";
-import { chartTooltipStyle, compactAxis } from "@/components/dashboard/chart-theme";
+import { barMoneyLabel, chartTooltipStyle, compactAxis } from "@/components/dashboard/chart-theme";
 
 export function SaldoEvolutionChart({
   data,
@@ -100,7 +101,7 @@ export function FluxoBarrasChart({
   return (
     <div className="h-[260px] w-full lg:h-[340px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} barCategoryGap="28%" maxBarSize={28} margin={{ top: 12, right: 8, left: 4, bottom: 0 }}>
+        <BarChart data={chartData} barCategoryGap="28%" maxBarSize={28} margin={{ top: 26, right: 8, left: 4, bottom: 0 }}>
           <defs>
             <linearGradient id={`inFill-${uid}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#6ee7b7" />
@@ -116,8 +117,12 @@ export function FluxoBarrasChart({
           <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} width={72} tickFormatter={compactAxis} />
           <Tooltip contentStyle={chartTooltipStyle} formatter={(value) => formatCurrency(Number(value))} />
           <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} />
-          <Bar dataKey="Entradas" fill={`url(#inFill-${uid})`} radius={[8, 8, 2, 2]} />
-          <Bar dataKey="Despesas" fill={`url(#outFill-${uid})`} radius={[8, 8, 2, 2]} />
+          <Bar dataKey="Entradas" fill={`url(#inFill-${uid})`} radius={[8, 8, 2, 2]}>
+            <LabelList dataKey="Entradas" position="top" formatter={barMoneyLabel} fill="#d4d4d8" fontSize={9} offset={4} />
+          </Bar>
+          <Bar dataKey="Despesas" fill={`url(#outFill-${uid})`} radius={[8, 8, 2, 2]}>
+            <LabelList dataKey="Despesas" position="top" formatter={barMoneyLabel} fill="#d4d4d8" fontSize={9} offset={4} />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

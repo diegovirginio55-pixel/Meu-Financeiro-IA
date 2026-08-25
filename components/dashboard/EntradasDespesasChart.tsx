@@ -9,9 +9,10 @@ import {
   Tooltip,
   Legend,
   CartesianGrid,
+  LabelList,
 } from "recharts";
 import { formatCurrency, formatMonthLabel } from "@/lib/finance/format";
-import { chartTooltipStyle } from "@/components/dashboard/chart-theme";
+import { barMoneyLabel, chartTooltipStyle } from "@/components/dashboard/chart-theme";
 
 interface Props {
   data: { mes: string; entradas: number; despesas: number }[];
@@ -30,7 +31,7 @@ export default function EntradasDespesasChart({ data }: Props) {
         Entradas x Despesas (últimos 6 meses)
       </h2>
       <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={chartData}>
+        <BarChart data={chartData} margin={{ top: 24, right: 8, left: 4, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
           <XAxis dataKey="mes" stroke="#71717a" fontSize={12} />
           <YAxis
@@ -44,8 +45,12 @@ export default function EntradasDespesasChart({ data }: Props) {
             formatter={(value) => formatCurrency(Number(value))}
           />
           <Legend />
-          <Bar dataKey="Entradas" fill="#10b981" radius={[6, 6, 0, 0]} />
-          <Bar dataKey="Despesas" fill="#ef4444" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="Entradas" fill="#10b981" radius={[6, 6, 0, 0]}>
+            <LabelList dataKey="Entradas" position="top" formatter={barMoneyLabel} fill="#d4d4d8" fontSize={9} offset={4} />
+          </Bar>
+          <Bar dataKey="Despesas" fill="#ef4444" radius={[6, 6, 0, 0]}>
+            <LabelList dataKey="Despesas" position="top" formatter={barMoneyLabel} fill="#d4d4d8" fontSize={9} offset={4} />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
