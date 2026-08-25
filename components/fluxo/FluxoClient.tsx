@@ -188,17 +188,17 @@ export default function FluxoClient({
           <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">
             {monthTitle(month)} · entradas menos saídas
           </p>
+          <div className="mb-1.5 flex justify-between text-[11px]">
+            <span className="font-medium text-emerald-300">{formatPercent(pctEntradas, 1)}</span>
+            <span className="font-medium text-rose-300">{formatPercent(pctSaidas, 1)}</span>
+          </div>
           <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
             <div className="h-full shrink-0 bg-emerald-400" style={{ width: `${pctEntradas}%` }} />
             <div className="h-full shrink-0 bg-rose-400" style={{ width: `${pctSaidas}%` }} />
           </div>
           <div className="mt-2 flex justify-between text-[11px] text-zinc-500">
-            <span className="text-emerald-300">
-              {formatCurrency(entradas)} · {formatPercent(pctEntradas, 1)}
-            </span>
-            <span className="text-rose-300">
-              {formatCurrency(despesas)} · {formatPercent(pctSaidas, 1)}
-            </span>
+            <span className="text-emerald-300">{formatCurrency(entradas)}</span>
+            <span className="text-rose-300">{formatCurrency(despesas)}</span>
           </div>
         </div>
       </PageHero>
