@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isInvestmentDescription } from "@/lib/finance/investment-movements";
+import { inferCategoryFromDescription } from "@/lib/finance/categories";
 import { pluggyApi, pluggyInvestmentAmount, type PluggyAccount, type PluggyInvestment } from "./client";
 import {
   bankFromLabel,
@@ -44,6 +45,8 @@ function mapCategory(
   description?: string | null,
 ): string {
   if (description && isInvestmentDescription(description)) return "Investimentos";
+  const inferred = description ? inferCategoryFromDescription(description) : null;
+  if (inferred) return inferred;
   if (pluggyCategory) {
     const mapped = CATEGORY_MAP[pluggyCategory.toLowerCase()];
     if (mapped) return mapped;

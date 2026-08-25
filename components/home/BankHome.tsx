@@ -12,7 +12,7 @@ import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 import { belongsToConnection, dailyBudgetFromBalance, greetingForNow, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
 import { institutionFromAssetName, realConnectionId } from "@/lib/finance/connection-filter";
 import type { Transaction } from "@/lib/finance/types";
-import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
+import { CATEGORY_ICONS, categoryColor } from "@/lib/finance/categories";
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
@@ -84,7 +84,9 @@ export default function BankHome({
   const bankLabel = selected ? shortBankName(selected.institution_name) : "visão geral";
   const monthTotal = snapshot.monthEntradas + snapshot.monthDespesas;
   const inShare = monthTotal > 0 ? (snapshot.monthEntradas / monthTotal) * 100 : 50;
-  const maxCategory = snapshot.gastosPorCategoria[0]?.total ?? 0;
+  const spendingCategories = snapshot.gastosPorCategoria;
+  const spendingTotal = spendingCategories.reduce((sum, item) => sum + item.total, 0);
+  const maxCategory = spendingCategories[0]?.total ?? 0;
   const todayKey = saoPauloTodayKey();
   const weekStart = saoPauloWeekStartKey();
   const scopedTx = useMemo(
@@ -332,38 +334,61 @@ export default function BankHome({
       </section>
 
       <div className="mt-8 px-4 lg:mt-10 lg:grid lg:grid-cols-2 lg:gap-12 lg:px-6">
-      {connectionId === "all" && snapshot.gastosPorCategoria.length > 0 && (
-        <section>
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
-              Onde foi o dinheiro
-            </h2>
+      {connectionId === "all" && spendingCategories.length > 0 && (
+        <section className="rounded-[28px] border border-zinc-800 bg-zinc-900/70 p-4 lg:p-5">
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
+                Onde foi o dinheiro
+              </h2>
+              <p className="mt-1 text-lg font-semibold text-white">
+                {hidden ? "••••••" : formatCurrency(spendingTotal)}
+              </p>
+              <p className="text-xs text-zinc-500">gastos de {monthName}, sem PIX nem aplicações</p>
+            </div>
             <Link href="/visao" className="text-xs text-emerald-400">
               gráficos
             </Link>
           </div>
-          <div className="space-y-3">
-            {snapshot.gastosPorCategoria.slice(0, 5).map((item) => (
-              <div key={item.category}>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="text-zinc-200">{item.category}</span>
-                  <span className="text-zinc-400">{hidden ? "••••" : formatCurrency(item.total)}</span>
+          <div className="space-y-3.5">
+            {spendingCategories.slice(0, 6).map((item) => {
+              const share = spendingTotal > 0 ? (item.total / spendingTotal) * 100 : 0;
+              const bar = maxCategory > 0 ? Math.max(6, (item.total / maxCategory) * 100) : 0;
+              return (
+                <div key={item.category}>
+                  <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                    <span className="flex min-w-0 items-center gap-2 text-zinc-200">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-sm">
+                        {CATEGORY_ICONS[item.category] ?? "🔖"}
+                      </span>
+                      <span className="truncate">{item.category}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block font-medium text-zinc-100">
+                        {hidden ? "••••" : formatCurrency(item.total)}
+                      </span>
+                      <span className="text-[11px] text-zinc-500">{share.toFixed(0)}%</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${bar}%`,
+                        backgroundColor: categoryColor(item.category),
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1 overflow-hidden rounded-full bg-zinc-800">
-                  <div
-                    className="h-full rounded-full bg-emerald-400/80"
-                    style={{ width: `${maxCategory > 0 ? (item.total / maxCategory) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
 
       {connectionId === "all" && snapshot.proximos30Dias.length > 0 && (
-        <section className="mt-8 lg:mt-0">
-          <div className="mb-3 flex items-baseline justify-between">
+        <section className="mt-8 rounded-[28px] border border-zinc-800 bg-zinc-900/70 p-4 lg:mt-0 lg:p-5">
+          <div className="mb-4 flex items-baseline justify-between">
             <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
               Próximos 30 dias
             </h2>

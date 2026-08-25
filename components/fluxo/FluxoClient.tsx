@@ -5,7 +5,7 @@ import { addMonths, eachDayOfInterval, endOfMonth, format, startOfMonth } from "
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
-import { categoryColor } from "@/lib/finance/categories";
+import { categoryColor, resolvedCategory } from "@/lib/finance/categories";
 import {
   belongsToConnection,
   futureExpensesInMonth,
@@ -83,7 +83,8 @@ export default function FluxoClient({
   const categorias = useMemo(() => {
     const map = new Map<string, number>();
     scoped.filter(isGasto).forEach((transaction) => {
-      map.set(transaction.category, (map.get(transaction.category) ?? 0) + Number(transaction.amount));
+      const category = resolvedCategory(transaction);
+      map.set(category, (map.get(category) ?? 0) + Number(transaction.amount));
     });
     return Array.from(map.entries())
       .map(([category, total]) => ({ category, total }))

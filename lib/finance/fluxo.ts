@@ -1,14 +1,23 @@
 import type { Account, Card, Debt, RecurringItem, Transaction } from "./types";
 import { assetMatchesBank, connectionBank, realConnectionId } from "./connection-filter";
 import { isInvestmentMovement } from "./investment-movements";
+import { isTransferDescription } from "./categories";
 import { differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns";
 
 export function isGasto(transaction: Transaction): boolean {
-  return transaction.type === "saida" && !isInvestmentMovement(transaction);
+  return (
+    transaction.type === "saida" &&
+    !isInvestmentMovement(transaction) &&
+    !isTransferDescription(transaction.description)
+  );
 }
 
 export function isRenda(transaction: Transaction): boolean {
-  return transaction.type === "entrada" && !isInvestmentMovement(transaction);
+  return (
+    transaction.type === "entrada" &&
+    !isInvestmentMovement(transaction) &&
+    !isTransferDescription(transaction.description)
+  );
 }
 
 export function saoPauloTodayKey(date = new Date()): string {

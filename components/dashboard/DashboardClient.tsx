@@ -7,6 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { formatCurrency } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
 import { belongsToConnection, dailyBudgetFromBalance, isGasto, isRenda, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
+import { resolvedCategory } from "@/lib/finance/categories";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Transaction } from "@/lib/finance/types";
@@ -99,7 +100,8 @@ export default function DashboardClient({
   const gastosPorCategoria = useMemo(() => {
     const map = new Map<string, number>();
     monthTx.filter(isGasto).forEach((transaction) => {
-      map.set(transaction.category, (map.get(transaction.category) ?? 0) + Number(transaction.amount));
+      const category = resolvedCategory(transaction);
+      map.set(category, (map.get(category) ?? 0) + Number(transaction.amount));
     });
     return Array.from(map.entries())
       .map(([category, total]) => ({ category, total }))

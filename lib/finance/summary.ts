@@ -19,6 +19,7 @@ import type {
 } from "./types";
 import { isGasto, isRenda, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange, dailyBudgetFromBalance } from "./fluxo";
 import { promoteInvestmentsFromTransactions } from "./investment-movements";
+import { resolvedCategory } from "./categories";
 
 export interface UpcomingItem {
   description: string;
@@ -140,10 +141,8 @@ export async function getFinancialSnapshot(
   monthTx
     .filter(isGasto)
     .forEach((t) => {
-      categoriaMap.set(
-        t.category,
-        (categoriaMap.get(t.category) ?? 0) + Number(t.amount),
-      );
+      const category = resolvedCategory(t);
+      categoriaMap.set(category, (categoriaMap.get(category) ?? 0) + Number(t.amount));
     });
   const gastosPorCategoria = Array.from(categoriaMap.entries())
     .map(([category, total]) => ({ category, total }))
