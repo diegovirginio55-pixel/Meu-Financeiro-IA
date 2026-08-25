@@ -319,7 +319,7 @@ export default function BancosClient({
         </p>
       </PageHero>
 
-      <div className="px-4 lg:px-6">
+      <div className="px-4 lg:px-6 xl:px-10 2xl:px-14">
       {error && (
         <p className="mb-4 rounded-2xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>
       )}
@@ -337,7 +337,7 @@ export default function BancosClient({
           Conexões
         </SectionLabel>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {connections.map((connection) => (
             <ConnectionCard
               key={connection.id}

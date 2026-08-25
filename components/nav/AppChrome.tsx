@@ -23,7 +23,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         className={
           phone
             ? "relative mx-auto w-full max-w-lg px-4 pt-4 pb-28"
-            : "relative mx-auto w-full max-w-7xl flex-1 px-6 py-8 pb-12 lg:px-8"
+            : "relative w-full flex-1 px-6 py-6 pb-10 xl:px-10 2xl:px-14"
         }
       >
         {children}

@@ -88,7 +88,7 @@ export default function DetalhesClient() {
         </div>
       </PageHero>
 
-      <div className="px-4 lg:px-6">
+      <div className="px-4 lg:px-6 xl:px-10 2xl:px-14">
         <TransactionsFilters
           filters={filters}
           onChange={setFilters}

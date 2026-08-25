@@ -199,7 +199,7 @@ export default function FluxoClient({
         </div>
       </PageHero>
 
-      <div className="flex flex-col gap-6 px-4 pb-2 lg:gap-8 lg:px-6">
+      <div className="flex flex-col gap-6 px-4 pb-2 lg:gap-8 lg:px-6 xl:px-10 2xl:px-14">
       <div className="grid gap-4 lg:grid-cols-3">
         <SoftPanel className="p-4 lg:col-span-2">
           <SectionLabel>Movimentação do mês</SectionLabel>

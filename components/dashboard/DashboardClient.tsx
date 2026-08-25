@@ -262,7 +262,7 @@ export default function DashboardClient({
         <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
       </PageHero>
 
-      <div className="flex flex-col gap-5 px-4 lg:gap-8 lg:px-6">
+      <div className="flex flex-col gap-5 px-4 lg:gap-8 lg:px-6 xl:px-10 2xl:px-14">
       {connections.length === 0 && (
         <Link href="/bancos" className="rounded-full bg-white px-5 py-2.5 text-center text-sm font-medium text-zinc-950">
           Conectar banco

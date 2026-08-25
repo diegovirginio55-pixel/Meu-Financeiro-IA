@@ -125,12 +125,12 @@ export default function BankHome({
   }
 
   return (
-    <div className="-mx-4 pb-6 text-zinc-100 lg:-mx-6">
-      <section className="relative overflow-hidden px-4 pb-7 pt-1 lg:px-6 lg:pb-10">
+    <div className="-mx-4 pb-6 text-zinc-100 lg:-mx-6 xl:-mx-10 2xl:-mx-14">
+      <section className="relative overflow-hidden px-4 pb-7 pt-1 lg:px-6 lg:pb-10 xl:px-10 2xl:px-14">
         <div className="pointer-events-none absolute -right-16 -top-10 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl lg:h-[22rem] lg:w-[22rem]" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
 
-        <div className="relative lg:grid lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-16">
+        <div className="relative lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-end lg:gap-16 xl:gap-24">
           <div>
             <header className="flex items-center justify-between">
               <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">
@@ -241,7 +241,7 @@ export default function BankHome({
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 px-4 lg:px-6">
+      <section className="grid grid-cols-2 gap-3 px-4 lg:grid-cols-3 lg:px-6 xl:px-10 2xl:px-14">
         <Link href="/fluxo" className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">Gastos de hoje</p>
           <p className="mt-2 text-xl font-semibold tracking-tight text-rose-300 lg:text-2xl">
@@ -254,10 +254,7 @@ export default function BankHome({
             {money(hidden, gastosSemana)}
           </p>
         </Link>
-      </section>
-
-      <section className="mt-3 px-4 lg:px-6">
-        <article className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4">
+        <article className="col-span-2 rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4 lg:col-span-1">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">Pode gastar por dia</p>
           <p className="mt-2 text-xl font-semibold tracking-tight text-white lg:text-2xl">
             {money(hidden, dailyBudget.perDay)}
@@ -269,13 +266,13 @@ export default function BankHome({
       </section>
 
       <section className="mt-2 lg:mt-4">
-        <div className="mb-3 flex items-baseline justify-between px-4 lg:px-6">
+        <div className="mb-3 flex items-baseline justify-between px-4 lg:px-6 xl:px-10 2xl:px-14">
           <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">Carteira</h2>
           <Link href="/bancos" className="text-xs text-emerald-400">
             gerenciar
           </Link>
         </div>
-        <div className="flex gap-4 overflow-x-auto px-4 pb-1 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] lg:overflow-visible lg:px-6">
+        <div className="flex gap-4 overflow-x-auto px-4 pb-1 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] lg:overflow-visible lg:px-6 xl:px-10 2xl:px-14">
           {walletAccounts.map((account) => {
             const connection = connectionForAsset(account, connections, selected);
             const name = officialInstitutionName(connection?.institution_name ?? account.name);
@@ -335,7 +332,7 @@ export default function BankHome({
         </div>
       </section>
 
-      <div className="mt-8 px-4 lg:mt-10 lg:grid lg:grid-cols-2 lg:gap-12 lg:px-6">
+      <div className="mt-8 px-4 lg:mt-10 lg:grid lg:grid-cols-2 lg:gap-12 lg:px-6 xl:gap-16 xl:px-10 2xl:px-14">
       {connectionId === "all" && spendingCategories.length > 0 && (
         <section className="rounded-[28px] border border-zinc-800 bg-zinc-900/70 p-4 lg:p-5">
           <div className="mb-4 flex items-end justify-between gap-3">

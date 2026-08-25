@@ -107,7 +107,7 @@ export default function ChatWindow() {
         title="Conversa"
         subtitle="Pergunte sobre gastos, saldo e investimentos"
       />
-      <div className="flex h-[calc(100vh-15rem)] flex-col px-4 lg:h-[calc(100vh-17rem)] lg:px-6">
+      <div className="flex h-[calc(100vh-15rem)] flex-col px-4 lg:h-[calc(100vh-12rem)] lg:px-6 xl:px-10 2xl:px-14">
         <div className="flex-1 space-y-3 overflow-y-auto pb-3">
           {loadingHistory ? (
             <p className="text-center text-sm text-zinc-500">Carregando conversa...</p>
