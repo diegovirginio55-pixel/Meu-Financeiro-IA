@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCurrency } from "@/lib/finance/format";
+import { formatCurrency, formatPercent } from "@/lib/finance/format";
 import { friendlyAccountName, isPlaceholderAccount } from "@/lib/finance/account-name";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
@@ -15,10 +15,30 @@ import type { Transaction } from "@/lib/finance/types";
 import { CATEGORY_ICONS, categoryColor } from "@/lib/finance/categories";
 import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
 import { BankLogo } from "@/components/bancos/BankLogo";
+import { accumulatedProfit } from "@/lib/finance/investment-pnl";
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
   return formatCurrency(value);
+}
+
+function signedPercent(value: number) {
+  const formatted = formatPercent(Math.abs(value));
+  if (value > 0) return `+${formatted}`;
+  if (value < 0) return `-${formatted}`;
+  return formatted;
+}
+
+function ProfitArrow({ up }: { up: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0" fill="currentColor" aria-hidden>
+      {up ? (
+        <path d="M8 3.2 13.2 9H10v4H6V9H2.8L8 3.2Z" />
+      ) : (
+        <path d="M8 12.8 2.8 7H6V3h4v4h3.2L8 12.8Z" />
+      )}
+    </svg>
+  );
 }
 
 function shortBankName(name: string) {
@@ -79,6 +99,14 @@ export default function BankHome({
   );
   const bankBalance = accounts.reduce((sum, item) => sum + Number(item.balance), 0);
   const bankInvestments = investments.reduce((sum, item) => sum + Number(item.amount), 0);
+  const investmentProfit = investments.reduce((sum, item) => sum + accumulatedProfit(item), 0);
+  const investedCapital = investments.reduce((sum, item) => {
+    const original = Number(item.amount_original ?? 0);
+    if (original !== 0) return sum + original;
+    const amount = Number(item.amount ?? 0);
+    return sum + Math.max(0, amount - accumulatedProfit(item));
+  }, 0);
+  const investmentProfitPct = investedCapital > 0 ? (investmentProfit / investedCapital) * 100 : 0;
   const saldoConta = bankBalance;
   const saldoTotal = bankBalance + bankInvestments;
   const displayedBalance = balanceView === "total" ? saldoTotal : saldoConta;
@@ -305,11 +333,21 @@ export default function BankHome({
           {bankInvestments > 0 && (
             <Link href="/ativos" className={`${walletTileClass} bg-gradient-to-br from-emerald-700 via-emerald-900 to-zinc-950`}>
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-emerald-200/80">Investido</p>
-              <p className="mt-10 text-sm text-white/75">
+              <p className="mt-8 text-sm text-white/75">
                 {investments.length} {investments.length === 1 ? "ativo" : "ativos"}
               </p>
               <p className="mt-1 text-2xl font-semibold tracking-tight text-white">
                 {money(hidden, bankInvestments)}
+              </p>
+              <p
+                className={`mt-2 flex items-center gap-1 text-xs font-medium ${
+                  investmentProfit >= 0 ? "text-emerald-300" : "text-rose-300"
+                }`}
+              >
+                <ProfitArrow up={investmentProfit >= 0} />
+                <span>{hidden ? "••••" : signedPercent(investmentProfitPct)}</span>
+                <span className="text-white/45">·</span>
+                <span>{hidden ? "••••" : money(false, investmentProfit)}</span>
               </p>
             </Link>
           )}
