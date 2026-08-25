@@ -92,44 +92,36 @@ export function LucroAtivosPanel({
   const visibleKeys = rows.slice(0, 12).map((row) => ({ key: row.key, label: row.label }));
   const rendimentoHoje = dailyYield[dailyYield.length - 1]?.rendimento ?? 0;
   const rendimento30d = periodYield(dailyYield);
-  const rendimentoMes = monthlyYield.series[monthlyYield.series.length - 1]?.rendimento ?? 0;
   const lucroDia = dailyYield[dailyYield.length - 1]?.lucro ?? lucroHoje;
-  const lucroMes = monthlyYield.series[monthlyYield.series.length - 1]?.lucro ?? 0;
 
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium text-zinc-200">Rendimento diário</h3>
-              <p className="mt-1 text-[11px] text-zinc-500">Lucro do dia dividido pelo patrimônio investido.</p>
-            </div>
-            <p className={`text-right text-sm font-semibold sm:text-lg ${lucroDia >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+          <h3 className="text-sm font-medium text-zinc-200">Rendimento diário</h3>
+          <p className="mt-1 text-[11px] text-zinc-500">Lucro do dia dividido pelo patrimônio investido.</p>
+          <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950/50 px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Hoje</p>
+            <p className={`mt-1 text-2xl font-semibold ${lucroDia >= 0 ? "text-emerald-400" : "text-rose-300"}`}>
               {formatCurrency(lucroDia)}
             </p>
+            <p className="mt-1 text-[11px] text-zinc-500">{formatPercent(rendimentoHoje, 3)}</p>
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">
-            {formatPercent(rendimentoHoje, 3)} hoje · 30 dias {formatPercent(rendimento30d)}
-          </p>
-          <div className="mt-2">
+          <div className="mt-3">
             <RendimentoDiarioChart data={dailyYield} />
           </div>
         </div>
         <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium text-zinc-200">Rendimento mensal</h3>
-              <p className="mt-1 text-[11px] text-zinc-500">Lucro do mês sobre o saldo médio investido.</p>
-            </div>
-            <p className={`text-right text-sm font-semibold sm:text-lg ${lucroMes >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {formatCurrency(lucroMes)}
+          <h3 className="text-sm font-medium text-zinc-200">Rendimento mensal</h3>
+          <p className="mt-1 text-[11px] text-zinc-500">Lucro do mês sobre o saldo médio investido.</p>
+          <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950/50 px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">30 dias</p>
+            <p className={`mt-1 text-2xl font-semibold ${lucroPeriodo >= 0 ? "text-emerald-400" : "text-rose-300"}`}>
+              {formatCurrency(lucroPeriodo)}
             </p>
+            <p className="mt-1 text-[11px] text-zinc-500">{formatPercent(rendimento30d)}</p>
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">
-            {formatPercent(rendimentoMes)} neste mês · últimos 12 meses
-          </p>
-          <div className="mt-2">
+          <div className="mt-3">
             <RendimentoMensalChart data={monthlyYield.series} />
           </div>
         </div>
