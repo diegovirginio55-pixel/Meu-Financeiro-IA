@@ -191,8 +191,7 @@ export default function BankHome({
                   <div className="bg-rose-400/80" style={{ width: `${100 - inShare}%` }} />
                 </div>
                 <p className="mt-2 text-center text-[11px] text-zinc-500">
-                  {snapshot.economia >= 0 ? "sobrou" : "faltou"}{" "}
-                  {hidden ? "••••" : formatCurrency(Math.abs(snapshot.economia))} em {monthName}
+                  líquido da conta {money(hidden, saldoConta)}
                 </p>
               </div>
             )}
