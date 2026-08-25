@@ -131,7 +131,7 @@ export default function ChatWindow() {
               type="button"
               onClick={() => void handleClear()}
               disabled={!canClear || clearing}
-              className="relative z-10 mb-1 shrink-0 rounded-full bg-white px-4 py-2 text-sm font-medium text-zinc-950 disabled:opacity-40"
+              className="relative z-10 mb-1 shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-zinc-950 disabled:opacity-40"
             >
               {clearing ? "Apagando..." : "Apagar conversa"}
             </button>
@@ -151,16 +151,6 @@ export default function ChatWindow() {
             messages.map((m) => <ChatBubble key={m.id} message={m} />)
           )}
           <div ref={bottomRef} />
-        </div>
-        <div className="mb-2 flex justify-end">
-          <button
-            type="button"
-            onClick={() => void handleClear()}
-            disabled={!canClear || clearing}
-            className="rounded-full px-3 py-1.5 text-sm font-medium text-zinc-300 underline underline-offset-4 disabled:opacity-40"
-          >
-            {clearing ? "Apagando..." : "Apagar conversa"}
-          </button>
         </div>
         <ChatInput disabled={sending} onSend={handleSend} />
       </div>
