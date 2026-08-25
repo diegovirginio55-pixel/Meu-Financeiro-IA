@@ -7,7 +7,7 @@ import { InstallAppButton } from "@/components/pwa/PwaInstall";
 
 const TABS = [
   { href: "/dashboard", label: "Início" },
-  { href: "/visao", label: "Gráficos" },
+  { href: "/visao", label: "Dashboard" },
   { href: "/detalhes", label: "Extrato" },
   { href: "/fluxo", label: "Fluxo" },
   { href: "/chat", label: "Chat" },

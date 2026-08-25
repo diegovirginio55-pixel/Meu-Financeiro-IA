@@ -9,7 +9,7 @@ import { InstallAppButton } from "@/components/pwa/PwaInstall";
 const TABS = [
   { href: "/dashboard", label: "Início", icon: HomeIcon },
   { href: "/detalhes", label: "Extrato", icon: ExtratoIcon },
-  { href: "/fluxo", label: "Fluxo", icon: PixIcon },
+  { href: "/visao", label: "Dashboard", icon: DashboardIcon },
   { href: "/chat", label: "Chat", icon: ChatIcon },
 ] as const;
 
@@ -37,13 +37,14 @@ function ExtratoIcon({ active }: { active?: boolean }) {
   );
 }
 
-function PixIcon({ active }: { active?: boolean }) {
+function DashboardIcon({ active }: { active?: boolean }) {
+  const color = active ? "#10B981" : "#71717A";
   return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden>
-      <path
-        fill={active ? "#10B981" : "#71717A"}
-        d="M12.8 4.3 19.7 11.2a1.1 1.1 0 0 1 0 1.6l-6.9 6.9a1.1 1.1 0 0 1-1.6 0L4.3 12.8a1.1 1.1 0 0 1 0-1.6l6.9-6.9a1.1 1.1 0 0 1 1.6 0Z"
-      />
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
+      <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.6" stroke={color} strokeWidth="1.6" />
+      <rect x="13" y="3.5" width="7.5" height="4.5" rx="1.6" stroke={color} strokeWidth="1.6" />
+      <rect x="13" y="10.5" width="7.5" height="10" rx="1.6" stroke={color} strokeWidth="1.6" />
+      <rect x="3.5" y="13.5" width="7.5" height="7" rx="1.6" stroke={color} strokeWidth="1.6" />
     </svg>
   );
 }
@@ -75,7 +76,7 @@ function MenuIcon({ active }: { active?: boolean }) {
   );
 }
 
-const MENU_ROUTES = ["/visao", "/ativos", "/bancos"];
+const MENU_ROUTES = ["/ativos", "/bancos", "/fluxo"];
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -101,7 +102,6 @@ export default function BottomNav() {
             <p className="text-sm font-semibold text-zinc-400">Menu</p>
             <div className="mt-3 flex flex-col gap-1">
               {[
-                { href: "/visao", label: "Visão geral e gráficos" },
                 { href: "/ativos", label: "Investimentos" },
                 { href: "/bancos", label: "Bancos conectados" },
                 { href: "/fluxo", label: "Fluxo de caixa" },
