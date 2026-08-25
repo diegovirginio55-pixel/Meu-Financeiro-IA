@@ -171,7 +171,7 @@ export default function FluxoClient({
                 setConnectionId(event.target.value);
                 setAccountId("all");
               }}
-              className="bg-transparent outline-none [color-scheme:dark]"
+              className="bg-transparent outline-none"
             >
               <option value="all">Tudo</option>
               {connections.map((connection) => (
@@ -322,7 +322,7 @@ export default function FluxoClient({
             <select
               value={accountId}
               onChange={(event) => setAccountId(event.target.value)}
-              className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none [color-scheme:dark]"
+              className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none"
             >
               <option value="all">Todas contas</option>
               {visibleAccounts.list.map((account) => (

@@ -14,6 +14,7 @@ import { institutionFromAssetName, realConnectionId } from "@/lib/finance/connec
 import type { Transaction } from "@/lib/finance/types";
 import { CATEGORY_ICONS, categoryColor } from "@/lib/finance/categories";
 import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { accumulatedProfit } from "@/lib/finance/investment-pnl";
 
@@ -166,6 +167,7 @@ export default function BankHome({
                 {greetingForNow()}
               </p>
               <div className="flex items-center gap-1 lg:hidden">
+                <ThemeToggle />
                 <button
                   type="button"
                   onClick={() => setHidden((value) => !value)}

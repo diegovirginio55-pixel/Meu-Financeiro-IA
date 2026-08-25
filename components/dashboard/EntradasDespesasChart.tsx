@@ -11,6 +11,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { formatCurrency, formatMonthLabel } from "@/lib/finance/format";
+import { chartTooltipStyle } from "@/components/dashboard/chart-theme";
 
 interface Props {
   data: { mes: string; entradas: number; despesas: number }[];
@@ -39,7 +40,7 @@ export default function EntradasDespesasChart({ data }: Props) {
             width={80}
           />
           <Tooltip
-            contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
+            contentStyle={chartTooltipStyle}
             formatter={(value) => formatCurrency(Number(value))}
           />
           <Legend />

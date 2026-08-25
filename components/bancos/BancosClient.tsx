@@ -57,8 +57,8 @@ function ConnectionCard({
       className="flex min-h-[168px] flex-col rounded-3xl p-4 text-left"
       style={{
         background: brand
-          ? `linear-gradient(160deg, ${brand.bg} 0%, #09090b 78%)`
-          : "linear-gradient(160deg, #27272a 0%, #09090b 78%)",
+          ? `linear-gradient(160deg, ${brand.bg} 0%, var(--background) 78%)`
+          : "linear-gradient(160deg, var(--color-zinc-800, #27272a) 0%, var(--background) 78%)",
       }}
     >
       <div className="flex items-start justify-between">

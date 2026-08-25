@@ -1,9 +1,9 @@
 export const chartTooltipStyle = {
-  background: "rgba(9, 9, 11, 0.96)",
-  border: "1px solid rgba(63, 63, 70, 0.85)",
+  background: "var(--chart-tooltip-bg)",
+  border: "1px solid var(--chart-tooltip-border)",
   borderRadius: 16,
   fontSize: 12,
-  color: "#fafafa",
+  color: "var(--chart-tooltip-fg)",
   boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
   padding: "10px 12px",
 };

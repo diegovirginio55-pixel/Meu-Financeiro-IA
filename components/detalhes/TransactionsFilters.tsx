@@ -74,7 +74,7 @@ export default function TransactionsFilters({
         <select
           value={filters.category}
           onChange={(e) => update("category", e.target.value)}
-          className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none [color-scheme:dark]"
+          className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
           <option value="">Categoria</option>
           {CATEGORIES.map((c) => (
@@ -86,7 +86,7 @@ export default function TransactionsFilters({
         <select
           value={filters.accountId}
           onChange={(e) => update("accountId", e.target.value)}
-          className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none [color-scheme:dark]"
+          className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
           <option value="">Conta</option>
           {accounts.map((a) => (
@@ -98,7 +98,7 @@ export default function TransactionsFilters({
         <select
           value={filters.cardId}
           onChange={(e) => update("cardId", e.target.value)}
-          className="col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none [color-scheme:dark]"
+          className="col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
           <option value="">Cartão</option>
           {cards.map((c) => (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
@@ -125,6 +126,7 @@ export default function BottomNav() {
                   {item.label}
                 </Link>
               ))}
+              <ThemeToggle variant="menu" />
               <InstallAppButton variant="menu" />
               <button
                 type="button"

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
@@ -57,6 +58,7 @@ export default function TabNav() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-4">
+          <ThemeToggle variant="nav" />
           <InstallAppButton variant="nav" />
           <button
             type="button"

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import { PwaRoot } from "@/components/pwa/PwaInstall";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,13 +50,19 @@ export default function RootLayout({
     <html
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-zinc-950">
         <Script id="pwa-capture" strategy="beforeInteractive">
           {`window.__pwaDeferred=null;window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__pwaDeferred=e;});`}
         </Script>
-        <PwaRoot />
-        {children}
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`(function(){try{if(localStorage.getItem("mf-theme")==="light"){document.documentElement.classList.add("light");document.documentElement.style.colorScheme="light";}else{document.documentElement.style.colorScheme="dark";}}catch(e){document.documentElement.style.colorScheme="dark";}})();`}
+        </Script>
+        <ThemeProvider>
+          <PwaRoot />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

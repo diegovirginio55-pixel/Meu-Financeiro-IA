@@ -281,7 +281,7 @@ export default function DashboardClient({
             <select
               value={connectionId}
               onChange={(event) => setConnectionId(event.target.value)}
-              className="bg-transparent outline-none [color-scheme:dark]"
+              className="bg-transparent outline-none"
             >
               <option value="all">Tudo</option>
               {connections.map((connection) => (

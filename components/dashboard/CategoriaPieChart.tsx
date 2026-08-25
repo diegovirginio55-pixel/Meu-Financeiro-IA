@@ -3,6 +3,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { formatCurrency } from "@/lib/finance/format";
 import { CATEGORY_COLORS } from "@/lib/finance/categories";
+import { chartTooltipStyle } from "@/components/dashboard/chart-theme";
 
 interface Props {
   data: { category: string; total: number }[];
@@ -45,7 +46,7 @@ export default function CategoriaPieChart({ data }: Props) {
             ))}
           </Pie>
           <Tooltip
-            contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }}
+            contentStyle={chartTooltipStyle}
             formatter={(value) => formatCurrency(Number(value))}
           />
           <Legend />
