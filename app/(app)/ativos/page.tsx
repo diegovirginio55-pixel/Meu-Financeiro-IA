@@ -9,9 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function AtivosPage() {
   const supabase = await createClient();
   const from = format(startOfMonth(subMonths(new Date(), 11)), "yyyy-MM-dd");
-
-  const [connections, snapRes, txRes] = await Promise.all([
-    getBankConnectionsWithAssets(supabase),
+  const connections = await getBankConnectionsWithAssets(supabase);
+  const [snapRes, txRes] = await Promise.all([
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", from),
     supabase.from("investment_transactions").select("*").gte("date", from),
   ]);

@@ -332,11 +332,10 @@ function runningCapitalByDate(
 
   investments.forEach((investment) => {
     const snaps = byInvestment.get(investment.id) ?? [];
-    let amount = Number(investment.amount ?? 0);
+    let amount = snaps.length > 0 ? 0 : Number(investment.amount ?? 0);
     if (snaps.length > 0) {
       const before = snaps.filter((item) => toDateKey(item.snapshot_date) < firstDate);
       if (before.length > 0) amount = Number(before[before.length - 1].amount);
-      else amount = Number(snaps[0].amount ?? amount);
     }
     let index = 0;
     dates.forEach((date) => {

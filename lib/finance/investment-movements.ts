@@ -84,7 +84,14 @@ export async function promoteInvestmentsFromTransactions(
 
   const grouped = new Map<
     string,
-    { name: string; amount: number; userId: string; accountId: string | null; type: string }
+    {
+      name: string;
+      amount: number;
+      userId: string;
+      accountId: string | null;
+      type: string;
+      movements: { id: string; date: string; amount: number; description: string }[];
+    }
   >();
 
   for (const transaction of applications) {
@@ -92,8 +99,15 @@ export async function promoteInvestmentsFromTransactions(
     const key = normalizeText(name);
     if (!key) continue;
     const current = grouped.get(key);
+    const movement = {
+      id: transaction.id,
+      date: transaction.date,
+      amount: Number(transaction.amount),
+      description: transaction.description,
+    };
     if (current) {
       current.amount += Number(transaction.amount);
+      current.movements.push(movement);
       continue;
     }
     grouped.set(key, {
@@ -102,6 +116,7 @@ export async function promoteInvestmentsFromTransactions(
       userId: transaction.user_id,
       accountId: transaction.account_id,
       type: investmentTypeFromDescription(transaction.description),
+      movements: [movement],
     });
   }
 
@@ -156,6 +171,7 @@ export async function promoteInvestmentsFromTransactions(
         const index = remaining.findIndex((current) => current.id === existing.id);
         if (index >= 0) remaining[index] = existing as Investment;
         else created.push(existing as Investment);
+        await syncSyntheticInvestmentHistory(supabase, existing as Investment, item, account);
       }
       continue;
     }
@@ -163,8 +179,75 @@ export async function promoteInvestmentsFromTransactions(
       const index = remaining.findIndex((current) => current.id === row.id);
       if (index >= 0) remaining[index] = row as Investment;
       else created.push(row as Investment);
+      await syncSyntheticInvestmentHistory(supabase, row as Investment, item, account);
     }
   }
 
   return [...remaining, ...created];
+}
+
+async function syncSyntheticInvestmentHistory(
+  supabase: SupabaseClient,
+  investment: Investment,
+  group: {
+    userId: string;
+    amount: number;
+    accountId: string | null;
+    movements: { id: string; date: string; amount: number; description: string }[];
+  },
+  account: Account | undefined,
+) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const bankConnectionId = account?.bank_connection_id ?? investment.bank_connection_id ?? null;
+  const byDate = new Map<string, number>();
+  for (const movement of group.movements) {
+    byDate.set(movement.date, (byDate.get(movement.date) ?? 0) + movement.amount);
+  }
+
+  let cumulative = 0;
+  const snapshots = [...byDate.keys()].sort().map((date) => {
+    cumulative += byDate.get(date) ?? 0;
+    return {
+      user_id: group.userId,
+      investment_id: investment.id,
+      bank_connection_id: bankConnectionId,
+      snapshot_date: date,
+      amount: cumulative,
+      amount_profit: 0,
+    };
+  });
+  if (!byDate.has(today)) {
+    snapshots.push({
+      user_id: group.userId,
+      investment_id: investment.id,
+      bank_connection_id: bankConnectionId,
+      snapshot_date: today,
+      amount: group.amount,
+      amount_profit: 0,
+    });
+  }
+
+  const { error: snapshotError } = await supabase
+    .from("investment_snapshots")
+    .upsert(snapshots, { onConflict: "investment_id,snapshot_date" });
+  if (snapshotError) {
+    console.error("Erro ao gravar snapshot do investimento do extrato:", snapshotError);
+  }
+
+  const txRows = group.movements.map((movement) => ({
+    user_id: group.userId,
+    investment_id: investment.id,
+    bank_connection_id: bankConnectionId,
+    pluggy_transaction_id: `bank-tx:${movement.id}`,
+    type: "BUY",
+    amount: movement.amount,
+    date: movement.date,
+    description: movement.description,
+  }));
+  const { error: txError } = await supabase
+    .from("investment_transactions")
+    .upsert(txRows, { onConflict: "pluggy_transaction_id" });
+  if (txError) {
+    console.error("Erro ao gravar aplicação do extrato nos gráficos:", txError);
+  }
 }
