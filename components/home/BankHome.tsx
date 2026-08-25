@@ -5,11 +5,12 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency } from "@/lib/finance/format";
-import { friendlyAccountName } from "@/lib/finance/account-name";
+import { friendlyAccountName, isPlaceholderAccount } from "@/lib/finance/account-name";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 import { belongsToConnection, dailyBudgetFromBalance, greetingForNow, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
+import { institutionFromAssetName, realConnectionId } from "@/lib/finance/connection-filter";
 import type { Transaction } from "@/lib/finance/types";
 import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
 
@@ -24,6 +25,28 @@ function shortBankName(name: string) {
   if (official === "Banco do Brasil") return "BB";
   return official;
 }
+
+function connectionForAsset(
+  asset: { name: string; bank_connection_id?: string | null },
+  connections: BankConnectionWithAssets[],
+  selected: BankConnectionWithAssets | null,
+) {
+  const realId = asset.bank_connection_id;
+  const bank = institutionFromAssetName(asset.name, "");
+  return (
+    connections.find(
+      (connection) =>
+        realConnectionId(connection.id) === realId &&
+        (!bank || officialInstitutionName(connection.institution_name) === bank),
+    ) ??
+    connections.find((connection) => connection.id === realId) ??
+    selected ??
+    null
+  );
+}
+
+const walletTileClass =
+  "relative w-[268px] min-h-[176px] shrink-0 overflow-hidden rounded-[28px] p-5 ring-1 ring-white/10 lg:w-auto";
 
 export default function BankHome({
   snapshot,
@@ -46,6 +69,12 @@ export default function BankHome({
   const accounts = selected?.accounts ?? snapshot.accounts;
   const cards = selected?.cards ?? snapshot.cards;
   const investments = selected?.investments ?? snapshot.investments;
+  const walletAccounts = [...accounts]
+    .filter((account) => !isPlaceholderAccount(account))
+    .sort((left, right) => Number(right.balance) - Number(left.balance));
+  const walletCards = [...cards].sort(
+    (left, right) => Number(right.current_invoice) - Number(left.current_invoice),
+  );
   const bankBalance = accounts.reduce((sum, item) => sum + Number(item.balance), 0);
   const bankInvestments = investments.reduce((sum, item) => sum + Number(item.amount), 0);
   const saldoConta = bankBalance;
@@ -242,58 +271,61 @@ export default function BankHome({
             gerenciar
           </Link>
         </div>
-        <div className="flex gap-3 overflow-x-auto px-4 pb-1 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-6">
-          {accounts.map((account) => {
-            const connection =
-              connections.find((item) => item.id === account.bank_connection_id) ?? selected;
+        <div className="flex gap-4 overflow-x-auto px-4 pb-1 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] lg:overflow-visible lg:px-6">
+          {walletAccounts.map((account) => {
+            const connection = connectionForAsset(account, connections, selected);
             const name = officialInstitutionName(connection?.institution_name ?? account.name);
             const brand = getBankBrand(name);
             return (
               <article
                 key={account.id}
-                className="w-[210px] shrink-0 rounded-3xl p-4 lg:w-auto"
+                className={walletTileClass}
                 style={{
                   background: brand
-                    ? `linear-gradient(160deg, ${brand.bg} 0%, #09090b 78%)`
-                    : "linear-gradient(160deg, #27272a 0%, #09090b 78%)",
+                    ? `linear-gradient(155deg, ${brand.bg} 0%, ${brand.bg}99 28%, #09090b 72%)`
+                    : "linear-gradient(155deg, #3f3f46 0%, #09090b 72%)",
                 }}
               >
-                <BankLogo name={name} imageUrl={connection?.institution_image_url} size="sm" />
-                <p className="mt-6 truncate text-xs text-white/70">
+                <div className="flex items-start justify-between gap-3">
+                  <BankLogo name={name} imageUrl={connection?.institution_image_url} size="md" />
+                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/55">
+                    {shortBankName(name)}
+                  </span>
+                </div>
+                <p className="mt-10 truncate text-sm text-white/75">
                   {friendlyAccountName(account.name, account.type)}
                 </p>
-                <p className="mt-1 text-xl font-semibold tracking-tight text-white">
+                <p className="mt-1 text-2xl font-semibold tracking-tight text-white">
                   {money(hidden, Number(account.balance))}
                 </p>
               </article>
             );
           })}
           {bankInvestments > 0 && (
-            <Link
-              href="/ativos"
-              className="w-[210px] shrink-0 rounded-3xl bg-gradient-to-br from-emerald-700 to-zinc-950 p-4 lg:w-auto"
-            >
-              <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/80">Investido</p>
-              <p className="mt-6 text-xs text-white/70">{investments.length} ativos</p>
-              <p className="mt-1 text-xl font-semibold tracking-tight text-white">
+            <Link href="/ativos" className={`${walletTileClass} bg-gradient-to-br from-emerald-700 via-emerald-900 to-zinc-950`}>
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-emerald-200/80">Investido</p>
+              <p className="mt-10 text-sm text-white/75">
+                {investments.length} {investments.length === 1 ? "ativo" : "ativos"}
+              </p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight text-white">
                 {money(hidden, bankInvestments)}
               </p>
             </Link>
           )}
-          {cards.map((card) => (
+          {walletCards.map((card) => (
             <Link
               key={card.id}
               href="/detalhes"
-              className="w-[210px] shrink-0 rounded-3xl bg-gradient-to-br from-zinc-800 to-zinc-950 p-4 ring-1 ring-zinc-800 lg:w-auto"
+              className={`${walletTileClass} bg-gradient-to-br from-zinc-700 via-zinc-900 to-zinc-950`}
             >
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Fatura</p>
-              <p className="mt-6 truncate text-xs text-white/70">{card.name}</p>
-              <p className="mt-1 text-xl font-semibold tracking-tight text-rose-300">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-400">Fatura</p>
+              <p className="mt-10 truncate text-sm text-white/75">{card.name}</p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight text-rose-300">
                 {money(hidden, Number(card.current_invoice))}
               </p>
             </Link>
           ))}
-          {accounts.length === 0 && cards.length === 0 && bankInvestments === 0 && (
+          {walletAccounts.length === 0 && walletCards.length === 0 && bankInvestments === 0 && (
             <p className="text-sm text-zinc-500">Nada neste banco ainda.</p>
           )}
         </div>
