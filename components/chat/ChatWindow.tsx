@@ -75,9 +75,17 @@ export default function ChatWindow() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
       });
-      const data: { reply?: string; error?: string } = await res.json();
+      const raw = await res.text();
+      let data: { reply?: string; error?: string } = {};
+      try {
+        data = raw ? (JSON.parse(raw) as { reply?: string; error?: string }) : {};
+      } catch {
+        data = {};
+      }
       const reply =
-        data.reply ?? "Não consegui processar sua mensagem agora, tente novamente.";
+        data.reply ??
+        data.error ??
+        "Não consegui processar sua mensagem agora, tente novamente.";
       setMessages((prev) =>
         prev.map((m) =>
           m.id === pendingId ? { ...m, content: "", pending: false } : m,

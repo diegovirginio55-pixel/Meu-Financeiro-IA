@@ -99,7 +99,12 @@ export const toolDefinitions: FunctionDeclaration[] = [
     name: "get_financial_summary",
     description:
       "Consulta a fotografia financeira atual completa: saldos, faturas, patrimônio, investimentos, dívidas, entradas/despesas do mês, maiores gastos, gastos por categoria e previsão dos próximos 30 dias. Use sempre que precisar responder perguntas sobre a situação financeira do usuário.",
-    parametersJsonSchema: { type: "object", properties: {} },
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        reason: { type: "string", description: "Por que está consultando o resumo, em uma frase curta." },
+      },
+    },
   },
   {
     name: "query_transactions",
