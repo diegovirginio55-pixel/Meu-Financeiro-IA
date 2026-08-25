@@ -14,7 +14,7 @@ import {
   withInstitutionPrefix,
 } from "./institution";
 import { notifyBankMovements } from "@/lib/push/send";
-import type { MovementNotice } from "@/lib/push/payload";
+import { isRecentMovementDate, recentMovements, type MovementNotice } from "@/lib/push/payload";
 
 const TRANSACTIONS_LOOKBACK_DAYS = 90;
 
@@ -113,6 +113,7 @@ async function syncTransactionsForAccount(
 
   return rows
     .filter((row) => !already.has(row.pluggy_transaction_id))
+    .filter((row) => isRecentMovementDate(row.date))
     .map((row) => ({
       description: row.description,
       amount: Number(row.amount),
@@ -514,6 +515,8 @@ export async function syncBankConnection(
           newMovements.push(
             ...txRows
               .filter((row) => row.pluggy_transaction_id && !already.has(row.pluggy_transaction_id))
+              .filter((row) => !String(row.pluggy_transaction_id).startsWith("purchase:"))
+              .filter((row) => isRecentMovementDate(row.date))
               .map((row) => ({
                 description: row.description || (row.type === "INTEREST" ? "Rendimento" : row.type === "BUY" ? "Aplicação" : row.type === "SELL" ? "Resgate" : "Investimento"),
                 amount: Math.abs(Number(row.amount)),
@@ -570,9 +573,10 @@ export async function syncBankConnection(
   } catch (error) {
     console.error("Erro ao reconciliar investimentos do extrato:", error);
   }
-  if (shouldNotify && newMovements.length > 0) {
+  const freshMovements = recentMovements(newMovements);
+  if (shouldNotify && freshMovements.length > 0) {
     try {
-      await notifyBankMovements(userId, officialInstitutionName(institutionName), newMovements);
+      await notifyBankMovements(userId, officialInstitutionName(institutionName), freshMovements);
     } catch (error) {
       console.error("Erro ao enviar notificações de movimentação:", error);
     }

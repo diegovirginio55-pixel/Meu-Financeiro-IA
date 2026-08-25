@@ -1,7 +1,7 @@
 import * as webpush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getVapidKeys, vapidSubject } from "./vapid";
-import { movementPayloads, type MovementNotice, type PushPayload } from "./payload";
+import { movementPayloads, recentMovements, type MovementNotice, type PushPayload } from "./payload";
 
 type SubscriptionRow = {
   id: string;
@@ -22,7 +22,7 @@ async function sendOne(keys: { publicKey: string; privateKey: string }, row: Sub
 }
 
 export async function notifyBankMovements(userId: string, bankName: string, movements: MovementNotice[]) {
-  const payloads = movementPayloads(bankName, movements);
+  const payloads = movementPayloads(bankName, recentMovements(movements));
   if (payloads.length === 0) return;
 
   const keys = await getVapidKeys();
