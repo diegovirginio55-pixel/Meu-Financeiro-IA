@@ -30,7 +30,7 @@ export default function LoginForm() {
       return;
     }
 
-    router.push("/bancos");
+    router.push("/dashboard");
     router.refresh();
   }
 

@@ -42,7 +42,7 @@ export default function BankHome({
   historyTx?: Transaction[];
 }) {
   const [connectionId, setConnectionId] = useState("all");
-  const [hidden, setHidden] = useState(true);
+  const [hidden, setHidden] = useState(false);
   const [balanceView, setBalanceView] = useBalanceView();
 
   const selected = useMemo(
