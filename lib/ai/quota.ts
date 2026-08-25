@@ -120,9 +120,10 @@ export function getQuotaView(state: ChatQuotaState, now = new Date()): ChatQuota
   const resetsAt = pacificResetAt(now).toISOString();
   const lockMs = state.lockUntil ? new Date(state.lockUntil).getTime() : 0;
   const lockedUntil = lockMs > now.getTime() ? new Date(lockMs).toISOString() : null;
-  const remaining = Math.max(0, CHAT_DAILY_LIMIT - state.used);
-  const waitUntil = lockedUntil ?? (remaining === 0 ? resetsAt : null);
+  const remainingUnlocked = Math.max(0, CHAT_DAILY_LIMIT - state.used);
+  const waitUntil = lockedUntil ?? (remainingUnlocked === 0 ? resetsAt : null);
   const limited = Boolean(waitUntil);
+  const remaining = limited ? 0 : remainingUnlocked;
   const label = limited && waitUntil
     ? `Você atingiu o limite de perguntas. Aguarde até ${formatWaitUntil(waitUntil, now)}.`
     : `Disponíveis ${remaining} pergunta${remaining === 1 ? "" : "s"}`;

@@ -59,8 +59,16 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const messages = (data ?? []).filter(
+    (row) =>
+      !(
+        row.role === "assistant" &&
+        typeof row.content === "string" &&
+        row.content.startsWith("Você atingiu o limite de perguntas")
+      ),
+  );
   const quota = getQuotaView(await readChatQuota());
-  return NextResponse.json({ messages: data ?? [], quota });
+  return NextResponse.json({ messages, quota });
 }
 
 export async function DELETE() {
@@ -113,9 +121,11 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: true })
     .limit(HISTORY_LIMIT);
 
-  await supabase
+  const { data: inserted } = await supabase
     .from("chat_messages")
-    .insert({ user_id: user.id, role: "user", content: userMessage });
+    .insert({ user_id: user.id, role: "user", content: userMessage })
+    .select("id")
+    .maybeSingle();
 
   try {
     const snapshot = await getFinancialSnapshot(supabase);
@@ -183,12 +193,10 @@ export async function POST(request: Request) {
       const locked = lockQuota(quotaState, geminiRetryAt(error));
       const quota = getQuotaView(locked);
       await writeChatQuota(locked);
-      await supabase.from("chat_messages").insert({
-        user_id: user.id,
-        role: "assistant",
-        content: quota.label,
-      });
-      return NextResponse.json({ reply: quota.label, limited: true, quota });
+      if (inserted?.id) {
+        await supabase.from("chat_messages").delete().eq("id", inserted.id);
+      }
+      return NextResponse.json({ limited: true, error: quota.label, quota }, { status: 429 });
     }
     await supabase.from("chat_messages").insert({
       user_id: user.id,

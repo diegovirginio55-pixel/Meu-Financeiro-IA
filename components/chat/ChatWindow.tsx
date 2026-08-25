@@ -101,8 +101,15 @@ export default function ChatWindow() {
       } catch {
         data = {};
       }
-      if (data.quota) setQuota(data.quota);
-      if (res.status === 429 && !data.reply) {
+      if (data.quota) {
+        setQuota(
+          data.quota.limited || data.limited
+            ? { ...data.quota, remaining: 0, limited: true }
+            : data.quota,
+        );
+      }
+      const blocked = res.status === 429 || data.limited || data.quota?.limited;
+      if (blocked && (data.reply?.startsWith("Você atingiu o limite") || !data.reply)) {
         setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== pendingId));
         return;
       }
@@ -151,7 +158,11 @@ export default function ChatWindow() {
   }
 
   const canClear = messages.length > 0 && !loadingHistory;
-  const limited = Boolean(quota?.limited);
+  const limited =
+    Boolean(quota?.limited) ||
+    (quota != null && quota.remaining <= 0) ||
+    Boolean(quota?.lockedUntil && new Date(quota.lockedUntil).getTime() > Date.now());
+  const remaining = limited ? 0 : (quota?.remaining ?? 0);
 
   return (
     <PageShell>
@@ -169,7 +180,7 @@ export default function ChatWindow() {
                     limited ? "bg-amber-400/15 text-amber-200" : "bg-emerald-400/10 text-emerald-300"
                   }`}
                 >
-                  {limited ? "Limite atingido" : `Disponíveis ${quota.remaining} perguntas`}
+                  {limited ? "Limite atingido" : `Disponíveis ${remaining} perguntas`}
                 </p>
               ) : null}
               <button
