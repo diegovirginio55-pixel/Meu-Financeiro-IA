@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isInvestmentDescription } from "@/lib/finance/investment-movements";
+import { isInvestmentDescription, promoteInvestmentsFromTransactions } from "@/lib/finance/investment-movements";
 import { inferCategoryFromDescription } from "@/lib/finance/categories";
+import type { Account, Investment } from "@/lib/finance/types";
 import { pluggyApi, pluggyInvestmentAmount, type PluggyAccount, type PluggyInvestment } from "./client";
 import {
   bankFromLabel,
@@ -418,4 +419,14 @@ export async function syncBankConnection(
       updated_at: new Date().toISOString(),
     })
     .eq("id", bankConnectionId);
+
+  const [{ data: dbAccounts }, { data: dbInvestments }] = await Promise.all([
+    supabase.from("accounts").select("*"),
+    supabase.from("investments").select("*"),
+  ]);
+  await promoteInvestmentsFromTransactions(
+    supabase,
+    (dbAccounts ?? []) as Account[],
+    (dbInvestments ?? []) as Investment[],
+  );
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
+import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
   { href: "/dashboard", label: "Início", icon: HomeIcon },
@@ -79,10 +80,10 @@ function MenuIcon({ active }: { active?: boolean }) {
 const MENU_ROUTES = ["/ativos", "/bancos", "/fluxo"];
 
 export default function BottomNav() {
-  const pathname = usePathname();
   const router = useRouter();
+  const { path, onNavigate } = useOptimisticPath();
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuActive = MENU_ROUTES.some((route) => pathname.startsWith(route));
+  const menuActive = MENU_ROUTES.some((route) => isActivePath(path, route));
 
   async function handleLogout() {
     const supabase = createClient();
@@ -109,7 +110,11 @@ export default function BottomNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setMenuOpen(false)}
+                  prefetch
+                  onClick={() => {
+                    onNavigate(item.href);
+                    setMenuOpen(false);
+                  }}
                   className="rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
                 >
                   {item.label}
@@ -131,12 +136,14 @@ export default function BottomNav() {
       <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-zinc-800 bg-zinc-950/95 pb-[max(0.4rem,env(safe-area-inset-bottom))] backdrop-blur">
         <div className="grid grid-cols-5 px-1 py-1.5">
           {TABS.map((tab) => {
-            const active = pathname === tab.href || (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
+            const active = isActivePath(path, tab.href);
             const Icon = tab.icon;
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
+                prefetch
+                onClick={() => onNavigate(tab.href)}
                 className="flex flex-col items-center gap-0.5 text-[11px]"
               >
                 <span className="flex h-9 w-9 items-center justify-center">
