@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -17,6 +17,7 @@ import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { accumulatedProfit } from "@/lib/finance/investment-pnl";
+import { useConnectionFilter, usePersistedState } from "@/lib/ui/use-persisted-state";
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
@@ -80,8 +81,9 @@ export default function BankHome({
   connections: BankConnectionWithAssets[];
   historyTx?: Transaction[];
 }) {
-  const [connectionId, setConnectionId] = useState("all");
-  const [hidden, setHidden] = useState(false);
+  const connectionIds = useMemo(() => connections.map((connection) => connection.id), [connections]);
+  const [connectionId, setConnectionId] = useConnectionFilter(connectionIds);
+  const [hidden, setHidden] = usePersistedState("mf-hide-values", false);
   const [balanceView, setBalanceView] = useBalanceView();
 
   const selected = useMemo(

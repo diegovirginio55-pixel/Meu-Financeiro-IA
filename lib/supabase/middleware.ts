@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { lastPathFromCookie } from "@/lib/ui/nav-memory";
 
 const PUBLIC_PATHS = ["/login", "/api/bank/webhook", "/api/bank/cron", "/manifest.webmanifest", "/sw.js"];
 
@@ -41,9 +42,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && pathname.startsWith("/login")) {
+  if (user && (pathname === "/" || pathname.startsWith("/login"))) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = lastPathFromCookie(request.cookies.get("mf-last-path")?.value);
     return NextResponse.redirect(url);
   }
 

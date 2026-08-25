@@ -6,6 +6,7 @@ import TransactionsTable from "./TransactionsTable";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
 import { formatCurrency, formatPercent } from "@/lib/finance/format";
 import { HeroAmount, PageHero, PageShell, SoftPanel } from "@/components/ui/page-chrome";
+import { usePersistedState } from "@/lib/ui/use-persisted-state";
 
 const DEFAULT_FILTERS: FiltersState = {
   period: "mes",
@@ -16,7 +17,7 @@ const DEFAULT_FILTERS: FiltersState = {
 };
 
 export default function DetalhesClient() {
-  const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS);
+  const [filters, setFilters, filtersReady] = usePersistedState<FiltersState>("mf-detalhes-filters", DEFAULT_FILTERS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
@@ -39,9 +40,10 @@ export default function DetalhesClient() {
   }, []);
 
   useEffect(() => {
+    if (!filtersReady) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(filters);
-  }, [filters, load]);
+  }, [filters, filtersReady, load]);
 
   async function handleUpdate(id: string, patch: Record<string, unknown>) {
     await fetch(`/api/transactions/${id}`, {

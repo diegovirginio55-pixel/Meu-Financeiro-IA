@@ -11,6 +11,7 @@ import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
 import { HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
+import { useConnectionFilter } from "@/lib/ui/use-persisted-state";
 
 type AssetRow = Investment & {
   bankName: string;
@@ -59,7 +60,8 @@ export default function AtivosClient({
   snapshots?: InvestmentSnapshot[];
   investmentTx?: InvestmentTxn[];
 }) {
-  const [connectionId, setConnectionId] = useState("all");
+  const connectionIds = useMemo(() => connections.map((connection) => connection.id), [connections]);
+  const [connectionId, setConnectionId] = useConnectionFilter(connectionIds);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const router = useRouter();
 

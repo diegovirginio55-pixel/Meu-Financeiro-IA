@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { addMonths, eachDayOfInterval, endOfMonth, format, startOfMonth } from "date-fns";
+import { useMemo } from "react";
+import { addMonths, eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
@@ -27,6 +27,7 @@ import {
   chipClass,
   useBalanceView,
 } from "@/components/ui/page-chrome";
+import { useConnectionFilter, usePersistedState } from "@/lib/ui/use-persisted-state";
 
 function monthTitle(month: Date): string {
   const raw = format(month, "MMMM 'de' yyyy", { locale: ptBR });
@@ -57,14 +58,18 @@ export default function FluxoClient({
   recurring: RecurringItem[];
   debts: Debt[];
 }) {
-  const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  const [connectionId, setConnectionId] = useState("all");
-  const [accountId, setAccountId] = useState("all");
-  const [type, setType] = useState<"todos" | "entrada" | "saida">("todos");
-  const [search, setSearch] = useState("");
+  const connectionIds = useMemo(() => connections.map((connection) => connection.id), [connections]);
+  const [connectionId, setConnectionId] = useConnectionFilter(connectionIds);
+  const [monthKey, setMonthKey] = usePersistedState("mf-fluxo-month", format(startOfMonth(new Date()), "yyyy-MM"));
+  const [accountId, setAccountId] = usePersistedState("mf-fluxo-account", "all");
+  const [type, setType] = usePersistedState<"todos" | "entrada" | "saida">("mf-fluxo-type", "todos");
+  const [search, setSearch] = usePersistedState("mf-fluxo-search", "");
   const [balanceView, setBalanceView] = useBalanceView();
 
-  const monthKey = format(month, "yyyy-MM");
+  const month = useMemo(() => {
+    const parsed = parseISO(`${monthKey}-01`);
+    return Number.isNaN(parsed.getTime()) ? startOfMonth(new Date()) : startOfMonth(parsed);
+  }, [monthKey]);
 
   const scoped = useMemo(() => {
     return transactions.filter((transaction) => {
@@ -287,7 +292,7 @@ export default function FluxoClient({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setMonth((current) => addMonths(current, -1))}
+                onClick={() => setMonthKey(format(addMonths(month, -1), "yyyy-MM"))}
                 className="rounded-full border border-zinc-800 px-2 py-1 text-zinc-400 hover:text-white"
               >
                 ‹
@@ -297,7 +302,7 @@ export default function FluxoClient({
               </p>
               <button
                 type="button"
-                onClick={() => setMonth((current) => addMonths(current, 1))}
+                onClick={() => setMonthKey(format(addMonths(month, 1), "yyyy-MM"))}
                 className="rounded-full border border-zinc-800 px-2 py-1 text-zinc-400 hover:text-white"
               >
                 ›

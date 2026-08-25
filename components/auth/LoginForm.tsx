@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { readLastPath } from "@/lib/ui/nav-memory";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function LoginForm() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(readLastPath());
     router.refresh();
   }
 

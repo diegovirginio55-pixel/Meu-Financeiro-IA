@@ -35,6 +35,7 @@ import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
 import { GoalsProgress, MaioresGastos, ProximasContas } from "@/components/dashboard/ListPanels";
 import type { InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 import { BalanceViewToggle, HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel, useBalanceView } from "@/components/ui/page-chrome";
+import { useConnectionFilter, usePersistedState } from "@/lib/ui/use-persisted-state";
 
 function CardIcon() {
   return (
@@ -67,9 +68,10 @@ export default function DashboardClient({
   snapshots?: InvestmentSnapshot[];
   investmentTx?: InvestmentTxn[];
 }) {
-  const [connectionId, setConnectionId] = useState("all");
+  const connectionIds = useMemo(() => connections.map((connection) => connection.id), [connections]);
+  const [connectionId, setConnectionId] = useConnectionFilter(connectionIds);
   const [openBanks, setOpenBanks] = useState<Set<string>>(new Set());
-  const [investTab, setInvestTab] = useState<"classes" | "instituicoes">("classes");
+  const [investTab, setInvestTab] = usePersistedState<"classes" | "instituicoes">("mf-visao-invest-tab", "classes");
   const [balanceView, setBalanceView] = useBalanceView();
   const router = useRouter();
 

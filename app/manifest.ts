@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Meu Financeiro IA",
     short_name: "Financeiro",
     description: "Painel financeiro pessoal com IA",
-    start_url: "/login",
+    start_url: "/",
     scope: "/",
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],

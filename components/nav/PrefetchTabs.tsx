@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-const ROUTES = ["/dashboard", "/detalhes", "/chat", "/bancos", "/fluxo"];
+const ROUTES = ["/dashboard", "/visao", "/detalhes", "/chat", "/bancos", "/fluxo", "/ativos"];
 
 export default function PrefetchTabs() {
   const router = useRouter();
