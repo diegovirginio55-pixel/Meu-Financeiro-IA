@@ -45,6 +45,19 @@ export function holdingDaysFrom(
   );
 }
 
+function productKey(name: string): string {
+  const text = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (/\blcd\b/.test(text)) return "lcd";
+  if (/\blci\b/.test(text)) return "lci";
+  if (/\blca\b/.test(text)) return "lca";
+  if (/\bcdb\b/.test(text)) return "cdb";
+  if (/tesouro/.test(text)) return "tesouro";
+  return "";
+}
+
 export function applicationTxAsBuys(
   investments: Investment[],
   transactions: Array<Pick<Transaction, "id" | "description" | "amount" | "date">>,
@@ -52,26 +65,35 @@ export function applicationTxAsBuys(
   const applications = transactions.filter((item) => isInvestmentDescription(item.description));
   const used = new Set<string>();
   const extra: InvestmentTxn[] = [];
+  const productCount = new Map<string, number>();
+  for (const investment of investments) {
+    const key = productKey(investment.name);
+    if (key) productCount.set(key, (productCount.get(key) ?? 0) + 1);
+  }
 
   for (const investment of investments) {
     const original = Number(investment.amount_original ?? investment.amount ?? 0);
-    const candidates = applications
-      .filter((item) => !used.has(item.id) && investmentNamesMatch(investment.name, item.description))
-      .sort((left, right) => {
-        const distance = (item: typeof left) => Math.abs(Number(item.amount) - original);
-        return distance(left) - distance(right);
+    const product = productKey(investment.name);
+    const uniqueProduct = Boolean(product) && productCount.get(product) === 1;
+    const candidates = applications.filter(
+      (item) => !used.has(item.id) && investmentNamesMatch(investment.name, item.description),
+    );
+    const chosen = uniqueProduct
+      ? candidates
+      : candidates
+          .sort((left, right) => Math.abs(Number(left.amount) - original) - Math.abs(Number(right.amount) - original))
+          .slice(0, 1);
+    for (const item of chosen) {
+      used.add(item.id);
+      extra.push({
+        id: item.id,
+        investment_id: investment.id,
+        bank_connection_id: investment.bank_connection_id ?? null,
+        type: "BUY",
+        amount: Number(item.amount),
+        date: item.date,
       });
-    const chosen = candidates[0];
-    if (!chosen) continue;
-    used.add(chosen.id);
-    extra.push({
-      id: chosen.id,
-      investment_id: investment.id,
-      bank_connection_id: investment.bank_connection_id ?? null,
-      type: "BUY",
-      amount: Number(chosen.amount),
-      date: chosen.date,
-    });
+    }
   }
 
   return extra;

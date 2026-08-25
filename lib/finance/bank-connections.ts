@@ -120,18 +120,25 @@ function investmentDedupeKey(name: string) {
 }
 
 export function uniqueInvestments(investments: Investment[]): Investment[] {
+  const filtered = investments.filter((item) => !isIssuerOnlyInvestment(item.name));
   const bestByName = new Map<string, Investment>();
-  for (const item of investments) {
+  for (const item of filtered) {
     const key = investmentDedupeKey(item.name) || item.id;
     const existing = bestByName.get(key);
     if (!existing || Number(item.amount) > Number(existing.amount)) {
       bestByName.set(key, item);
     }
   }
-  return investments.filter((item) => {
+  return filtered.filter((item) => {
     const key = investmentDedupeKey(item.name) || item.id;
     return bestByName.get(key)?.id === item.id;
   });
+}
+
+function isIssuerOnlyInvestment(name: string): boolean {
+  const cleaned = investmentDedupeKey(name);
+  if (/\b(lci|lca|cdb|lcd|cri|cra|tesouro|fundo|previdencia)\b/.test(cleaned)) return false;
+  return /nu financeira|nufin|financeira sa|sociedade de credito/.test(cleaned);
 }
 
 function splitConnectionsByInstitution(connections: BankConnectionWithAssets[]): BankConnectionWithAssets[] {
