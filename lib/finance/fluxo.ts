@@ -52,11 +52,12 @@ export function saoPauloHour(date = new Date()): number {
   return Number(parts.find((part) => part.type === "hour")?.value ?? "0") % 24;
 }
 
+export const OWNER_NAME = "Diego Isidoro";
+
 export function greetingForNow(date = new Date()): string {
   const hour = saoPauloHour(date);
-  if (hour >= 5 && hour < 12) return "Bom dia";
-  if (hour >= 12 && hour < 18) return "Boa tarde";
-  return "Boa noite";
+  const greeting = hour >= 5 && hour < 12 ? "Bom Dia" : hour >= 12 && hour < 18 ? "Boa Tarde" : "Boa Noite";
+  return `${greeting} ${OWNER_NAME}`;
 }
 
 export function saoPauloWeekStartKey(date = new Date()): string {

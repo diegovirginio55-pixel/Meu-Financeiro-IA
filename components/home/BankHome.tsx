@@ -133,7 +133,7 @@ export default function BankHome({
   if (connections.length === 0) {
     return (
       <div className="flex min-h-[70vh] flex-col justify-end pb-8 lg:justify-center lg:pb-0">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-400">{greetingForNow()}</p>
+        <p className="text-sm font-medium tracking-wide text-emerald-400">{greetingForNow()}</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white lg:text-6xl">
           Seu dinheiro,
           <br />
@@ -161,7 +161,7 @@ export default function BankHome({
         <div className="relative lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-end lg:gap-16 xl:gap-24">
           <div>
             <header className="flex items-center justify-between">
-              <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">
+              <p className="text-sm font-medium tracking-wide text-emerald-400/90">
                 {greetingForNow()}
               </p>
               <div className="flex items-center gap-1 lg:hidden">
@@ -169,13 +169,13 @@ export default function BankHome({
                   type="button"
                   onClick={() => setHidden((value) => !value)}
                   aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-300"
                 >
                   {hidden ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
                 <Link
                   href="/bancos"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-300"
                   aria-label="Bancos conectados"
                 >
                   <BanksIcon />
@@ -458,7 +458,7 @@ export default function BankHome({
   );
 }
 
-function EyeIcon({ className = "h-5 w-5" }: { className?: string }) {
+function EyeIcon({ className = "h-7 w-7" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden>
       <path
@@ -471,7 +471,7 @@ function EyeIcon({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
-function EyeOffIcon({ className = "h-5 w-5" }: { className?: string }) {
+function EyeOffIcon({ className = "h-7 w-7" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden>
       <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -487,7 +487,7 @@ function EyeOffIcon({ className = "h-5 w-5" }: { className?: string }) {
 
 function BanksIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" aria-hidden>
       <path d="M4 9.5 12 4l8 5.5V20H4V9.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       <path d="M8 20v-6h8v6" stroke="currentColor" strokeWidth="1.6" />
     </svg>
