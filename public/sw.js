@@ -1,4 +1,4 @@
-const CACHE = "financeiro-shell-v8";
+const CACHE = "financeiro-shell-v9";
 const SHELL = ["/logo.png", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
