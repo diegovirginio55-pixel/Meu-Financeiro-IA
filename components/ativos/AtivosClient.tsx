@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/finance/format";
-import { isPlaceholderAccount } from "@/lib/finance/account-name";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Investment, InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 import { accumulatedProfit } from "@/lib/finance/investment-pnl";
@@ -104,11 +103,6 @@ export default function AtivosClient({
   }, [visibleConnections]);
 
   const investido = assets.reduce((sum, asset) => sum + Number(asset.amount), 0);
-  const saldoConta = visibleConnections
-    .flatMap((connection) => connection.accounts)
-    .filter((account) => !isPlaceholderAccount(account))
-    .reduce((sum, account) => sum + Number(account.balance ?? 0), 0);
-  const patrimonio = saldoConta + investido;
   const investmentIds = useMemo(() => new Set(assets.map((item) => item.id)), [assets]);
 
   const groups = useMemo(() => {
@@ -139,8 +133,8 @@ export default function AtivosClient({
     <PageShell>
       <PageHero
         kicker="Investimentos"
-        title={<HeroAmount>{formatCurrency(patrimonio)}</HeroAmount>}
-        subtitle={`${formatCurrency(saldoConta)} em conta + ${formatCurrency(investido)} investido · ${assets.length} ${assets.length === 1 ? "ativo" : "ativos"}`}
+        title={<HeroAmount>{formatCurrency(investido)}</HeroAmount>}
+        subtitle={`${assets.length} ${assets.length === 1 ? "ativo" : "ativos"} investidos`}
         trailing={
           <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
             <select

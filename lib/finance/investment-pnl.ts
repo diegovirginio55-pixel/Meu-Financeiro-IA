@@ -168,13 +168,23 @@ function seriesForInvestment({
   dates: string[];
 }): { points: Array<{ date: string; value: number }>; estimated: boolean } {
   const snaps = withLivePosition(investment, snapshots);
+  const profit = accumulatedProfit(investment);
+  // O histórico salvo de amount_profit pode conter valores antigos calculados com uma
+  // lógica já corrigida; se a soma dos pontos não bate com o lucro real atual, o dado é
+  // pouco confiável e caímos para a estimativa suave em vez de mostrar um pico artificial.
+  const isReliable = (points: Array<{ date: string; value: number }>) => {
+    if (profit === 0) return true;
+    const total = points.reduce((sum, point) => sum + point.value, 0);
+    return Math.abs(total) <= Math.abs(profit) + 0.5;
+  };
+
   const profitSnaps = snaps.filter((item) => item.amount_profit != null);
   const profitDiffs = profitSnaps.length >= 2 ? diffSnapshots(profitSnaps, "amount_profit") : [];
   const catchUpOnly =
     profitDiffs.filter((point) => Math.abs(point.value) >= 0.005).length === 1 &&
     profitSnaps.some((item) => Number(item.amount_profit) !== 0 && toDateKey(item.snapshot_date) === saoPauloTodayKey()) &&
     !profitSnaps.some((item) => Number(item.amount_profit) !== 0 && toDateKey(item.snapshot_date) !== saoPauloTodayKey());
-  if (hasMovement(profitDiffs) && !catchUpOnly) {
+  if (hasMovement(profitDiffs) && !catchUpOnly && isReliable(profitDiffs)) {
     return { points: profitDiffs, estimated: false };
   }
 
@@ -191,14 +201,13 @@ function seriesForInvestment({
       date: point.date,
       value: point.value - netCapitalFlow(transactions, point.date),
     }));
-    const profit = accumulatedProfit(investment);
     const catchUpAmount =
       amountDiffs.filter((point) => Math.abs(point.value) >= 0.005).length === 1 &&
       amountDiffs.some(
         (point) =>
           point.date === saoPauloTodayKey() && (profit === 0 || Math.abs(point.value - profit) < 1),
       );
-    if (hasMovement(amountDiffs) && !catchUpAmount) {
+    if (hasMovement(amountDiffs) && !catchUpAmount && isReliable(amountDiffs)) {
       return { points: amountDiffs, estimated: false };
     }
   }

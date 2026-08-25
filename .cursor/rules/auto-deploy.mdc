@@ -9,6 +9,8 @@ Quando o usuário pedir uma mudança no app (UI, cálculo, sync, texto), ao term
 
 1. Faça commit das alterações (sem `.env` nem segredos).
 2. Faça `git push` para `origin` na branch atual (`main`), para o Render publicar.
+   Destino fixo: `https://github.com/diegovirginio55-pixel/Meu-Financeiro-IA.git`.
+   Conta GitHub fixa: `diegovirginio55-pixel`. Não pergunte qual conta usar e não use outra.
 3. Avise em português que já subiu e que o site atualiza em alguns minutos.
 
 Não espere o usuário dizer "suba". Só não suba se ele pedir explicitamente para não enviar, ou se a mudança for só local (regra, rascunho, arquivo que ele pediu para não versionar).
