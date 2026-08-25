@@ -26,7 +26,7 @@ export function PageHero({
       <header className="relative flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <img
-            src="/logo.png"
+            src="/logo.png?v=2"
             alt=""
             width={28}
             height={28}

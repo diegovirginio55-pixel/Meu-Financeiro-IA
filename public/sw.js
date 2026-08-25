@@ -1,5 +1,6 @@
-const CACHE = "financeiro-shell-v9";
-const SHELL = ["/logo.png", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
+const CACHE = "financeiro-shell-v10";
+const SHELL = ["/logo.png?v=2", "/icon-192.png?v=2", "/icon-512.png?v=2", "/apple-touch-icon.png?v=2"];
+const SHELL_PATHS = new Set(SHELL.map((item) => item.split("?")[0]));
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -36,7 +37,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response && response.status === 200 && SHELL.includes(url.pathname)) {
+        if (response && response.status === 200 && SHELL_PATHS.has(url.pathname)) {
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined);
         }
@@ -57,8 +58,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      icon: "/icon-192.png?v=2",
+      badge: "/icon-192.png?v=2",
       data: { url: payload.url || "/detalhes" },
     }),
   );

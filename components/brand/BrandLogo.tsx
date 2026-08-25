@@ -37,7 +37,7 @@ export function BrandLogo({
   const mark = (
     <>
       <img
-        src="/logo.png"
+        src="/logo.png?v=2"
         alt=""
         width={s.px}
         height={s.px}

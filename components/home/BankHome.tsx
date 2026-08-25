@@ -142,7 +142,7 @@ export default function BankHome({
     return (
       <div className="flex min-h-[70vh] flex-col justify-end pb-8 lg:justify-center lg:pb-0">
         <img
-          src="/logo.png"
+          src="/logo.png?v=2"
           alt="Meu Financeiro IA"
           width={56}
           height={56}
@@ -178,7 +178,7 @@ export default function BankHome({
             <header className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <img
-                  src="/logo.png"
+                  src="/logo.png?v=2"
                   alt=""
                   width={32}
                   height={32}

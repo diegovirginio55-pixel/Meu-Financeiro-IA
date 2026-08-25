@@ -46,7 +46,7 @@ export function PwaInstallBanner() {
       aria-label="Instalar aplicativo"
       className="fixed inset-x-3 z-[9999] flex items-center gap-3 rounded-2xl border border-zinc-700 bg-zinc-900 p-3 shadow-2xl max-lg:bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:bottom-5 lg:left-auto lg:right-5 lg:w-[min(28rem,calc(100vw-2.5rem))]"
     >
-      <img src="/icon-192.png" alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-xl" />
+      <img src="/icon-192.png?v=2" alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-xl" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-white">Instalar o Meu Financeiro</p>
         <p className="text-[11px] leading-snug text-zinc-400">
