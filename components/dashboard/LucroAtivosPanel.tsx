@@ -221,9 +221,9 @@ export function LucroAtivosPanel({
 
 function Kpi({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-zinc-800 px-3 py-2">
-      <p className="text-[11px] text-zinc-500">{label}</p>
-      <p className={`mt-1 text-sm font-semibold sm:text-lg ${value >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-950/50 px-3 py-2.5">
+      <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold sm:text-lg ${value >= 0 ? "text-emerald-400" : "text-rose-300"}`}>
         {formatCurrency(value)}
       </p>
     </div>

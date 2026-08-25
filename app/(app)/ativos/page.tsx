@@ -1,14 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
-import { format, startOfMonth, subMonths } from "date-fns";
 import AtivosClient from "@/components/ativos/AtivosClient";
 import { getBankConnectionsWithAssets } from "@/lib/finance/bank-connections";
+import { lastNMonthKeys } from "@/lib/finance/fluxo";
 import type { InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function AtivosPage() {
   const supabase = await createClient();
-  const from = format(startOfMonth(subMonths(new Date(), 11)), "yyyy-MM-dd");
+  const from = `${lastNMonthKeys(12)[0]}-01`;
   const connections = await getBankConnectionsWithAssets(supabase);
   const [snapRes, txRes] = await Promise.all([
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", from),

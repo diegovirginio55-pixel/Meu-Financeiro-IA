@@ -1,5 +1,6 @@
-import { eachDayOfInterval, format, startOfMonth, subDays, subMonths } from "date-fns";
 import { formatMonthLabel } from "./format";
+import { lastNDateKeys, lastNMonthKeys, saoPauloTodayKey } from "./fluxo";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { BankConnection, Investment, InvestmentSnapshot, InvestmentTxn } from "./types";
 import { institutionFromAssetName, realConnectionId } from "./connection-filter";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
@@ -110,13 +111,13 @@ function seriesForInvestment({
   investment,
   snapshots,
   interest,
-  interval,
+  dates,
   days,
 }: {
   investment: Investment;
   snapshots: InvestmentSnapshot[];
   interest: InvestmentTxn[];
-  interval: Date[];
+  dates: string[];
   days: number;
 }): { points: Array<{ date: string; value: number }>; estimated: boolean } {
   const profitSnaps = snapshots.filter((item) => item.amount_profit != null);
@@ -138,24 +139,21 @@ function seriesForInvestment({
   const perDay = estimatedDailyProfit(investment, Math.min(days, 30));
   if (perDay === 0) return { points: [], estimated: false };
 
-  const last = interval[interval.length - 1] ?? new Date();
-  const estimateFrom = format(subDays(last, 29), "yyyy-MM-dd");
+  const estimateFrom = dates[Math.max(0, dates.length - 30)] ?? dates[0];
   return {
-    points: interval
-      .filter((day) => format(day, "yyyy-MM-dd") >= estimateFrom)
-      .map((day) => ({ date: format(day, "yyyy-MM-dd"), value: perDay })),
+    points: dates.filter((date) => date >= estimateFrom).map((date) => ({ date, value: perDay })),
     estimated: true,
   };
 }
 
 function toSeries(
-  interval: Date[],
+  dates: string[],
   keys: PnlSeriesKey[],
   daily: Map<string, Map<string, number>>,
 ): DailyPnlPoint[] {
-  return interval.map((day) => {
-    const date = format(day, "yyyy-MM-dd");
-    const row: DailyPnlPoint = { date, label: format(day, "dd/MM"), Total: 0 };
+  return dates.map((date) => {
+    const [, month, day] = date.split("-");
+    const row: DailyPnlPoint = { date, label: `${day}/${month}`, Total: 0 };
     keys.forEach((item) => {
       const value = daily.get(date)?.get(item.key) ?? 0;
       row[item.key] = Number(value.toFixed(2));
@@ -179,9 +177,7 @@ export function buildDailyInvestmentPnlByAsset({
 }): { series: DailyPnlPoint[]; keys: PnlSeriesKey[]; estimated: boolean; estimatedIds: string[] } {
   const eligible = eligibleInvestments(investments, snapshots);
   const knownIds = new Set(eligible.map((item) => item.id));
-  const end = new Date();
-  const start = subDays(end, days - 1);
-  const interval = eachDayOfInterval({ start, end });
+  const dates = lastNDateKeys(days);
   const byInvestment = snapshotsByInvestment(snapshots);
   const interestByInvestment = new Map<string, InvestmentTxn[]>();
   transactions
@@ -200,7 +196,7 @@ export function buildDailyInvestmentPnlByAsset({
       investment,
       snapshots: byInvestment.get(investment.id) ?? [],
       interest: interestByInvestment.get(investment.id) ?? [],
-      interval,
+      dates,
       days,
     });
     if (estimated) estimatedIds.push(investment.id);
@@ -208,7 +204,7 @@ export function buildDailyInvestmentPnlByAsset({
   });
 
   const series = toSeries(
-    interval,
+    dates,
     eligible.map((item) => ({ key: item.id, label: shortInvestmentLabel(item.name) })),
     daily,
   );
@@ -260,9 +256,7 @@ export function buildDailyInvestmentPnl({
     ),
   );
 
-  const end = new Date();
-  const start = subDays(end, days - 1);
-  const interval = eachDayOfInterval({ start, end });
+  const dates = byAsset.series.map((point) => point.date);
   const daily = new Map<string, Map<string, number>>();
 
   byAsset.series.forEach((point) => {
@@ -275,7 +269,7 @@ export function buildDailyInvestmentPnl({
 
   return {
     series: toSeries(
-      interval,
+      dates,
       banks.map((bank) => ({ key: bank, label: bank })),
       daily,
     ),
@@ -392,14 +386,16 @@ export function buildMonthlyInvestmentYield({
   transactions: InvestmentTxn[];
   months?: number;
 }): { series: YieldPoint[]; estimated: boolean } {
-  const end = new Date();
-  const start = startOfMonth(subMonths(end, months - 1));
-  const interval = eachDayOfInterval({ start, end });
+  const monthKeys = lastNMonthKeys(months);
+  const from = `${monthKeys[0]}-01`;
+  const today = saoPauloTodayKey();
+  const span =
+    differenceInCalendarDays(parseISO(`${today}T12:00:00`), parseISO(`${from}T12:00:00`)) + 1;
   const daily = buildDailyInvestmentPnlByAsset({
     investments,
     snapshots,
     transactions,
-    days: interval.length,
+    days: Math.max(span, 30),
   });
   const dailyYield = buildDailyYieldSeries(daily.series, investments, snapshots);
   const byMonth = new Map<string, { lucro: number; capital: number; days: number }>();
@@ -413,20 +409,18 @@ export function buildMonthlyInvestmentYield({
     byMonth.set(month, row);
   });
 
-  const series: YieldPoint[] = [];
-  for (let i = months - 1; i >= 0; i -= 1) {
-    const date = format(startOfMonth(subMonths(end, i)), "yyyy-MM");
+  const series: YieldPoint[] = monthKeys.map((date) => {
     const row = byMonth.get(date);
     const capital = row && row.days > 0 ? row.capital / row.days : 0;
     const lucro = row?.lucro ?? 0;
-    series.push({
+    return {
       date,
       label: formatMonthLabel(date),
       lucro: Number(lucro.toFixed(2)),
       capital: Number(capital.toFixed(2)),
       rendimento: capital > 0 ? Number(((lucro / capital) * 100).toFixed(4)) : 0,
-    });
-  }
+    };
+  });
 
   return { series, estimated: daily.estimated };
 }

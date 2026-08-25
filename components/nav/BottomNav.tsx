@@ -110,7 +110,7 @@ export default function BottomNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  prefetch
+                  prefetch={item.href !== "/ativos"}
                   onClick={() => {
                     onNavigate(item.href);
                     setMenuOpen(false);

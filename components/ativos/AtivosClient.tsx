@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Investment, InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
@@ -59,6 +60,15 @@ export default function AtivosClient({
 }) {
   const [connectionId, setConnectionId] = useState("all");
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const router = useRouter();
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") router.refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [router]);
 
   const visibleConnections = useMemo(() => {
     if (connectionId === "all") return connections;
@@ -77,6 +87,7 @@ export default function AtivosClient({
   }, [visibleConnections]);
 
   const total = assets.reduce((sum, asset) => sum + Number(asset.amount), 0);
+  const investmentIds = useMemo(() => new Set(assets.map((item) => item.id)), [assets]);
 
   const groups = useMemo(() => {
     const map = new Map<string, AssetRow[]>();
@@ -140,8 +151,8 @@ export default function AtivosClient({
         <LucroAtivosPanel
           connections={visibleConnections}
           investments={assets}
-          snapshots={snapshots}
-          investmentTx={investmentTx}
+          snapshots={snapshots.filter((item) => investmentIds.has(item.investment_id))}
+          investmentTx={investmentTx.filter((item) => !item.investment_id || investmentIds.has(item.investment_id))}
         />
 
         <section>
