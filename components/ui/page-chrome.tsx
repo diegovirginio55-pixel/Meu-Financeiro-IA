@@ -88,18 +88,34 @@ export function chipClass(active: boolean) {
 export type BalanceView = "total" | "conta";
 
 const BALANCE_VIEW_KEY = "mf-balance-view";
+const BALANCE_VIEW_EVENT = "mf-balance-view";
+
+function readBalanceView(): BalanceView {
+  if (typeof window === "undefined") return "total";
+  const stored = window.localStorage.getItem(BALANCE_VIEW_KEY);
+  return stored === "conta" || stored === "total" ? stored : "total";
+}
 
 export function useBalanceView() {
   const [value, setValue] = useState<BalanceView>("total");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(BALANCE_VIEW_KEY);
-    if (stored === "conta" || stored === "total") setValue(stored);
+    setValue(readBalanceView());
+    function sync() {
+      setValue(readBalanceView());
+    }
+    window.addEventListener("storage", sync);
+    window.addEventListener(BALANCE_VIEW_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(BALANCE_VIEW_EVENT, sync);
+    };
   }, []);
 
   function onChange(next: BalanceView) {
     setValue(next);
     window.localStorage.setItem(BALANCE_VIEW_KEY, next);
+    window.dispatchEvent(new Event(BALANCE_VIEW_EVENT));
   }
 
   return [value, onChange] as const;
@@ -113,25 +129,30 @@ export function BalanceViewToggle({
   onChange: (value: BalanceView) => void;
 }) {
   return (
-    <div className="flex gap-2" role="tablist" aria-label="Tipo de saldo">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={value === "total"}
-        onClick={() => onChange("total")}
-        className={chipClass(value === "total")}
-      >
-        Saldo total
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={value === "conta"}
-        onClick={() => onChange("conta")}
-        className={chipClass(value === "conta")}
-      >
-        Saldo em conta
-      </button>
+    <div>
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Tipo de saldo">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={value === "total"}
+          onClick={() => onChange("total")}
+          className={chipClass(value === "total")}
+        >
+          Saldo total
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={value === "conta"}
+          onClick={() => onChange("conta")}
+          className={chipClass(value === "conta")}
+        >
+          Saldo em conta
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-zinc-500">
+        {value === "total" ? "contas + investimentos" : "somente o livre nas contas"}
+      </p>
     </div>
   );
 }

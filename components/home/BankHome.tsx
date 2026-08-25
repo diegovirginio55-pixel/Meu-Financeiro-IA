@@ -129,9 +129,6 @@ export default function BankHome({
             <div className="mt-4">
               <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
             </div>
-            <p className="mt-2 text-xs text-zinc-500">
-              {balanceView === "total" ? "contas + investimentos" : "somente o livre nas contas"}
-            </p>
 
             <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-1">
               <button

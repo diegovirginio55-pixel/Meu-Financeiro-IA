@@ -240,7 +240,6 @@ export default function DashboardClient({
       <PageHero
         kicker="Visão geral"
         title={<HeroAmount>{formatCurrency(displayedBalance)}</HeroAmount>}
-        subtitle={<BalanceViewToggle value={balanceView} onChange={setBalanceView} />}
         trailing={
           <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
             <select
@@ -257,7 +256,9 @@ export default function DashboardClient({
             </select>
           </label>
         }
-      />
+      >
+        <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
+      </PageHero>
 
       <div className="flex flex-col gap-5 px-4 lg:gap-8 lg:px-6">
       {connections.length === 0 && (
