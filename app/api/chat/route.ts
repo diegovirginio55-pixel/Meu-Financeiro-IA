@@ -28,6 +28,21 @@ export async function GET() {
   return NextResponse.json({ messages: data ?? [] });
 }
 
+export async function DELETE() {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const { error } = await supabase.from("chat_messages").delete().eq("user_id", userData.user.id);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();

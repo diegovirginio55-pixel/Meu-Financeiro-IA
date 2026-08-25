@@ -11,6 +11,7 @@ export default function ChatWindow() {
   const [messages, setMessages] = useState<ChatUiMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sending, setSending] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -100,12 +101,39 @@ export default function ChatWindow() {
     }
   }
 
+  async function handleClear() {
+    if (messages.length === 0 || clearing) return;
+    if (!confirm("Apagar toda a conversa? Isso não pode ser desfeito.")) return;
+    setClearing(true);
+    try {
+      const res = await fetch("/api/chat", { method: "DELETE" });
+      if (!res.ok) throw new Error("fail");
+      setMessages([]);
+    } catch {
+      alert("Não deu para apagar a conversa agora. Tente de novo.");
+    } finally {
+      setClearing(false);
+    }
+  }
+
   return (
     <PageShell>
       <PageHero
         kicker="IA"
         title="Conversa"
         subtitle="Pergunte sobre gastos, saldo e investimentos"
+        trailing={
+          messages.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => void handleClear()}
+              disabled={clearing}
+              className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 disabled:opacity-50"
+            >
+              {clearing ? "Apagando..." : "Limpar conversa"}
+            </button>
+          ) : null
+        }
       />
       <div className="flex h-[calc(100vh-15rem)] flex-col px-4 lg:h-[calc(100vh-12rem)] lg:px-6 xl:px-10 2xl:px-14">
         <div className="flex-1 space-y-3 overflow-y-auto pb-3">
