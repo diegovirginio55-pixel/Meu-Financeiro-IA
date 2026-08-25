@@ -14,6 +14,7 @@ import { institutionFromAssetName, realConnectionId } from "@/lib/finance/connec
 import type { Transaction } from "@/lib/finance/types";
 import { CATEGORY_ICONS, categoryColor } from "@/lib/finance/categories";
 import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
+import { BankLogo } from "@/components/bancos/BankLogo";
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
