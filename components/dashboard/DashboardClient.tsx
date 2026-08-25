@@ -1,13 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { eachDayOfInterval, format, parseISO, startOfMonth, subDays, subMonths } from "date-fns";
+import { useRouter } from "next/navigation";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
-import { belongsToConnection, dailyBudgetFromBalance, isGasto, isRenda, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
-import { resolvedCategory } from "@/lib/finance/categories";
+import {
+  belongsToConnection,
+  dailyBudgetFromBalance,
+  isGasto,
+  isRenda,
+  lastNDateKeys,
+  lastNMonthKeys,
+  saoPauloMonthKey,
+  saoPauloTodayKey,
+  saoPauloWeekStartKey,
+  sumGastosInRange,
+} from "@/lib/finance/fluxo";
+import { isTransferDescription, resolvedCategory } from "@/lib/finance/categories";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Transaction } from "@/lib/finance/types";
@@ -59,6 +71,15 @@ export default function DashboardClient({
   const [openBanks, setOpenBanks] = useState<Set<string>>(new Set());
   const [investTab, setInvestTab] = useState<"classes" | "instituicoes">("classes");
   const [balanceView, setBalanceView] = useBalanceView();
+  const router = useRouter();
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") router.refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [router]);
 
   const visibleConnections = useMemo(() => {
     if (connectionId === "all") return connections;
@@ -80,7 +101,7 @@ export default function DashboardClient({
     [historyTx, connectionId, snapshot.accounts, snapshot.cards],
   );
 
-  const monthKey = format(startOfMonth(new Date()), "yyyy-MM");
+  const monthKey = saoPauloMonthKey();
   const monthTx = scopedTx.filter((transaction) => transaction.date.startsWith(monthKey));
   const monthEntradas = monthTx
     .filter(isRenda)
@@ -109,11 +130,7 @@ export default function DashboardClient({
   }, [monthTx]);
 
   const evolucaoMensal = useMemo(() => {
-    const now = new Date();
-    const map = new Map<string, { entradas: number; despesas: number }>();
-    for (let i = 11; i >= 0; i -= 1) {
-      map.set(format(startOfMonth(subMonths(now, i)), "yyyy-MM"), { entradas: 0, despesas: 0 });
-    }
+    const map = new Map(lastNMonthKeys(12).map((mes) => [mes, { entradas: 0, despesas: 0 }]));
     scopedTx.forEach((transaction) => {
       const bucket = map.get(transaction.date.slice(0, 7));
       if (!bucket) return;
@@ -124,26 +141,27 @@ export default function DashboardClient({
   }, [scopedTx]);
 
   const evolucaoSaldo = useMemo(() => {
-    const now = new Date();
-    const nets = new Map<string, number>();
-    for (let i = 0; i < 12; i += 1) {
-      nets.set(format(startOfMonth(subMonths(now, i)), "yyyy-MM"), 0);
-    }
+    const months = lastNMonthKeys(12);
+    const cashNet = new Map(months.map((mes) => [mes, 0]));
+    const patrNet = new Map(months.map((mes) => [mes, 0]));
     scopedTx.forEach((transaction) => {
       const key = transaction.date.slice(0, 7);
-      if (!nets.has(key)) return;
-      const delta = transaction.type === "entrada" ? Number(transaction.amount) : -Number(transaction.amount);
-      nets.set(key, (nets.get(key) ?? 0) + delta);
+      if (!cashNet.has(key)) return;
+      const amount = Number(transaction.amount);
+      if (!isTransferDescription(transaction.description)) {
+        cashNet.set(key, (cashNet.get(key) ?? 0) + (transaction.type === "entrada" ? amount : -amount));
+      }
+      if (isRenda(transaction)) patrNet.set(key, (patrNet.get(key) ?? 0) + amount);
+      else if (isGasto(transaction)) patrNet.set(key, (patrNet.get(key) ?? 0) - amount);
     });
     const points: { mes: string; saldo: number; patrimonio: number }[] = [];
     let saldo = totalBalance;
     let patr = patrimonio;
-    for (let i = 0; i < 12; i += 1) {
-      const mes = format(startOfMonth(subMonths(now, i)), "yyyy-MM");
+    for (let index = months.length - 1; index >= 0; index -= 1) {
+      const mes = months[index];
       points.push({ mes, saldo, patrimonio: patr });
-      const net = nets.get(mes) ?? 0;
-      saldo -= net;
-      patr -= net;
+      saldo -= cashNet.get(mes) ?? 0;
+      patr -= patrNet.get(mes) ?? 0;
     }
     return points.reverse();
   }, [scopedTx, totalBalance, patrimonio]);
@@ -199,14 +217,21 @@ export default function DashboardClient({
   const inactiveInvestments = investments.length - activeInvestments;
 
   const fluxoDiario = useMemo(() => {
-    const days = eachDayOfInterval({ start: subDays(new Date(), 29), end: new Date() });
-    return days.map((day) => {
-      const key = format(day, "yyyy-MM-dd");
-      const dayTx = scopedTx.filter((transaction) => transaction.date === key);
+    const days = lastNDateKeys(30);
+    const byDay = new Map(days.map((key) => [key, { entradas: 0, despesas: 0 }]));
+    scopedTx.forEach((transaction) => {
+      const bucket = byDay.get(transaction.date);
+      if (!bucket) return;
+      if (isRenda(transaction)) bucket.entradas += Number(transaction.amount);
+      else if (isGasto(transaction)) bucket.despesas += Number(transaction.amount);
+    });
+    return days.map((key) => {
+      const bucket = byDay.get(key)!;
+      const [, month, day] = key.split("-");
       return {
-        dia: format(day, "dd/MM"),
-        entradas: dayTx.filter(isRenda).reduce((sum, transaction) => sum + Number(transaction.amount), 0),
-        despesas: dayTx.filter(isGasto).reduce((sum, transaction) => sum + Number(transaction.amount), 0),
+        dia: `${day}/${month}`,
+        entradas: bucket.entradas,
+        despesas: bucket.despesas,
       };
     });
   }, [scopedTx]);
@@ -215,10 +240,19 @@ export default function DashboardClient({
     const labels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
     const totals = [0, 0, 0, 0, 0, 0, 0];
     monthTx.filter(isGasto).forEach((transaction) => {
-      totals[parseISO(transaction.date).getDay()] += Number(transaction.amount);
+      totals[parseISO(`${transaction.date}T12:00:00`).getDay()] += Number(transaction.amount);
     });
     return labels.map((dia, index) => ({ dia, total: totals[index] }));
   }, [monthTx]);
+
+  const maioresGastos = useMemo(
+    () =>
+      monthTx
+        .filter(isGasto)
+        .sort((left, right) => Number(right.amount) - Number(left.amount))
+        .slice(0, 8),
+    [monthTx],
+  );
 
   const mixPatrimonio = [
     { name: "Contas", value: Math.max(0, totalBalance), color: "#34d399" },
@@ -434,7 +468,7 @@ export default function DashboardClient({
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
         <SectionLabel>Evolução do saldo</SectionLabel>
         <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(totalBalance)}</p>
-        <p className="mt-1 text-xs text-zinc-500">Linha vermelha: saldo em contas · pontilhada: patrimônio</p>
+        <p className="mt-1 text-xs text-zinc-500">Verde: saldo em contas · azul: patrimônio</p>
         <div className="mt-2">
           <SaldoEvolutionChart data={evolucaoSaldo} />
         </div>
@@ -478,7 +512,7 @@ export default function DashboardClient({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <MaioresGastos items={snapshot.maioresGastos.filter((item) => belongsToConnection(item, connectionId, snapshot.accounts, snapshot.cards))} />
+        <MaioresGastos items={maioresGastos} />
         <ProximasContas items={snapshot.proximos30Dias} saldoPrevisto={snapshot.saldoPrevisto30Dias} />
       </div>
 

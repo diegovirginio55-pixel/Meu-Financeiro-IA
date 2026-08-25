@@ -43,7 +43,7 @@ export default function TabNav() {
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  prefetch
+                  prefetch={tab.href !== "/visao"}
                   onClick={() => onNavigate(tab.href)}
                   className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active ? "bg-white font-medium text-zinc-950" : "text-zinc-400 hover:text-zinc-100"

@@ -1,11 +1,12 @@
 import { formatCurrency, formatDate } from "@/lib/finance/format";
-import { CATEGORY_ICONS } from "@/lib/finance/categories";
+import { CATEGORY_ICONS, resolvedCategory } from "@/lib/finance/categories";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
+import type { Transaction } from "@/lib/finance/types";
 
 export function MaioresGastos({
   items,
 }: {
-  items: FinancialSnapshot["maioresGastos"];
+  items: Transaction[];
 }) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
@@ -16,20 +17,23 @@ export function MaioresGastos({
         <p className="text-sm text-zinc-500">Nenhuma despesa registrada.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {items.map((t) => (
+          {items.map((t) => {
+            const category = resolvedCategory(t);
+            return (
             <li
               key={t.id}
               className="flex items-center justify-between text-sm"
             >
               <span className="flex items-center gap-2 text-zinc-300">
-                <span>{CATEGORY_ICONS[t.category] ?? "🔖"}</span>
+                <span>{CATEGORY_ICONS[category] ?? "🔖"}</span>
                 {t.description}
               </span>
               <span className="font-medium text-red-400">
                 {formatCurrency(Number(t.amount))}
               </span>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

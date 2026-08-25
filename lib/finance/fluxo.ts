@@ -2,7 +2,7 @@ import type { Account, Card, Debt, RecurringItem, Transaction } from "./types";
 import { assetMatchesBank, connectionBank, realConnectionId } from "./connection-filter";
 import { isInvestmentMovement } from "./investment-movements";
 import { isTransferDescription } from "./categories";
-import { differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns";
+import { differenceInCalendarDays, format, parseISO, startOfWeek, subDays } from "date-fns";
 
 export function isGasto(transaction: Transaction): boolean {
   return (
@@ -22,6 +22,25 @@ export function isRenda(transaction: Transaction): boolean {
 
 export function saoPauloTodayKey(date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+export function saoPauloMonthKey(date = new Date()): string {
+  return saoPauloTodayKey(date).slice(0, 7);
+}
+
+export function shiftMonthKey(monthKey: string, delta: number): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function lastNMonthKeys(count: number, from = saoPauloMonthKey()): string[] {
+  return Array.from({ length: count }, (_, index) => shiftMonthKey(from, index - (count - 1)));
+}
+
+export function lastNDateKeys(count: number, from = saoPauloTodayKey()): string[] {
+  const end = parseISO(`${from}T12:00:00`);
+  return Array.from({ length: count }, (_, index) => format(subDays(end, count - 1 - index), "yyyy-MM-dd"));
 }
 
 export function saoPauloHour(date = new Date()): number {

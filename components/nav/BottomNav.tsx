@@ -142,7 +142,7 @@ export default function BottomNav() {
               <Link
                 key={tab.href}
                 href={tab.href}
-                prefetch
+                prefetch={tab.href !== "/visao"}
                 onClick={() => onNavigate(tab.href)}
                 className="flex flex-col items-center gap-0.5 text-[11px]"
               >
