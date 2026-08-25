@@ -9,16 +9,9 @@ import { friendlyAccountName } from "@/lib/finance/account-name";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
-import { belongsToConnection, dailyBudgetFromBalance, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
+import { belongsToConnection, dailyBudgetFromBalance, greetingForNow, saoPauloTodayKey, saoPauloWeekStartKey, sumGastosInRange } from "@/lib/finance/fluxo";
 import type { Transaction } from "@/lib/finance/types";
 import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Bom dia";
-  if (hour < 18) return "Boa tarde";
-  return "Boa noite";
-}
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
@@ -79,7 +72,7 @@ export default function BankHome({
   if (connections.length === 0) {
     return (
       <div className="flex min-h-[70vh] flex-col justify-end pb-8 lg:justify-center lg:pb-0">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-400">{greeting()}</p>
+        <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-400">{greetingForNow()}</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white lg:text-6xl">
           Seu dinheiro,
           <br />
@@ -108,7 +101,7 @@ export default function BankHome({
           <div>
             <header className="flex items-center justify-between">
               <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-400/90">
-                {greeting()}
+                {greetingForNow()}
               </p>
               <div className="flex items-center gap-1 lg:hidden">
                 <button
@@ -136,6 +129,9 @@ export default function BankHome({
             <div className="mt-4">
               <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
             </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              {balanceView === "total" ? "contas + investimentos" : "somente o livre nas contas"}
+            </p>
 
             <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-1">
               <button

@@ -15,6 +15,22 @@ export function saoPauloTodayKey(date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
+export function saoPauloHour(date = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  return Number(parts.find((part) => part.type === "hour")?.value ?? "0") % 24;
+}
+
+export function greetingForNow(date = new Date()): string {
+  const hour = saoPauloHour(date);
+  if (hour >= 5 && hour < 12) return "Bom dia";
+  if (hour >= 12 && hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export function saoPauloWeekStartKey(date = new Date()): string {
   return format(startOfWeek(parseISO(saoPauloTodayKey(date)), { weekStartsOn: 1 }), "yyyy-MM-dd");
 }
