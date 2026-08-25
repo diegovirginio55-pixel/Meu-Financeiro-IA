@@ -11,7 +11,7 @@ const TABS = [
   { href: "/dashboard", label: "Início", icon: HomeIcon },
   { href: "/detalhes", label: "Extrato", icon: ExtratoIcon },
   { href: "/visao", label: "Dashboard", icon: DashboardIcon },
-  { href: "/chat", label: "Chat", icon: ChatIcon },
+  { href: "/chat", label: "Chat IA", icon: ChatIcon },
 ] as const;
 
 function HomeIcon({ active }: { active?: boolean }) {
