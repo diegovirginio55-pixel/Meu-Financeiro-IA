@@ -265,33 +265,93 @@ function formatAxisPercent(value: number): string {
   return `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
 }
 
-export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
-  const hasValues = data.some((point) => point.rendimento !== 0);
+function YieldTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: YieldPoint }>;
+  label?: string;
+}) {
+  if (!active || !payload?.[0]) return null;
+  const row = payload[0].payload;
+  const up = row.rendimento >= 0;
   return (
-    <div className="relative h-[240px] w-full lg:h-[280px]">
+    <div className="rounded-2xl border border-zinc-700/70 bg-zinc-950/95 px-3.5 py-2.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+      <p className="text-[11px] text-zinc-400">{label}</p>
+      <p className={`mt-0.5 text-sm font-semibold ${up ? "text-emerald-400" : "text-rose-400"}`}>
+        {formatPercent(row.rendimento, 3)}
+      </p>
+      <p className="text-[11px] text-zinc-500">{formatCurrency(row.lucro)} no dia</p>
+    </div>
+  );
+}
+
+export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
+  const uid = useId().replace(/:/g, "");
+  const hasValues = data.some((point) => point.rendimento !== 0);
+  const peak = data.reduce(
+    (best, item) => (item.rendimento > best.rendimento ? item : best),
+    data[0] ?? { date: "", label: "", lucro: 0, capital: 0, rendimento: 0 },
+  );
+
+  return (
+    <div className="relative h-[248px] w-full lg:h-[292px]">
       {!hasValues && (
         <p className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 px-6 text-center text-sm text-zinc-500">
           Sem rendimento diário ainda. Sincronize os bancos para começar o histórico.
         </p>
       )}
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} barCategoryGap="12%" maxBarSize={14} margin={{ top: 12, right: 8, left: 4, bottom: 0 }}>
-          <CartesianGrid stroke="#27272a" strokeDasharray="4 8" vertical={false} />
-          <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} dy={8} />
-          <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisPercent} />
-          <Tooltip
-            contentStyle={chartTooltipStyle}
-            formatter={(value) => [formatPercent(Number(value), 3), "Rendimento"]}
-            labelFormatter={(label, payload) => {
-              const row = payload?.[0]?.payload as YieldPoint | undefined;
-              if (!row) return String(label);
-              return `${label} · ${formatCurrency(row.lucro)}`;
-            }}
+        <BarChart data={data} barCategoryGap="22%" margin={{ top: 10, right: 6, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`yieldFill-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#6ee7b7" />
+              <stop offset="55%" stopColor="#34d399" />
+              <stop offset="100%" stopColor="#047857" />
+            </linearGradient>
+            <linearGradient id={`yieldPeak-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#d1fae5" />
+              <stop offset="40%" stopColor="#6ee7b7" />
+              <stop offset="100%" stopColor="#059669" />
+            </linearGradient>
+            <linearGradient id={`yieldNeg-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#fda4af" />
+              <stop offset="100%" stopColor="#e11d48" />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#27272a" strokeDasharray="3 10" vertical={false} strokeOpacity={0.75} />
+          <XAxis
+            dataKey="label"
+            stroke="#a1a1aa"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            interval={4}
+            minTickGap={18}
+            dy={8}
           />
-          <Bar dataKey="rendimento" name="rendimento" radius={[4, 4, 0, 0]}>
-            {data.map((entry) => (
-              <Cell key={entry.date} fill={entry.rendimento >= 0 ? "#34d399" : "#fb7185"} />
-            ))}
+          <YAxis
+            stroke="#a1a1aa"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            width={48}
+            tickFormatter={formatAxisPercent}
+          />
+          <Tooltip cursor={{ fill: "rgba(52, 211, 153, 0.08)" }} content={<YieldTooltip />} />
+          <Bar dataKey="rendimento" name="Rendimento" radius={[7, 7, 3, 3]} maxBarSize={16}>
+            {data.map((entry) => {
+              const empty = Math.abs(entry.rendimento) < 0.0005;
+              const isPeak = !empty && entry.date === peak.date;
+              const fill = entry.rendimento < 0
+                ? `url(#yieldNeg-${uid})`
+                : isPeak
+                  ? `url(#yieldPeak-${uid})`
+                  : `url(#yieldFill-${uid})`;
+              return <Cell key={entry.date} fill={fill} fillOpacity={empty ? 0.16 : 1} />;
+            })}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
