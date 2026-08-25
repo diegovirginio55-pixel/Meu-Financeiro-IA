@@ -5,10 +5,12 @@ import ChatBubble from "./ChatBubble";
 import ChatInput from "./ChatInput";
 import type { ChatUiMessage } from "@/lib/finance/chat-types";
 import type { ChatMessageRow } from "@/lib/finance/types";
+import type { ChatQuotaView } from "@/lib/ai/quota";
 import { PageHero, PageShell } from "@/components/ui/page-chrome";
 
 export default function ChatWindow() {
   const [messages, setMessages] = useState<ChatUiMessage[]>([]);
+  const [quota, setQuota] = useState<ChatQuotaView | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sending, setSending] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -22,7 +24,7 @@ export default function ChatWindow() {
     let active = true;
     fetch("/api/chat")
       .then((res) => res.json())
-      .then((data: { messages?: ChatMessageRow[] }) => {
+      .then((data: { messages?: ChatMessageRow[]; quota?: ChatQuotaView }) => {
         if (!active) return;
         const loaded: ChatUiMessage[] = (data.messages ?? []).map((m) => ({
           id: m.id,
@@ -30,6 +32,7 @@ export default function ChatWindow() {
           content: m.content,
         }));
         setMessages(loaded);
+        if (data.quota) setQuota(data.quota);
       })
       .finally(() => {
         if (active) setLoadingHistory(false);
@@ -38,6 +41,20 @@ export default function ChatWindow() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!quota?.lockedUntil) return;
+    const wait = new Date(quota.lockedUntil).getTime() - Date.now();
+    const timer = window.setTimeout(() => {
+      fetch("/api/chat")
+        .then((res) => res.json())
+        .then((data: { quota?: ChatQuotaView }) => {
+          if (data.quota) setQuota(data.quota);
+        })
+        .catch(() => undefined);
+    }, Math.max(400, wait + 250));
+    return () => window.clearTimeout(timer);
+  }, [quota?.lockedUntil]);
 
   function revealText(id: string, text: string) {
     let i = 0;
@@ -76,11 +93,18 @@ export default function ChatWindow() {
         body: JSON.stringify({ message }),
       });
       const raw = await res.text();
-      let data: { reply?: string; error?: string } = {};
+      let data: { reply?: string; error?: string; quota?: ChatQuotaView; limited?: boolean } = {};
       try {
-        data = raw ? (JSON.parse(raw) as { reply?: string; error?: string }) : {};
+        data = raw
+          ? (JSON.parse(raw) as { reply?: string; error?: string; quota?: ChatQuotaView; limited?: boolean })
+          : {};
       } catch {
         data = {};
+      }
+      if (data.quota) setQuota(data.quota);
+      if (res.status === 429 && !data.reply) {
+        setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== pendingId));
+        return;
       }
       const reply =
         data.reply ??
@@ -115,8 +139,10 @@ export default function ChatWindow() {
     setClearing(true);
     try {
       const res = await fetch("/api/chat", { method: "DELETE" });
+      const data: { quota?: ChatQuotaView } = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error("fail");
       setMessages([]);
+      if (data.quota) setQuota(data.quota);
     } catch {
       alert("Não deu para apagar a conversa agora. Tente de novo.");
     } finally {
@@ -125,6 +151,7 @@ export default function ChatWindow() {
   }
 
   const canClear = messages.length > 0 && !loadingHistory;
+  const limited = Boolean(quota?.limited);
 
   return (
     <PageShell>
@@ -135,14 +162,25 @@ export default function ChatWindow() {
             <h1 className="text-[34px] font-semibold leading-[1.05] tracking-tight text-white lg:text-5xl">
               Conversa
             </h1>
-            <button
-              type="button"
-              onClick={() => void handleClear()}
-              disabled={!canClear || clearing}
-              className="relative z-10 mb-1 shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-zinc-950 disabled:opacity-40"
-            >
-              {clearing ? "Apagando..." : "Apagar conversa"}
-            </button>
+            <div className="relative z-10 mb-1 flex shrink-0 items-center gap-2">
+              {quota ? (
+                <p
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                    limited ? "bg-amber-400/15 text-amber-200" : "bg-emerald-400/10 text-emerald-300"
+                  }`}
+                >
+                  {limited ? "Limite atingido" : `Disponíveis ${quota.remaining} perguntas`}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void handleClear()}
+                disabled={!canClear || clearing}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-zinc-950 disabled:opacity-40"
+              >
+                {clearing ? "Apagando..." : "Apagar conversa"}
+              </button>
+            </div>
           </div>
         }
         subtitle="Pergunte sobre gastos, saldo e investimentos"
@@ -160,7 +198,17 @@ export default function ChatWindow() {
           )}
           <div ref={bottomRef} />
         </div>
-        <ChatInput disabled={sending} onSend={handleSend} />
+        {quota ? (
+          <p className={`mb-2 px-1 text-xs ${limited ? "text-amber-300" : "text-zinc-500"}`}>
+            {quota.label}
+          </p>
+        ) : null}
+        <ChatInput
+          disabled={sending || limited}
+          locked={limited}
+          onSend={handleSend}
+          onQuota={setQuota}
+        />
       </div>
     </PageShell>
   );

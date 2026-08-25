@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { Content, Part } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { genAI, buildSystemPrompt, GEMINI_MODEL } from "@/lib/ai/gemini";
+import { consumeQuestion, geminiRetryAt, getQuotaView, isGeminiQuotaError, lockQuota } from "@/lib/ai/quota";
+import { readChatQuota, writeChatQuota } from "@/lib/ai/quota-cookie";
 import { toolDefinitions, executeTool } from "@/lib/ai/tools";
 import { getFinancialSnapshot } from "@/lib/finance/summary";
 
@@ -57,7 +59,8 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ messages: data ?? [] });
+  const quota = getQuotaView(await readChatQuota());
+  return NextResponse.json({ messages: data ?? [], quota });
 }
 
 export async function DELETE() {
@@ -72,7 +75,7 @@ export async function DELETE() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, quota: getQuotaView(await readChatQuota()) });
 }
 
 export async function POST(request: Request) {
@@ -93,6 +96,15 @@ export async function POST(request: Request) {
 
   if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json({ reply: "A chave da IA não está configurada no servidor." });
+  }
+
+  const quotaState = await readChatQuota();
+  const quotaBefore = getQuotaView(quotaState);
+  if (quotaBefore.limited) {
+    return NextResponse.json(
+      { limited: true, error: quotaBefore.label, quota: quotaBefore },
+      { status: 429 },
+    );
   }
 
   const { data: historyRows } = await supabase
@@ -161,14 +173,28 @@ export async function POST(request: Request) {
       tool_calls: toolCallsLog.length > 0 ? toolCallsLog : null,
     });
 
-    return NextResponse.json({ reply: finalText });
+    const nextState = consumeQuestion(quotaState);
+    const quota = getQuotaView(nextState);
+    await writeChatQuota(nextState);
+    return NextResponse.json({ reply: finalText, quota });
   } catch (error) {
     console.error("Erro no chat com a IA:", error);
+    if (isGeminiQuotaError(error)) {
+      const locked = lockQuota(quotaState, geminiRetryAt(error));
+      const quota = getQuotaView(locked);
+      await writeChatQuota(locked);
+      await supabase.from("chat_messages").insert({
+        user_id: user.id,
+        role: "assistant",
+        content: quota.label,
+      });
+      return NextResponse.json({ reply: quota.label, limited: true, quota });
+    }
     await supabase.from("chat_messages").insert({
       user_id: user.id,
       role: "assistant",
       content: FALLBACK_REPLY,
     });
-    return NextResponse.json({ reply: FALLBACK_REPLY });
+    return NextResponse.json({ reply: FALLBACK_REPLY, quota: quotaBefore });
   }
 }

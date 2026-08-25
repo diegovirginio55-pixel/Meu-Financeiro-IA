@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
+import type { ChatQuotaView } from "@/lib/ai/quota";
+
 const MAX_SECONDS = 60;
 
 function pickMimeType() {
@@ -17,10 +19,14 @@ function formatTimer(seconds: number) {
 
 export default function ChatInput({
   disabled,
+  locked,
   onSend,
+  onQuota,
 }: {
   disabled: boolean;
+  locked?: boolean;
   onSend: (message: string) => void;
+  onQuota?: (quota: ChatQuotaView) => void;
 }) {
   const [value, setValue] = useState("");
   const [recording, setRecording] = useState(false);
@@ -141,7 +147,8 @@ export default function ChatInput({
       const extension = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
       form.append("audio", blob, `audio.${extension}`);
       const res = await fetch("/api/chat/transcribe", { method: "POST", body: form });
-      const data: { text?: string; error?: string } = await res.json();
+      const data: { text?: string; error?: string; quota?: ChatQuotaView } = await res.json();
+      if (data.quota) onQuota?.(data.quota);
       const text = (data.text ?? "").trim();
       if (!res.ok || !text) {
         setError(data.error || "Não deu para entender o áudio. Tente de novo.");
@@ -208,7 +215,7 @@ export default function ChatInput({
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="O que você quer saber sobre seu dinheiro?"
+                placeholder={locked ? "Limite de perguntas atingido" : "O que você quer saber sobre seu dinheiro?"}
                 rows={1}
                 disabled={busy}
                 className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
