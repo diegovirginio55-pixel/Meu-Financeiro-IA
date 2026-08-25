@@ -93,24 +93,20 @@ export function LucroAtivosPanel({
   const rendimentoHoje = dailyYield[dailyYield.length - 1]?.rendimento ?? 0;
   const rendimento30d = periodYield(dailyYield);
   const rendimentoMes = monthlyYield.series[monthlyYield.series.length - 1]?.rendimento ?? 0;
+  const lucroDia = dailyYield[dailyYield.length - 1]?.lucro ?? lucroHoje;
+  const lucroMes = monthlyYield.series[monthlyYield.series.length - 1]?.lucro ?? 0;
 
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-      <div className="grid grid-cols-3 gap-2">
-        <Kpi label="Hoje" value={lucroHoje} />
-        <Kpi label="30 dias" value={lucroPeriodo} />
-        <Kpi label="Acumulado" value={lucroAcumulado} />
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-zinc-800 p-3 lg:p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-medium text-zinc-200">Rendimento diário</h3>
               <p className="mt-1 text-[11px] text-zinc-500">Lucro do dia dividido pelo patrimônio investido.</p>
             </div>
-            <p className={`text-sm font-semibold sm:text-base ${lucroHoje >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {formatCurrency(lucroHoje)}
+            <p className={`text-right text-sm font-semibold sm:text-lg ${lucroDia >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {formatCurrency(lucroDia)}
             </p>
           </div>
           <p className="mt-2 text-[11px] text-zinc-500">
@@ -126,8 +122,8 @@ export function LucroAtivosPanel({
               <h3 className="text-sm font-medium text-zinc-200">Rendimento mensal</h3>
               <p className="mt-1 text-[11px] text-zinc-500">Lucro do mês sobre o saldo médio investido.</p>
             </div>
-            <p className={`text-sm font-semibold sm:text-base ${lucroPeriodo >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {formatCurrency(lucroPeriodo)}
+            <p className={`text-right text-sm font-semibold sm:text-lg ${lucroMes >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {formatCurrency(lucroMes)}
             </p>
           </div>
           <p className="mt-2 text-[11px] text-zinc-500">
@@ -186,6 +182,12 @@ export function LucroAtivosPanel({
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <Kpi label="Hoje" value={lucroHoje} />
+        <Kpi label="30 dias" value={lucroPeriodo} />
+        <Kpi label="Acumulado" value={lucroAcumulado} />
       </div>
 
       <div className="mt-4">
@@ -265,10 +267,10 @@ export function LucroAtivosPanel({
 function Kpi({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-950/50 px-3 py-2.5">
-      <p className={`truncate text-sm font-semibold sm:text-lg ${value >= 0 ? "text-emerald-400" : "text-rose-300"}`}>
+      <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold sm:text-lg ${value >= 0 ? "text-emerald-400" : "text-rose-300"}`}>
         {formatCurrency(value)}
       </p>
-      <p className="mt-1 text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
     </div>
   );
 }
