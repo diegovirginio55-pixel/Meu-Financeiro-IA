@@ -76,9 +76,9 @@ export default function DetalhesClient() {
         title={<HeroAmount>{formatCurrency(saldo)}</HeroAmount>}
         subtitle={`${transactions.length} lançamentos neste filtro`}
       >
-        <div className="mb-1.5 flex justify-between text-[11px]">
-          <span className="font-medium text-emerald-300">{formatPercent(pctEntradas, 1)}</span>
-          <span className="font-medium text-rose-300">{formatPercent(pctSaidas, 1)}</span>
+        <div className="mb-1.5 flex justify-between text-sm">
+          <span className="font-semibold text-emerald-300">{formatPercent(pctEntradas, 1)}</span>
+          <span className="font-semibold text-rose-300">{formatPercent(pctSaidas, 1)}</span>
         </div>
         <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
           <div className="h-full shrink-0 bg-emerald-400" style={{ width: `${pctEntradas}%` }} />
