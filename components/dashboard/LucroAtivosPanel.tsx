@@ -21,6 +21,7 @@ import {
 } from "@/components/dashboard/ExtraCharts";
 
 type ChartMode = "juntos" | "bancos" | "ativos";
+type ChartVariant = "bar" | "line";
 
 export function LucroAtivosPanel({
   connections,
@@ -34,6 +35,7 @@ export function LucroAtivosPanel({
   investmentTx: InvestmentTxn[];
 }) {
   const [mode, setMode] = useState<ChartMode>("ativos");
+  const [variant, setVariant] = useState<ChartVariant>("bar");
 
   const liveInvestments = useMemo(
     () => withAccruedYield(investments, snapshots, investmentTx),
@@ -104,23 +106,42 @@ export function LucroAtivosPanel({
               : ""}
           </p>
         </div>
-        <div className="flex rounded-full bg-zinc-900 p-0.5 text-[11px]">
-          {(
-            [
-              ["juntos", "Total"],
-              ["bancos", "Por banco"],
-              ["ativos", "Por investimento"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setMode(value)}
-              className={`rounded-full px-2.5 py-1 ${mode === value ? "bg-emerald-600 text-white" : "text-zinc-400"}`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex rounded-full bg-zinc-900 p-0.5 text-[11px]">
+            {(
+              [
+                ["bar", "Barras"],
+                ["line", "Linha"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setVariant(value)}
+                className={`rounded-full px-2.5 py-1 ${variant === value ? "bg-zinc-700 text-white" : "text-zinc-400"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex rounded-full bg-zinc-900 p-0.5 text-[11px]">
+            {(
+              [
+                ["juntos", "Total"],
+                ["bancos", "Por banco"],
+                ["ativos", "Por investimento"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMode(value)}
+                className={`rounded-full px-2.5 py-1 ${mode === value ? "bg-emerald-600 text-white" : "text-zinc-400"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -131,10 +152,20 @@ export function LucroAtivosPanel({
       </div>
 
       <div className="mt-4">
-        {mode === "juntos" && <LucroDiarioChart data={byAsset.series} series={[]} mode="juntos" />}
-        {mode === "bancos" && <LucroDiarioChart data={byBank.series} banks={byBank.banks} mode="ambos" />}
+        {mode === "juntos" && (
+          <LucroDiarioChart data={byAsset.series} series={[]} mode="juntos" variant={variant} />
+        )}
+        {mode === "bancos" && (
+          <LucroDiarioChart data={byBank.series} banks={byBank.banks} mode="ambos" variant={variant} />
+        )}
         {mode === "ativos" && (
-          <LucroDiarioChart data={byAsset.series} series={visibleKeys} mode="separados" height={320} />
+          <LucroDiarioChart
+            data={byAsset.series}
+            series={visibleKeys}
+            mode="separados"
+            height={320}
+            variant={variant}
+          />
         )}
       </div>
 
