@@ -8,15 +8,25 @@ export function PwaRoot() {
     if (process.env.NODE_ENV !== "production") return;
     if (!("serviceWorker" in navigator)) return;
 
-    const register = () => {
-      void navigator.serviceWorker
-        .register("/sw.js", { scope: "/", updateViaCache: "none" })
-        .then((registration) => void registration.update())
-        .catch(() => undefined);
+    void navigator.serviceWorker
+      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .then((registration) => void registration.update())
+      .catch(() => undefined);
+
+    if (navigator.serviceWorker.controller) return;
+
+    const onControllerChange = () => {
+      try {
+        if (sessionStorage.getItem("mf-sw-reload") === "1") return;
+        sessionStorage.setItem("mf-sw-reload", "1");
+      } catch {
+        return;
+      }
+      window.location.reload();
     };
 
-    if (document.readyState === "complete") register();
-    else window.addEventListener("load", register, { once: true });
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    return () => navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
   }, []);
 
   return <PwaInstallBanner />;
@@ -56,7 +66,8 @@ export function PwaInstallBanner() {
         )}
         {showHelp && isDesktopChrome && !canInstall && (
           <p className="mt-1 text-[11px] leading-snug text-zinc-300">
-            Clique no ícone de instalação na barra de endereço ou em ⋮ → Instalar página como app.
+            Clique no ícone de instalação na barra de endereço (monitor com seta) ou em ⋮ → Instalar página como app.
+            O Chrome usa esse nome; o app deve abrir em janela própria, sem barra de endereço.
           </p>
         )}
       </div>
@@ -127,7 +138,7 @@ export function InstallAppButton({
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 text-left shadow-xl">
             <p className="text-sm font-medium text-white">Como instalar</p>
             <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-              No Chrome, toque em Instalar no banner ou no ícone da barra de endereço. No iPhone, abra no Safari,
+              No Chrome, use o botão Instalar do banner ou o ícone de app na barra de endereço. No iPhone, abra no Safari,
               toque em Compartilhar e depois em Adicionar à Tela de Início.
             </p>
             <button type="button" onClick={() => setOpen(false)} className="mt-3 text-xs text-emerald-400">

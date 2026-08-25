@@ -1,5 +1,5 @@
-const CACHE = "financeiro-shell-v5";
-const SHELL = ["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
+const CACHE = "financeiro-shell-v6";
+const SHELL = ["/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

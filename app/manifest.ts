@@ -2,15 +2,24 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Meu Financeiro IA",
     short_name: "Financeiro",
     description: "Painel financeiro pessoal com IA",
-    start_url: "/",
+    start_url: "/login",
     scope: "/",
     display: "standalone",
+    display_override: ["standalone", "minimal-ui"],
+    orientation: "any",
     background_color: "#09090b",
     theme_color: "#09090b",
     lang: "pt-BR",
+    dir: "ltr",
+    categories: ["finance", "productivity"],
+    prefer_related_applications: false,
+    launch_handler: {
+      client_mode: ["navigate-existing", "auto"],
+    },
     icons: [
       {
         src: "/icon-192.png",
@@ -29,6 +38,22 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
+      },
+    ],
+    screenshots: [
+      {
+        src: "/screenshots/desktop.png",
+        sizes: "1280x720",
+        type: "image/png",
+        form_factor: "wide",
+        label: "Painel do Meu Financeiro IA",
+      },
+      {
+        src: "/screenshots/mobile.png",
+        sizes: "720x1280",
+        type: "image/png",
+        form_factor: "narrow",
+        label: "Meu Financeiro no celular",
       },
     ],
   };

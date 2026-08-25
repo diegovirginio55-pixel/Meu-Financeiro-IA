@@ -20,7 +20,10 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/manifest.webmanifest",
-        headers: [{ key: "Content-Type", value: "application/manifest+json" }],
+        headers: [
+          { key: "Content-Type", value: "application/manifest+json" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
       },
     ];
   },
