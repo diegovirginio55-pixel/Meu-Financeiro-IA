@@ -13,6 +13,7 @@ import { belongsToConnection, dailyBudgetFromBalance, greetingForNow, saoPauloTo
 import { institutionFromAssetName, realConnectionId } from "@/lib/finance/connection-filter";
 import type { Transaction } from "@/lib/finance/types";
 import { CATEGORY_ICONS, categoryColor } from "@/lib/finance/categories";
+import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";

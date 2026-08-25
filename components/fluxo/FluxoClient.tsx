@@ -12,11 +12,21 @@ import {
   isGasto,
   isRenda,
 } from "@/lib/finance/fluxo";
-import type { Account, BankConnection, Card, Debt, RecurringItem, Transaction } from "@/lib/finance/types";
+import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
+import type { Account, Card, Debt, RecurringItem, Transaction } from "@/lib/finance/types";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { FluxoAreaChart, FluxoDonutChart } from "@/components/fluxo/FluxoCharts";
 import { assetMatchesBank, connectionBank, realConnectionId } from "@/lib/finance/connection-filter";
-import { HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel, chipClass } from "@/components/ui/page-chrome";
+import {
+  BalanceViewToggle,
+  HeroAmount,
+  PageHero,
+  PageShell,
+  SectionLabel,
+  SoftPanel,
+  chipClass,
+  useBalanceView,
+} from "@/components/ui/page-chrome";
 
 function monthTitle(month: Date): string {
   const raw = format(month, "MMMM 'de' yyyy", { locale: ptBR });
@@ -43,7 +53,7 @@ export default function FluxoClient({
   transactions: Transaction[];
   accounts: Account[];
   cards: Card[];
-  connections: BankConnection[];
+  connections: BankConnectionWithAssets[];
   recurring: RecurringItem[];
   debts: Debt[];
 }) {
@@ -52,6 +62,7 @@ export default function FluxoClient({
   const [accountId, setAccountId] = useState("all");
   const [type, setType] = useState<"todos" | "entrada" | "saida">("todos");
   const [search, setSearch] = useState("");
+  const [balanceView, setBalanceView] = useBalanceView();
 
   const monthKey = format(month, "yyyy-MM");
 
@@ -132,14 +143,23 @@ export default function FluxoClient({
     return { list, cardList };
   }, [accounts, cards, connectionId]);
 
-  const economia = entradas - despesas;
+  const visibleConnections = useMemo(() => {
+    if (connectionId === "all") return connections;
+    return connections.filter((connection) => connection.id === connectionId);
+  }, [connectionId, connections]);
+  const saldoConta = visibleConnections
+    .flatMap((connection) => connection.accounts)
+    .reduce((sum, account) => sum + Number(account.balance), 0);
+  const saldoInvestido = visibleConnections
+    .flatMap((connection) => connection.investments)
+    .reduce((sum, investment) => sum + Number(investment.amount), 0);
+  const displayedBalance = balanceView === "total" ? saldoConta + saldoInvestido : saldoConta;
 
   return (
     <PageShell>
       <PageHero
         kicker="Fluxo"
-        title={<HeroAmount>{formatCurrency(economia)}</HeroAmount>}
-        subtitle={`${monthTitle(month)} · entradas menos saídas`}
+        title={<HeroAmount>{formatCurrency(displayedBalance)}</HeroAmount>}
         trailing={
           <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
             <select
@@ -160,16 +180,22 @@ export default function FluxoClient({
           </label>
         }
       >
-        <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
-          <div
-            className="bg-emerald-400"
-            style={{ width: `${entradas + despesas > 0 ? (entradas / (entradas + despesas)) * 100 : 50}%` }}
-          />
-          <div className="bg-rose-400/80" />
-        </div>
-        <div className="mt-2 flex justify-between text-[11px] text-zinc-500">
-          <span className="text-emerald-300">{formatCurrency(entradas)}</span>
-          <span className="text-rose-300">{formatCurrency(despesas)}</span>
+        <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
+        <div className="mt-6">
+          <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">
+            {monthTitle(month)} · entradas menos saídas
+          </p>
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
+            <div
+              className="bg-emerald-400"
+              style={{ width: `${entradas + despesas > 0 ? (entradas / (entradas + despesas)) * 100 : 50}%` }}
+            />
+            <div className="bg-rose-400/80" />
+          </div>
+          <div className="mt-2 flex justify-between text-[11px] text-zinc-500">
+            <span className="text-emerald-300">{formatCurrency(entradas)}</span>
+            <span className="text-rose-300">{formatCurrency(despesas)}</span>
+          </div>
         </div>
       </PageHero>
 
