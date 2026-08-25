@@ -87,17 +87,11 @@ export async function promoteInvestmentsFromTransactions(
   accounts: Account[],
   investments: Investment[],
 ): Promise<Investment[]> {
-  const officialConnectionIds = new Set(
-    investments
-      .filter((row) => isOfficialPluggyId(row.pluggy_investment_id))
-      .map((row) => row.bank_connection_id)
-      .filter((id): id is string => Boolean(id)),
-  );
+  const official = investments.filter((row) => isOfficialPluggyId(row.pluggy_investment_id));
 
   const leftoverSynthetics = investments.filter((row) => {
     if (!row.pluggy_investment_id?.startsWith("bank-tx:")) return false;
-    if (!row.bank_connection_id) return officialConnectionIds.size > 0;
-    return officialConnectionIds.has(row.bank_connection_id);
+    return official.some((other) => investmentNamesMatch(other.name, row.name));
   });
   if (leftoverSynthetics.length > 0) {
     await supabase.from("investments").delete().in(
@@ -163,22 +157,16 @@ export async function promoteInvestmentsFromTransactions(
     });
   }
 
-  const namesMatch = (left: string, right: string) =>
-    Boolean(left && right && (left.includes(right) || right.includes(left)));
-
   const created: Investment[] = [];
   for (const item of grouped.values()) {
     const key = normalizeText(item.name);
     const syntheticId = `bank-tx:${key.replace(/\s+/g, "-").slice(0, 80)}`;
     const realMatch = remaining.find(
       (row) =>
-        isOfficialPluggyId(row.pluggy_investment_id) &&
-        namesMatch(normalizeText(row.name), key),
+        isOfficialPluggyId(row.pluggy_investment_id) && investmentNamesMatch(row.name, item.name),
     );
     const account = accounts.find((row) => row.id === item.accountId);
-    const connectionHasOfficial =
-      Boolean(account?.bank_connection_id && officialConnectionIds.has(account.bank_connection_id));
-    if (realMatch || connectionHasOfficial) {
+    if (realMatch) {
       const syntheticIndex = remaining.findIndex((row) => row.pluggy_investment_id === syntheticId);
       if (syntheticIndex >= 0) remaining.splice(syntheticIndex, 1);
       await supabase.from("investments").delete().eq("pluggy_investment_id", syntheticId);

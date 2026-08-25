@@ -416,6 +416,7 @@ export async function syncBankConnection(
         .filter((row) => {
           const pluggyId = row.pluggy_investment_id as string | null;
           if (!pluggyId || keepIds.has(pluggyId)) return false;
+          if (pluggyId.startsWith("bank-tx:")) return false;
           return true;
         })
         .map((row) => row.id as string);

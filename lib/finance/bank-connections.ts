@@ -4,6 +4,7 @@ import { inferInstitutionName, isGenericConnectorName } from "@/lib/pluggy/insti
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { groupedConnectionId, institutionFromAssetName, realConnectionId } from "./connection-filter";
 import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
+import { promoteInvestmentsFromTransactions } from "./investment-movements";
 import { daysAgoKey } from "./fluxo";
 
 export type BankConnectionWithAssets = BankConnection & {
@@ -30,7 +31,12 @@ export async function getBankConnectionsWithAssets(
   const connections = (connRes.data ?? []) as BankConnection[];
   const accounts = (accRes.data ?? []) as Account[];
   const cards = (cardRes.data ?? []) as Card[];
-  const investments = (invRes.data ?? []) as Investment[];
+  let investments = (invRes.data ?? []) as Investment[];
+  try {
+    investments = await promoteInvestmentsFromTransactions(supabase, accounts, investments);
+  } catch (error) {
+    console.error("Erro ao reconciliar investimentos do extrato:", error);
+  }
 
   const usedAccountIds = new Set<string>();
   const usedCardIds = new Set<string>();
