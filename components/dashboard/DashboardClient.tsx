@@ -502,11 +502,13 @@ export default function DashboardClient({
           <FluxoDiarioChart data={fluxoDiario} />
         </section>
         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-          <h2 className="mb-2 text-sm font-medium text-zinc-300">Gastos por dia da semana</h2>
+          <h2 className="text-sm font-medium text-zinc-200">Gastos por dia da semana</h2>
+          <p className="mb-2 mt-1 text-[11px] text-zinc-500">Quanto saiu em cada dia neste mês.</p>
           <SemanaGastosChart data={gastosPorSemana} />
         </section>
         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-          <h2 className="mb-2 text-sm font-medium text-zinc-300">Mix do patrimônio</h2>
+          <h2 className="text-sm font-medium text-zinc-200">Mix do patrimônio</h2>
+          <p className="mb-2 mt-1 text-[11px] text-zinc-500">Quanto está em contas e quanto está investido.</p>
           <MixPizzaChart data={mixPatrimonio} />
         </section>
       </div>
