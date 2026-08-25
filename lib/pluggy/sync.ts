@@ -149,13 +149,27 @@ function pluggyAccountName(account: { name?: string; marketingName?: string | nu
 
 function monthlyRate(inv: {
   lastMonthRate?: number | null;
+  lastTwelveMonthsRate?: number | null;
   annualRate?: number | null;
   fixedAnnualRate?: number | null;
 }): number | null {
   if (inv.lastMonthRate != null && Number(inv.lastMonthRate) !== 0) return Number(inv.lastMonthRate);
+  if (inv.lastTwelveMonthsRate != null && Number(inv.lastTwelveMonthsRate) !== 0) {
+    return Number(inv.lastTwelveMonthsRate) / 12;
+  }
   if (inv.annualRate != null && Number(inv.annualRate) !== 0) return Number(inv.annualRate) / 12;
   if (inv.fixedAnnualRate != null && Number(inv.fixedAnnualRate) !== 0) return Number(inv.fixedAnnualRate) / 12;
   return null;
+}
+
+function investmentProfit(inv: PluggyInvestment, amount: number): number | null {
+  if (inv.amountProfit != null && Number(inv.amountProfit) !== 0) {
+    return Number(inv.amountProfit);
+  }
+  if (inv.amountOriginal != null && Number(inv.amountOriginal) !== 0 && amount !== 0) {
+    return Number((amount - Number(inv.amountOriginal)).toFixed(2));
+  }
+  return inv.amountProfit == null ? null : Number(inv.amountProfit);
 }
 
 function investmentInstitution(
@@ -306,7 +320,7 @@ export async function syncBankConnection(
           name: withInstitutionPrefix(inv.name || "Investimento", bank),
           amount,
           type: investmentLabel(inv.type, inv.subtype, inv.name),
-          amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
+          amount_profit: investmentProfit(inv, amount),
           amount_original: inv.amountOriginal == null ? null : Number(inv.amountOriginal),
           last_month_rate: rate == null ? null : Number(rate),
           pluggy_investment_id: inv.id,
@@ -339,7 +353,7 @@ export async function syncBankConnection(
             bank_connection_id: bankConnectionId,
             snapshot_date: today,
             amount: pluggyInvestmentAmount(inv),
-            amount_profit: inv.amountProfit == null ? null : Number(inv.amountProfit),
+            amount_profit: investmentProfit(inv, pluggyInvestmentAmount(inv)),
           },
         ];
       });

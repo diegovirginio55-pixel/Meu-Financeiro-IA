@@ -47,10 +47,19 @@ function shortInvestmentLabel(name: string): string {
 }
 
 function addTo(daily: Map<string, Map<string, number>>, date: string, key: string, value: number) {
-  if (!Number.isFinite(value) || value === 0) return;
+  if (!Number.isFinite(value) || Math.abs(value) < 0.005) return;
   if (!daily.has(date)) daily.set(date, new Map());
   const row = daily.get(date)!;
   row.set(key, (row.get(key) ?? 0) + value);
+}
+
+export function accumulatedProfit(investment: Investment): number {
+  const explicit = Number(investment.amount_profit);
+  if (Number.isFinite(explicit) && explicit !== 0) return explicit;
+  const amount = Number(investment.amount ?? 0);
+  const original = Number(investment.amount_original ?? 0);
+  if (amount !== 0 && original !== 0) return Number((amount - original).toFixed(2));
+  return 0;
 }
 
 function estimatedDailyProfit(investment: Investment, days: number): number {
@@ -59,13 +68,39 @@ function estimatedDailyProfit(investment: Investment, days: number): number {
   if (rate !== 0 && amount !== 0) {
     return (amount * (rate / 100)) / 30;
   }
-  const profit = Number(investment.amount_profit ?? 0);
+  const profit = accumulatedProfit(investment);
   if (profit !== 0) return profit / Math.max(days, 1);
-  const original = Number(investment.amount_original ?? 0);
-  if (amount !== 0 && original !== 0 && amount !== original) {
-    return (amount - original) / Math.max(days, 1);
-  }
   return 0;
+}
+
+function hasMovement(points: Array<{ date: string; value: number }>): boolean {
+  return points.some((point) => Math.abs(point.value) >= 0.005);
+}
+
+function withLivePosition(investment: Investment, snapshots: InvestmentSnapshot[]): InvestmentSnapshot[] {
+  const today = saoPauloTodayKey();
+  const inferred = accumulatedProfit(investment);
+  const live: InvestmentSnapshot = {
+    id: `live:${investment.id}`,
+    investment_id: investment.id,
+    bank_connection_id: investment.bank_connection_id ?? null,
+    snapshot_date: today,
+    amount: Number(investment.amount ?? 0),
+    amount_profit:
+      investment.amount_profit != null && Number(investment.amount_profit) !== 0
+        ? Number(investment.amount_profit)
+        : inferred !== 0
+          ? inferred
+          : null,
+  };
+  const rest = snapshots.filter((item) => toDateKey(item.snapshot_date) !== today);
+  return [...rest, live].sort((a, b) => toDateKey(a.snapshot_date).localeCompare(toDateKey(b.snapshot_date)));
+}
+
+function netCapitalFlow(transactions: InvestmentTxn[], date: string): number {
+  return transactions
+    .filter((item) => toDateKey(item.date) === date && item.type !== "INTEREST")
+    .reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
 }
 
 function eligibleInvestments(investments: Investment[], snapshots: InvestmentSnapshot[]): Investment[] {
@@ -86,7 +121,7 @@ function snapshotsByInvestment(snapshots: InvestmentSnapshot[]) {
     list.push(item);
     map.set(item.investment_id, list);
   });
-  map.forEach((list) => list.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date)));
+  map.forEach((list) => list.sort((a, b) => toDateKey(a.snapshot_date).localeCompare(toDateKey(b.snapshot_date))));
   return map;
 }
 
@@ -110,36 +145,50 @@ function diffSnapshots(
 function seriesForInvestment({
   investment,
   snapshots,
-  interest,
+  transactions,
   dates,
   days,
 }: {
   investment: Investment;
   snapshots: InvestmentSnapshot[];
-  interest: InvestmentTxn[];
+  transactions: InvestmentTxn[];
   dates: string[];
   days: number;
 }): { points: Array<{ date: string; value: number }>; estimated: boolean } {
-  const profitSnaps = snapshots.filter((item) => item.amount_profit != null);
-  if (profitSnaps.length >= 2) {
-    return { points: diffSnapshots(profitSnaps, "amount_profit"), estimated: false };
+  const snaps = withLivePosition(investment, snapshots);
+  const profitSnaps = snaps.filter((item) => item.amount_profit != null);
+  const profitDiffs = profitSnaps.length >= 2 ? diffSnapshots(profitSnaps, "amount_profit") : [];
+  const catchUpOnly =
+    profitDiffs.filter((point) => Math.abs(point.value) >= 0.005).length === 1 &&
+    profitSnaps.some((item) => Number(item.amount_profit) !== 0 && toDateKey(item.snapshot_date) === saoPauloTodayKey()) &&
+    !profitSnaps.some((item) => Number(item.amount_profit) !== 0 && toDateKey(item.snapshot_date) !== saoPauloTodayKey());
+  if (hasMovement(profitDiffs) && !catchUpOnly) {
+    return { points: profitDiffs, estimated: false };
   }
 
-  if (interest.length > 0) {
+  const yieldTx = transactions.filter((item) => item.type === "INTEREST");
+  if (yieldTx.length > 0) {
     return {
-      points: interest.map((item) => ({ date: toDateKey(item.date), value: Number(item.amount) })),
+      points: yieldTx.map((item) => ({ date: toDateKey(item.date), value: Number(item.amount) })),
       estimated: false,
     };
   }
 
-  if (snapshots.length >= 2) {
-    return { points: diffSnapshots(snapshots, "amount"), estimated: false };
+  if (snaps.length >= 2) {
+    const amountDiffs = diffSnapshots(snaps, "amount").map((point) => ({
+      date: point.date,
+      value: point.value - netCapitalFlow(transactions, point.date),
+    }));
+    if (hasMovement(amountDiffs)) {
+      return { points: amountDiffs, estimated: false };
+    }
   }
 
   const perDay = estimatedDailyProfit(investment, Math.min(days, 30));
-  if (perDay === 0) return { points: [], estimated: false };
+  if (Math.abs(perDay) < 0.005) return { points: [], estimated: false };
 
-  const estimateFrom = dates[Math.max(0, dates.length - 30)] ?? dates[0];
+  const firstSnap = snaps[0] ? toDateKey(snaps[0].snapshot_date) : dates[0];
+  const estimateFrom = dates.find((date) => date >= firstSnap) ?? dates[Math.max(0, dates.length - 30)] ?? dates[0];
   return {
     points: dates.filter((date) => date >= estimateFrom).map((date) => ({ date, value: perDay })),
     estimated: true,
@@ -179,13 +228,13 @@ export function buildDailyInvestmentPnlByAsset({
   const knownIds = new Set(eligible.map((item) => item.id));
   const dates = lastNDateKeys(days);
   const byInvestment = snapshotsByInvestment(snapshots);
-  const interestByInvestment = new Map<string, InvestmentTxn[]>();
+  const txByInvestment = new Map<string, InvestmentTxn[]>();
   transactions
-    .filter((item) => item.type === "INTEREST" && item.investment_id && knownIds.has(item.investment_id))
+    .filter((item) => item.investment_id && knownIds.has(item.investment_id))
     .forEach((item) => {
-      const list = interestByInvestment.get(item.investment_id!) ?? [];
+      const list = txByInvestment.get(item.investment_id!) ?? [];
       list.push(item);
-      interestByInvestment.set(item.investment_id!, list);
+      txByInvestment.set(item.investment_id!, list);
     });
 
   const daily = new Map<string, Map<string, number>>();
@@ -195,7 +244,7 @@ export function buildDailyInvestmentPnlByAsset({
     const { points, estimated } = seriesForInvestment({
       investment,
       snapshots: byInvestment.get(investment.id) ?? [],
-      interest: interestByInvestment.get(investment.id) ?? [],
+      transactions: txByInvestment.get(investment.id) ?? [],
       dates,
       days,
     });
@@ -301,7 +350,7 @@ export function summarizeAssetPnl(
         today: Number(last?.[item.key] ?? 0),
         d7: sumKey(series, item.key, 7),
         d30: sumKey(series, item.key),
-        accumulated: Number(investment?.amount_profit ?? 0),
+        accumulated: investment ? accumulatedProfit(investment) : 0,
         rate: investment?.last_month_rate == null ? null : Number(investment.last_month_rate),
         estimated: estimated.has(item.key),
       };
@@ -310,7 +359,7 @@ export function summarizeAssetPnl(
 }
 
 export function totalAccumulatedProfit(investments: Investment[]): number {
-  return investments.reduce((sum, item) => sum + Number(item.amount_profit ?? 0), 0);
+  return investments.reduce((sum, item) => sum + accumulatedProfit(item), 0);
 }
 
 function runningCapitalByDate(

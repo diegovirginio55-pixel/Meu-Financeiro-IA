@@ -213,7 +213,7 @@ async function syncSyntheticInvestmentHistory(
       bank_connection_id: bankConnectionId,
       snapshot_date: date,
       amount: cumulative,
-      amount_profit: 0,
+      amount_profit: null,
     };
   });
   if (!byDate.has(today)) {
@@ -223,7 +223,7 @@ async function syncSyntheticInvestmentHistory(
       bank_connection_id: bankConnectionId,
       snapshot_date: today,
       amount: group.amount,
-      amount_profit: 0,
+      amount_profit: null,
     });
   }
 

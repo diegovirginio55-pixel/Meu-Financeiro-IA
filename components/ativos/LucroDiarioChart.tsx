@@ -53,8 +53,7 @@ export function LucroDiarioChart({
     <div className="relative w-full" style={{ height }}>
       {!hasValues && (
         <p className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 px-6 text-center text-sm text-zinc-500">
-          Ainda não há lucro diário suficiente. Sincronize os bancos para gravar o primeiro dia; o gráfico
-          preenche a cada nova sincronização.
+          Ainda não há variação de lucro para montar o gráfico. Sincronize os bancos: o app grava o valor de cada dia e o lucro aparece na sequência.
         </p>
       )}
       <ResponsiveContainer width="100%" height="100%">

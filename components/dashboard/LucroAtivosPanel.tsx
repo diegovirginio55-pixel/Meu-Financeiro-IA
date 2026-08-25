@@ -92,7 +92,7 @@ export function LucroAtivosPanel({
           <p className="mt-1 text-xs text-zinc-500">
             Cada ativo, cada banco e o total dos últimos 30 dias.
             {estimated
-              ? " Ativos sem histórico (como CDBs do Inter com um único dia gravado) usam a taxa do último mês ou o lucro acumulado até a próxima sincronização."
+              ? " Sem histórico diário da Pluggy, o app estima o lucro com a taxa do último mês ou com o valor atual menos o valor aplicado."
               : ""}
           </p>
         </div>
