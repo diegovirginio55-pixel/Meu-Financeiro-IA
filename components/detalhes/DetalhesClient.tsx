@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import TransactionsFilters, { type FiltersState } from "./TransactionsFilters";
 import TransactionsTable from "./TransactionsTable";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
-import { formatCurrency } from "@/lib/finance/format";
+import { formatCurrency, formatPercent } from "@/lib/finance/format";
 import { HeroAmount, PageHero, PageShell, SoftPanel } from "@/components/ui/page-chrome";
 
 const DEFAULT_FILTERS: FiltersState = {
@@ -65,6 +65,9 @@ export default function DetalhesClient() {
     .filter((t) => t.type === "saida")
     .reduce((s, t) => s + Number(t.amount), 0);
   const saldo = totalEntradas - totalSaidas;
+  const movimento = totalEntradas + totalSaidas;
+  const pctEntradas = movimento > 0 ? (totalEntradas / movimento) * 100 : 0;
+  const pctSaidas = movimento > 0 ? (totalSaidas / movimento) * 100 : 0;
 
   return (
     <PageShell>
@@ -73,18 +76,17 @@ export default function DetalhesClient() {
         title={<HeroAmount>{formatCurrency(saldo)}</HeroAmount>}
         subtitle={`${transactions.length} lançamentos neste filtro`}
       >
-        <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
-          <div
-            className="bg-emerald-400"
-            style={{
-              width: `${totalEntradas + totalSaidas > 0 ? (totalEntradas / (totalEntradas + totalSaidas)) * 100 : 50}%`,
-            }}
-          />
-          <div className="bg-rose-400/80" />
+        <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
+          <div className="h-full shrink-0 bg-emerald-400" style={{ width: `${pctEntradas}%` }} />
+          <div className="h-full shrink-0 bg-rose-400" style={{ width: `${pctSaidas}%` }} />
         </div>
         <div className="mt-2 flex justify-between text-[11px] text-zinc-500">
-          <span className="text-emerald-300">entradas {formatCurrency(totalEntradas)}</span>
-          <span className="text-rose-300">saídas {formatCurrency(totalSaidas)}</span>
+          <span className="text-emerald-300">
+            entradas {formatCurrency(totalEntradas)} · {formatPercent(pctEntradas, 1)}
+          </span>
+          <span className="text-rose-300">
+            saídas {formatCurrency(totalSaidas)} · {formatPercent(pctSaidas, 1)}
+          </span>
         </div>
       </PageHero>
 

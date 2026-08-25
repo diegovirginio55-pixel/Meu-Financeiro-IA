@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCurrency, formatDate } from "@/lib/finance/format";
+import { formatCurrency, formatDate, formatPercent } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
 import { CATEGORY_ICONS, categoryColor, resolvedCategory } from "@/lib/finance/categories";
 import {
@@ -90,6 +90,9 @@ export default function FluxoClient({
   const despesas = scoped
     .filter(isGasto)
     .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+  const movimento = entradas + despesas;
+  const pctEntradas = movimento > 0 ? (entradas / movimento) * 100 : 0;
+  const pctSaidas = movimento > 0 ? (despesas / movimento) * 100 : 0;
 
   const categorias = useMemo(() => {
     const map = new Map<string, number>();
@@ -185,16 +188,17 @@ export default function FluxoClient({
           <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">
             {monthTitle(month)} · entradas menos saídas
           </p>
-          <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
-            <div
-              className="bg-emerald-400"
-              style={{ width: `${entradas + despesas > 0 ? (entradas / (entradas + despesas)) * 100 : 50}%` }}
-            />
-            <div className="bg-rose-400/80" />
+          <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
+            <div className="h-full shrink-0 bg-emerald-400" style={{ width: `${pctEntradas}%` }} />
+            <div className="h-full shrink-0 bg-rose-400" style={{ width: `${pctSaidas}%` }} />
           </div>
           <div className="mt-2 flex justify-between text-[11px] text-zinc-500">
-            <span className="text-emerald-300">{formatCurrency(entradas)}</span>
-            <span className="text-rose-300">{formatCurrency(despesas)}</span>
+            <span className="text-emerald-300">
+              {formatCurrency(entradas)} · {formatPercent(pctEntradas, 1)}
+            </span>
+            <span className="text-rose-300">
+              {formatCurrency(despesas)} · {formatPercent(pctSaidas, 1)}
+            </span>
           </div>
         </div>
       </PageHero>
