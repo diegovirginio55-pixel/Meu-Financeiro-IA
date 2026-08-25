@@ -62,7 +62,7 @@ function ConnectionCard({
       }}
     >
       <div className="flex items-start justify-between">
-        <BankLogo name={name} imageUrl={connection.institution_image_url} />
+        <BankLogo name={name} imageUrl={connection.institution_image_url} size="lg" />
         <span
           className={`mt-1 h-2.5 w-2.5 rounded-full ${
             active ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.85)]" : "bg-amber-400"

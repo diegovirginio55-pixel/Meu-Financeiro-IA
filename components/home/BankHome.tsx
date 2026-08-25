@@ -288,7 +288,7 @@ export default function BankHome({
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <BankLogo name={name} imageUrl={connection?.institution_image_url} size="md" />
+                  <BankLogo name={name} imageUrl={connection?.institution_image_url} size="lg" />
                   <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/55">
                     {shortBankName(name)}
                   </span>

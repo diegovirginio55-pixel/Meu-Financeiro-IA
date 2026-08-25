@@ -16,7 +16,8 @@ export function BankLogo({
 }) {
   const brand = getBankBrand(name);
   const box =
-    size === "sm" ? "h-5 w-5 rounded-md" : size === "lg" ? "h-9 w-9 rounded-lg" : "h-11 w-11 rounded-xl";
+    size === "sm" ? "h-5 w-5 rounded-md" : size === "lg" ? "h-14 w-14 rounded-2xl" : "h-11 w-11 rounded-xl";
+  const initials = size === "lg" ? "text-sm" : "text-xs";
   const logo = brand?.logo;
   const remote = !isGenericPluggyImage(imageUrl) ? imageUrl : null;
 
@@ -31,7 +32,7 @@ export function BankLogo({
   if (brand) {
     return (
       <div
-        className={`flex shrink-0 items-center justify-center text-xs font-bold tracking-tight ${box}`}
+        className={`flex shrink-0 items-center justify-center font-bold tracking-tight ${initials} ${box}`}
         style={{ backgroundColor: brand.bg, color: brand.fg }}
       >
         {brandInitials(name)}
@@ -40,7 +41,7 @@ export function BankLogo({
   }
 
   return (
-    <div className={`flex items-center justify-center bg-zinc-800 text-xs font-semibold text-zinc-200 ${box}`}>
+    <div className={`flex items-center justify-center bg-zinc-800 font-semibold text-zinc-200 ${initials} ${box}`}>
       {brandInitials(name)}
     </div>
   );
