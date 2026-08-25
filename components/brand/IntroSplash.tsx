@@ -1,16 +1,59 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const HOLD_MS = 1300;
+const FADE_MS = 450;
+const RESUME_THRESHOLD_MS = 8000;
 
 export default function IntroSplash() {
   const [phase, setPhase] = useState<"visible" | "leaving" | "done">("visible");
+  const [runId, setRunId] = useState(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const hiddenAt = useRef<number | null>(null);
+
+  function clearTimers() {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+  }
+
+  function play() {
+    clearTimers();
+    setPhase("visible");
+    setRunId((id) => id + 1);
+    timers.current.push(setTimeout(() => setPhase("leaving"), HOLD_MS));
+    timers.current.push(setTimeout(() => setPhase("done"), HOLD_MS + FADE_MS));
+  }
 
   useEffect(() => {
-    const leave = setTimeout(() => setPhase("leaving"), 1300);
-    const done = setTimeout(() => setPhase("done"), 1750);
+    play();
+
+    // Apps instalados (Android/iOS) costumam "retomar" a sessão em vez de recarregar a
+    // página quando o usuário reabre pelo ícone. Detectamos isso pela troca de
+    // visibilidade e voltamos a mostrar a intro quando o app ficou em segundo plano por
+    // um tempo (abertura "de verdade"), sem repetir em trocas rápidas de app.
+    function handleVisibility() {
+      if (document.visibilityState === "hidden") {
+        hiddenAt.current = Date.now();
+        return;
+      }
+      const since = hiddenAt.current;
+      hiddenAt.current = null;
+      if (since != null && Date.now() - since > RESUME_THRESHOLD_MS) {
+        play();
+      }
+    }
+
+    function handlePageShow(event: PageTransitionEvent) {
+      if (event.persisted) play();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pageshow", handlePageShow);
     return () => {
-      clearTimeout(leave);
-      clearTimeout(done);
+      clearTimers();
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pageshow", handlePageShow);
     };
   }, []);
 
@@ -18,6 +61,7 @@ export default function IntroSplash() {
 
   return (
     <div
+      key={runId}
       aria-hidden
       className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-zinc-950 transition-opacity duration-500 ease-out ${
         phase === "leaving" ? "opacity-0" : "opacity-100"
