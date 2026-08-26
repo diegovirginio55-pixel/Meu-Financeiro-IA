@@ -11,6 +11,7 @@ export interface Account {
   source: "manual" | "pluggy";
   created_at: string;
   updated_at: string;
+  institution_name?: string | null;
 }
 
 export interface Card {
@@ -26,6 +27,7 @@ export interface Card {
   source: "manual" | "pluggy";
   created_at: string;
   updated_at: string;
+  institution_name?: string | null;
 }
 
 export interface Transaction {

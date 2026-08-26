@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatCurrency, formatDate } from "@/lib/finance/format";
 import { CATEGORIES, CATEGORY_ICONS } from "@/lib/finance/categories";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
+import { accountBankLabel, cardBankLabel } from "@/lib/finance/account-name";
 import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
 
 interface EditableFields {
@@ -43,8 +44,14 @@ export default function TransactionsTable({
   const phone = usePhoneLayout();
 
   function accountOrCardLabel(t: Transaction) {
-    if (t.card_id) return cards.find((c) => c.id === t.card_id)?.name ?? "Cartão";
-    if (t.account_id) return accounts.find((a) => a.id === t.account_id)?.name ?? "Conta";
+    if (t.card_id) {
+      const card = cards.find((c) => c.id === t.card_id);
+      return card ? cardBankLabel(card) : "Cartão";
+    }
+    if (t.account_id) {
+      const account = accounts.find((a) => a.id === t.account_id);
+      return account ? accountBankLabel(account) : "Conta";
+    }
     return "—";
   }
 

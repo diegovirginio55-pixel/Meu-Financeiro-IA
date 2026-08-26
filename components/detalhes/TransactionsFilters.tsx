@@ -1,7 +1,7 @@
 "use client";
 
 import { CATEGORIES } from "@/lib/finance/categories";
-import { friendlyAccountName } from "@/lib/finance/account-name";
+import { accountBankLabel, cardBankLabel } from "@/lib/finance/account-name";
 import type { Account, Card } from "@/lib/finance/types";
 import { chipClass } from "@/components/ui/page-chrome";
 
@@ -88,10 +88,10 @@ export default function TransactionsFilters({
           onChange={(e) => update("accountId", e.target.value)}
           className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
-          <option value="">Conta</option>
+          <option value="">Todas as contas</option>
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
-              {friendlyAccountName(a.name, a.type)}
+              {accountBankLabel(a)}
             </option>
           ))}
         </select>
@@ -100,10 +100,10 @@ export default function TransactionsFilters({
           onChange={(e) => update("cardId", e.target.value)}
           className="col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
-          <option value="">Cartão</option>
+          <option value="">Todos os cartões</option>
           {cards.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {cardBankLabel(c)}
             </option>
           ))}
         </select>

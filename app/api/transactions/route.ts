@@ -47,20 +47,31 @@ export async function GET(request: Request) {
 
   query = query.order("date", { ascending: false }).order("created_at", { ascending: false });
 
-  const [{ data: transactions, error }, { data: accounts }, { data: cards }] =
+  const [{ data: transactions, error }, { data: accounts }, { data: cards }, { data: connections }] =
     await Promise.all([
       query,
       supabase.from("accounts").select("*").order("created_at"),
       supabase.from("cards").select("*").order("created_at"),
+      supabase.from("bank_connections").select("id, institution_name"),
     ]);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const bankNameById = new Map((connections ?? []).map((c) => [c.id, c.institution_name]));
+  const accountsWithBank = (accounts ?? []).map((a) => ({
+    ...a,
+    institution_name: a.bank_connection_id ? bankNameById.get(a.bank_connection_id) ?? null : null,
+  }));
+  const cardsWithBank = (cards ?? []).map((c) => ({
+    ...c,
+    institution_name: c.bank_connection_id ? bankNameById.get(c.bank_connection_id) ?? null : null,
+  }));
+
   return NextResponse.json({
     transactions: transactions ?? [],
-    accounts: accounts ?? [],
-    cards: cards ?? [],
+    accounts: accountsWithBank,
+    cards: cardsWithBank,
   });
 }
