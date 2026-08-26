@@ -65,8 +65,6 @@ export function LucroAtivosPanel({
   );
 
   const lucroAcumulado = totalAccumulatedProfit(liveInvestments);
-  const lucroPeriodoRaw = byAsset.series.reduce((sum, point) => sum + Number(point.Total), 0);
-  const lucroPeriodo = Math.abs(lucroPeriodoRaw) >= 0.005 ? lucroPeriodoRaw : lucroAcumulado;
   const lucroHojeRaw = Number(byAsset.series[byAsset.series.length - 1]?.Total ?? 0);
   const lucroHoje = Math.abs(lucroHojeRaw) >= 0.005 ? lucroHojeRaw : 0;
   const rendimentoHoje = dailyYield[dailyYield.length - 1]?.rendimento ?? 0;
@@ -91,7 +89,7 @@ export function LucroAtivosPanel({
 
       <div className="mt-4 grid grid-cols-3 gap-2">
         <Kpi label="Hoje" value={lucroHoje} />
-        <Kpi label="30 dias" value={lucroPeriodo} />
+        <Kpi label="No mês" value={lucroMes} />
         <Kpi label="Acumulado" value={lucroAcumulado} />
       </div>
 
