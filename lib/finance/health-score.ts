@@ -23,6 +23,23 @@ function clamp(value: number, min = 0, max = 100): number {
   return Math.min(max, Math.max(min, value));
 }
 
+export function healthScoreLabel(score: number): string {
+  if (score >= 80) return "Excelente";
+  if (score >= 60) return "Boa";
+  if (score >= 40) return "Regular";
+  return "Precisa de atenção";
+}
+
+export function healthScoreTone(score: number): { stroke: string; glow: string; badge: string } {
+  if (score >= 70) {
+    return { stroke: "#34d399", glow: "rgba(52,211,153,0.35)", badge: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30" };
+  }
+  if (score >= 40) {
+    return { stroke: "#fbbf24", glow: "rgba(251,191,36,0.3)", badge: "bg-amber-500/15 text-amber-300 ring-amber-500/30" };
+  }
+  return { stroke: "#fb7185", glow: "rgba(251,113,133,0.3)", badge: "bg-rose-500/15 text-rose-300 ring-rose-500/30" };
+}
+
 function statusFor(score: number, greenAt = 66, yellowAt = 40): FactorStatus {
   if (score >= greenAt) return "green";
   if (score >= yellowAt) return "yellow";

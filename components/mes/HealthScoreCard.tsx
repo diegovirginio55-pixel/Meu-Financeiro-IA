@@ -1,4 +1,5 @@
 import type { FactorStatus, HealthScoreResult } from "@/lib/finance/health-score";
+import { healthScoreLabel, healthScoreTone } from "@/lib/finance/health-score";
 import { SoftPanel } from "@/components/ui/page-chrome";
 
 const STATUS_STYLES: Record<FactorStatus, { dot: string; bar: string; chip: string }> = {
@@ -6,19 +7,6 @@ const STATUS_STYLES: Record<FactorStatus, { dot: string; bar: string; chip: stri
   yellow: { dot: "🟡", bar: "bg-amber-400", chip: "bg-amber-500/10 text-amber-300" },
   red: { dot: "🔴", bar: "bg-rose-400", chip: "bg-rose-500/10 text-rose-300" },
 };
-
-function scoreLabel(score: number): string {
-  if (score >= 80) return "Excelente";
-  if (score >= 60) return "Boa";
-  if (score >= 40) return "Regular";
-  return "Precisa de atenção";
-}
-
-function scoreColors(score: number): { stroke: string; glow: string; text: string; badge: string } {
-  if (score >= 70) return { stroke: "#34d399", glow: "rgba(52,211,153,0.35)", text: "text-emerald-400", badge: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30" };
-  if (score >= 40) return { stroke: "#fbbf24", glow: "rgba(251,191,36,0.3)", text: "text-amber-400", badge: "bg-amber-500/15 text-amber-300 ring-amber-500/30" };
-  return { stroke: "#fb7185", glow: "rgba(251,113,133,0.3)", text: "text-rose-400", badge: "bg-rose-500/15 text-rose-300 ring-rose-500/30" };
-}
 
 function ScoreRing({ score, color, glow }: { score: number; color: string; glow: string }) {
   const radius = 42;
@@ -53,7 +41,7 @@ function ScoreRing({ score, color, glow }: { score: number; color: string; glow:
 }
 
 export function HealthScoreCard({ result }: { result: HealthScoreResult }) {
-  const colors = scoreColors(result.score);
+  const colors = healthScoreTone(result.score);
   return (
     <SoftPanel className="relative overflow-hidden p-5 lg:p-6">
       <div className="pointer-events-none absolute -right-10 -top-14 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl" />
@@ -67,7 +55,7 @@ export function HealthScoreCard({ result }: { result: HealthScoreResult }) {
         <ScoreRing score={result.score} color={colors.stroke} glow={colors.glow} />
         <div>
           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${colors.badge}`}>
-            {scoreLabel(result.score)}
+            {healthScoreLabel(result.score)}
           </span>
           <p className="mt-2 text-sm text-zinc-400">
             Nota calculada a partir de 8 indicadores da sua vida financeira.
