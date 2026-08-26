@@ -23,18 +23,17 @@ export function accountBankLabel(account: {
   type?: string | null;
   institution_name?: string | null;
 }): string {
-  const friendly = friendlyAccountName(account.name, account.type);
   const bank = account.institution_name ? officialInstitutionName(account.institution_name) : null;
-  if (!bank) return friendly;
-  if (friendly.toLowerCase().includes(bank.toLowerCase())) return friendly;
-  const kind = /^\d+$/.test(friendly) ? `Conta ${friendly}` : friendly;
-  return `${bank} • ${kind}`;
+  if (!bank) return friendlyAccountName(account.name, account.type);
+  const last4 = account.name.match(/(\d{4})\s*$/)?.[1] ?? null;
+  return last4 ? `${bank} • ${last4}` : bank;
 }
 
 export function cardBankLabel(card: { name: string; institution_name?: string | null }): string {
   const bank = card.institution_name ? officialInstitutionName(card.institution_name) : null;
-  if (!bank || card.name.toLowerCase().includes(bank.toLowerCase())) return card.name;
-  return `${bank} • ${card.name}`;
+  if (!bank) return card.name;
+  const last4 = card.name.match(/(\d{4})\s*$/)?.[1] ?? null;
+  return last4 ? `${bank} • ${last4}` : bank;
 }
 
 export function isPlaceholderAccount(account: { name: string; balance: number }): boolean {
