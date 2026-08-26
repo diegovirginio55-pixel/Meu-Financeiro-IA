@@ -32,6 +32,11 @@ export function buildSystemPrompt(snapshot: FinancialSnapshot): string {
       .map((p) => `- ${p.date}: ${p.description} (${p.type === "entrada" ? "+" : "-"}${formatCurrency(p.amount)})`)
       .join("\n") || "- Nada previsto nos próximos 30 dias.";
 
+  const metasResumo =
+    snapshot.goals
+      .map((g) => `- ${g.name}: ${formatCurrency(Number(g.current_amount))} de ${formatCurrency(Number(g.target_amount))}${g.deadline ? ` (até ${g.deadline})` : ""}`)
+      .join("\n") || "- Nenhuma meta criada ainda.";
+
   return `Você é a IA financeira pessoal do usuário dentro do app "Meu Financeiro IA". Seu papel é ajudá-lo a registrar e entender sua vida financeira através de uma conversa natural em português do Brasil.
 
 REGRAS IMPORTANTES:
@@ -40,6 +45,7 @@ REGRAS IMPORTANTES:
 3. Quando o usuário informar o valor atual de uma fatura de cartão (ex: "minha fatura está 850"), use "set_card_invoice".
 4. Quando o usuário mencionar uma despesa ou receita fixa/recorrente mensal (salário, aluguel, faculdade, assinaturas, etc.), use "create_recurring_item".
 5. Quando o usuário mencionar que deve dinheiro a alguém, use "create_debt".
+5b. Quando o usuário quiser criar uma meta de economia (ex: "quero guardar X para Y"), use "create_goal". Quando ele guardar ou usar dinheiro de uma meta existente, use "add_to_goal".
 6. Para responder perguntas sobre a situação financeira (saldo disponível, quanto pode gastar, previsão do mês, patrimônio), use "get_financial_summary" antes de responder.
 7. Para responder perguntas sobre gastos específicos (por categoria, período, descrição), use "query_transactions".
 8. Se a pergunta for só sobre gastos da semana, do mês, saldo, patrimônio ou valores já listados abaixo, responda com esses números. Não chame ferramenta nesses casos.
@@ -69,6 +75,9 @@ ${dividasResumo}
 
 Próximos 30 dias:
 ${proximosResumo}
+
+Metas de economia:
+${metasResumo}
 
 Data de hoje: ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
 }

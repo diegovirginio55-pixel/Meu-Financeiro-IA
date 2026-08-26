@@ -11,6 +11,7 @@ export interface FiltersState {
   accountId: string;
   cardId: string;
   type: string;
+  search: string;
 }
 
 const PERIODS: { value: FiltersState["period"]; label: string }[] = [
@@ -38,6 +39,35 @@ export default function TransactionsFilters({
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="relative">
+        <svg
+          viewBox="0 0 24 24"
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500"
+          fill="none"
+          aria-hidden
+        >
+          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+        <input
+          type="text"
+          value={filters.search ?? ""}
+          onChange={(e) => update("search", e.target.value)}
+          placeholder="Buscar por descrição ou valor…"
+          className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 py-2.5 pl-9 pr-9 text-sm text-zinc-200 outline-none placeholder:text-zinc-500"
+        />
+        {filters.search && (
+          <button
+            type="button"
+            onClick={() => update("search", "")}
+            aria-label="Limpar busca"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         {PERIODS.map((p) => (
           <button

@@ -167,6 +167,63 @@ export function SemanaGastosChart({
   );
 }
 
+export function CategoryCompareChart({
+  data,
+  currentLabel,
+  previousLabel,
+}: {
+  data: { category: string; atual: number; anterior: number }[];
+  currentLabel: string;
+  previousLabel: string;
+}) {
+  const uid = useId().replace(/:/g, "");
+  const rows = [...data].sort((a, b) => Math.max(b.atual, b.anterior) - Math.max(a.atual, a.anterior)).slice(0, 8);
+  const height = Math.min(360, Math.max(200, rows.length * 56 + 40));
+
+  if (rows.length === 0) {
+    return <p className="flex h-[240px] items-center justify-center text-sm text-zinc-500">Sem gastos para comparar ainda.</p>;
+  }
+
+  return (
+    <div className="w-full" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} layout="vertical" barCategoryGap="30%" margin={{ top: 8, right: 16, left: 4, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`compareAtual-${uid}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#0ea5e9" />
+              <stop offset="100%" stopColor="#7dd3fc" />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#27272a" strokeDasharray="3 10" horizontal={false} strokeOpacity={0.7} />
+          <XAxis type="number" stroke="#a1a1aa" fontSize={11} tickLine={false} axisLine={false} tickFormatter={compactAxis} />
+          <YAxis
+            type="category"
+            dataKey="category"
+            stroke="#d4d4d8"
+            fontSize={11}
+            width={104}
+            tickLine={false}
+            axisLine={false}
+            interval={0}
+          />
+          <Tooltip
+            contentStyle={chartTooltipStyle}
+            formatter={(value, name) => [formatCurrency(Number(value)), name === "atual" ? currentLabel : previousLabel]}
+          />
+          <Legend
+            verticalAlign="top"
+            height={28}
+            wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }}
+            formatter={(value) => (value === "atual" ? currentLabel : previousLabel)}
+          />
+          <Bar dataKey="anterior" name="anterior" fill="#52525b" radius={[0, 8, 8, 0]} maxBarSize={16} />
+          <Bar dataKey="atual" name="atual" fill={`url(#compareAtual-${uid})`} radius={[0, 8, 8, 0]} maxBarSize={16} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export function MixPizzaChart({
   data,
 }: {

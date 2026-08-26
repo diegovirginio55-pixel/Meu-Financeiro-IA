@@ -24,7 +24,17 @@ async function sendOne(keys: { publicKey: string; privateKey: string }, row: Sub
 export async function notifyBankMovements(userId: string, bankName: string, movements: MovementNotice[]) {
   const payloads = movementPayloads(bankName, recentMovements(movements));
   if (payloads.length === 0) return;
+  for (const payload of payloads) {
+    await sendPushToUser(userId, payload);
+  }
+}
 
+/**
+ * Envia uma notificação push genérica para todas as inscrições ativas de
+ * um usuário (usado por alertas inteligentes e resumo semanal, além das
+ * movimentações bancárias).
+ */
+export async function sendPushToUser(userId: string, payload: PushPayload) {
   const keys = await getVapidKeys();
   if (!keys) return;
 
@@ -36,20 +46,18 @@ export async function notifyBankMovements(userId: string, bankName: string, move
 
   if (!subscriptions || subscriptions.length === 0) return;
 
-  for (const payload of payloads) {
-    await Promise.all(
-      (subscriptions as SubscriptionRow[]).map(async (row) => {
-        try {
-          await sendOne(keys, row, payload);
-        } catch (error) {
-          const status = (error as { statusCode?: number }).statusCode;
-          if (status === 404 || status === 410) {
-            await supabase.from("push_subscriptions").delete().eq("id", row.id);
-            return;
-          }
-          console.error("Erro ao enviar notificação push:", error);
+  await Promise.all(
+    (subscriptions as SubscriptionRow[]).map(async (row) => {
+      try {
+        await sendOne(keys, row, payload);
+      } catch (error) {
+        const status = (error as { statusCode?: number }).statusCode;
+        if (status === 404 || status === 410) {
+          await supabase.from("push_subscriptions").delete().eq("id", row.id);
+          return;
         }
-      }),
-    );
-  }
+        console.error("Erro ao enviar notificação push:", error);
+      }
+    }),
+  );
 }

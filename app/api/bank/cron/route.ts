@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshBankConnections } from "@/lib/pluggy/auto-refresh";
 import { publicOrigin } from "@/lib/pluggy/origin";
+import { runAlertsAndSummaries } from "@/lib/push/alerts-runner";
 
 /**
  * Atualização em segundo plano, mesmo com o app fechado.
@@ -24,5 +25,12 @@ export async function GET(request: Request) {
     webhookUrl: origin ? `${origin}/api/bank/webhook` : undefined,
   });
 
-  return NextResponse.json(result);
+  let alerts: { users: number; sent: number } | null = null;
+  try {
+    alerts = await runAlertsAndSummaries(supabase);
+  } catch (error) {
+    console.error("Erro ao rodar alertas inteligentes:", error);
+  }
+
+  return NextResponse.json({ ...result, alerts });
 }

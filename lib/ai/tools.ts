@@ -97,6 +97,34 @@ export const toolDefinitions: FunctionDeclaration[] = [
     },
   },
   {
+    name: "create_goal",
+    description:
+      "Cria uma meta de economia com valor objetivo (ex: 'quero guardar R$5000 para uma viagem até dezembro').",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Nome da meta, ex: 'Viagem', 'Reserva de emergência'." },
+        target_amount: { type: "number", description: "Valor objetivo em reais." },
+        current_amount: { type: "number", description: "Valor já guardado, se o usuário mencionar. Padrão 0." },
+        deadline: { type: "string", description: "Data limite YYYY-MM-DD, se houver." },
+      },
+      required: ["name", "target_amount"],
+    },
+  },
+  {
+    name: "add_to_goal",
+    description:
+      "Adiciona (ou remove, com valor negativo) um valor ao progresso de uma meta existente, a partir do nome informado pelo usuário.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name_contains: { type: "string", description: "Trecho do nome da meta para localizá-la." },
+        amount: { type: "number", description: "Valor a adicionar ao progresso (negativo para remover)." },
+      },
+      required: ["name_contains", "amount"],
+    },
+  },
+  {
     name: "get_financial_summary",
     description:
       "Consulta a fotografia financeira atual completa: saldos, faturas, patrimônio, investimentos, dívidas, entradas/despesas do mês, maiores gastos, gastos por categoria e previsão dos próximos 30 dias. Use sempre que precisar responder perguntas sobre a situação financeira do usuário.",
@@ -323,6 +351,50 @@ export async function executeTool(
         .eq("id", target.id);
       if (error) return { success: false, error: error.message };
       return { success: true, debt: target };
+    }
+
+    case "create_goal": {
+      const { name, target_amount, current_amount, deadline } = input as {
+        name: string;
+        target_amount: number;
+        current_amount?: number;
+        deadline?: string;
+      };
+      const { data, error } = await supabase
+        .from("goals")
+        .insert({
+          user_id: userId,
+          name,
+          target_amount,
+          current_amount: current_amount ?? 0,
+          deadline: deadline ?? null,
+        })
+        .select()
+        .single();
+      if (error) return { success: false, error: error.message };
+      return { success: true, goal: data };
+    }
+
+    case "add_to_goal": {
+      const { name_contains, amount } = input as {
+        name_contains: string;
+        amount: number;
+      };
+      const { data: goals } = await supabase
+        .from("goals")
+        .select("*")
+        .ilike("name", `%${name_contains}%`);
+      if (!goals || goals.length === 0) {
+        return { success: false, error: "Nenhuma meta correspondente encontrada." };
+      }
+      const target = goals[0];
+      const newAmount = Math.max(0, Number(target.current_amount) + amount);
+      const { error } = await supabase
+        .from("goals")
+        .update({ current_amount: newAmount })
+        .eq("id", target.id);
+      if (error) return { success: false, error: error.message };
+      return { success: true, goal_name: target.name, current_amount: newAmount, target_amount: target.target_amount };
     }
 
     case "get_financial_summary": {

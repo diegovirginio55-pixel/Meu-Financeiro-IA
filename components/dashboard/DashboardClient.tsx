@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCurrency } from "@/lib/finance/format";
+import { formatCurrency, formatMonthLabel } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
 import {
   belongsToConnection,
@@ -17,6 +17,7 @@ import {
   saoPauloMonthKey,
   saoPauloTodayKey,
   saoPauloWeekStartKey,
+  shiftMonthKey,
   sumGastosInRange,
 } from "@/lib/finance/fluxo";
 import { isTransferDescription, resolvedCategory } from "@/lib/finance/categories";
@@ -30,9 +31,16 @@ import {
   GastosDonutChart,
   SaldoEvolutionChart,
 } from "@/components/dashboard/OverviewCharts";
-import { EconomiaMensalChart, FluxoDiarioChart, MixPizzaChart, SemanaGastosChart } from "@/components/dashboard/ExtraCharts";
+import {
+  CategoryCompareChart,
+  EconomiaMensalChart,
+  FluxoDiarioChart,
+  MixPizzaChart,
+  SemanaGastosChart,
+} from "@/components/dashboard/ExtraCharts";
 import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
-import { GoalsProgress, MaioresGastos, ProximasContas } from "@/components/dashboard/ListPanels";
+import { MaioresGastos, ProximasContas } from "@/components/dashboard/ListPanels";
+import GoalsPanel from "@/components/dashboard/GoalsPanel";
 import type { InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 import { BalanceViewToggle, HeroAmount, PageHero, PageShell, SectionLabel, SoftPanel, useBalanceView } from "@/components/ui/page-chrome";
 import { useConnectionFilter, usePersistedState } from "@/lib/ui/use-persisted-state";
@@ -130,6 +138,27 @@ export default function DashboardClient({
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
   }, [monthTx]);
+
+  const previousMonthKey = shiftMonthKey(monthKey, -1);
+  const categoryCompare = useMemo(() => {
+    const atualMap = new Map<string, number>();
+    const anteriorMap = new Map<string, number>();
+    scopedTx.forEach((transaction) => {
+      if (!isGasto(transaction)) return;
+      const category = resolvedCategory(transaction);
+      if (transaction.date.startsWith(monthKey)) {
+        atualMap.set(category, (atualMap.get(category) ?? 0) + Number(transaction.amount));
+      } else if (transaction.date.startsWith(previousMonthKey)) {
+        anteriorMap.set(category, (anteriorMap.get(category) ?? 0) + Number(transaction.amount));
+      }
+    });
+    const categories = new Set([...atualMap.keys(), ...anteriorMap.keys()]);
+    return Array.from(categories).map((category) => ({
+      category,
+      atual: atualMap.get(category) ?? 0,
+      anterior: anteriorMap.get(category) ?? 0,
+    }));
+  }, [scopedTx, monthKey, previousMonthKey]);
 
   const evolucaoMensal = useMemo(() => {
     const map = new Map(lastNMonthKeys(12).map((mes) => [mes, { entradas: 0, despesas: 0 }]));
@@ -487,6 +516,18 @@ export default function DashboardClient({
         </section>
       </div>
 
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
+        <h2 className="text-sm font-medium text-zinc-200">Este mês vs mês anterior</h2>
+        <p className="mb-2 mt-1 text-[11px] text-zinc-500">
+          {formatMonthLabel(monthKey)} comparado com {formatMonthLabel(previousMonthKey)}, por categoria.
+        </p>
+        <CategoryCompareChart
+          data={categoryCompare}
+          currentLabel={formatMonthLabel(monthKey)}
+          previousLabel={formatMonthLabel(previousMonthKey)}
+        />
+      </section>
+
       <LucroAtivosPanel
         connections={visibleConnections}
         investments={investments}
@@ -520,7 +561,7 @@ export default function DashboardClient({
         <ProximasContas items={snapshot.proximos30Dias} saldoPrevisto={snapshot.saldoPrevisto30Dias} />
       </div>
 
-      <GoalsProgress goals={snapshot.goals} />
+      <GoalsPanel initialGoals={snapshot.goals} />
       </div>
     </PageShell>
   );

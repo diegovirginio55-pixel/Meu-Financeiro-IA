@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import TransactionsFilters, { type FiltersState } from "./TransactionsFilters";
 import TransactionsTable from "./TransactionsTable";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
@@ -8,6 +8,15 @@ import { formatCurrency, formatPercent } from "@/lib/finance/format";
 import { isPlaceholderAccount, isPlaceholderCard } from "@/lib/finance/account-name";
 import { HeroAmount, PageHero, PageShell, SoftPanel } from "@/components/ui/page-chrome";
 import { usePersistedState } from "@/lib/ui/use-persisted-state";
+import { exportTransactionsPdf } from "@/lib/finance/export-pdf";
+
+const PERIOD_LABELS: Record<FiltersState["period"], string> = {
+  hoje: "Hoje",
+  semana: "Esta semana",
+  mes: "Este mês",
+  ano: "Este ano",
+  todos: "Todo o período",
+};
 
 const DEFAULT_FILTERS: FiltersState = {
   period: "mes",
@@ -15,7 +24,25 @@ const DEFAULT_FILTERS: FiltersState = {
   accountId: "",
   cardId: "",
   type: "",
+  search: "",
 };
+
+function normalize(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function matchesSearch(transaction: Transaction, search: string | undefined): boolean {
+  const term = normalize((search ?? "").trim());
+  if (!term) return true;
+  if (normalize(transaction.description).includes(term)) return true;
+  if (normalize(transaction.category).includes(term)) return true;
+  const amountStr = String(transaction.amount).replace(".", ",");
+  if (amountStr.includes(term.replace(".", ","))) return true;
+  return false;
+}
 
 export default function DetalhesClient() {
   const [filters, setFilters, filtersReady] = usePersistedState<FiltersState>("mf-detalhes-filters", DEFAULT_FILTERS);
@@ -24,6 +51,7 @@ export default function DetalhesClient() {
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async (f: FiltersState) => {
     const params = new URLSearchParams();
@@ -90,10 +118,30 @@ export default function DetalhesClient() {
     await load(filters);
   }
 
-  const totalEntradas = transactions
+  async function handleExportPdf() {
+    setExporting(true);
+    try {
+      await exportTransactionsPdf({
+        title: `Extrato — ${PERIOD_LABELS[filters.period]}`,
+        subtitle: filters.search ? `Busca: "${filters.search}"` : undefined,
+        transactions: filteredTransactions,
+        accounts,
+        cards,
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const filteredTransactions = useMemo(
+    () => transactions.filter((t) => matchesSearch(t, filters.search)),
+    [transactions, filters.search],
+  );
+
+  const totalEntradas = filteredTransactions
     .filter((t) => t.type === "entrada")
     .reduce((s, t) => s + Number(t.amount), 0);
-  const totalSaidas = transactions
+  const totalSaidas = filteredTransactions
     .filter((t) => t.type === "saida")
     .reduce((s, t) => s + Number(t.amount), 0);
   const saldo = totalEntradas - totalSaidas;
@@ -106,7 +154,17 @@ export default function DetalhesClient() {
       <PageHero
         kicker="Extrato"
         title={<HeroAmount>{formatCurrency(saldo)}</HeroAmount>}
-        subtitle={`${transactions.length} lançamentos neste filtro`}
+        subtitle={`${filteredTransactions.length} lançamentos neste filtro`}
+        trailing={
+          <button
+            type="button"
+            onClick={() => void handleExportPdf()}
+            disabled={exporting || filteredTransactions.length === 0}
+            className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {exporting ? "Gerando…" : "Exportar PDF"}
+          </button>
+        }
       >
         <div className="mb-1.5 flex justify-between text-sm">
           <span className="font-semibold text-emerald-300">{formatPercent(pctEntradas, 1)}</span>
@@ -152,7 +210,7 @@ export default function DetalhesClient() {
           ) : (
             <SoftPanel>
               <TransactionsTable
-                transactions={transactions}
+                transactions={filteredTransactions}
                 accounts={accounts}
                 cards={cards}
                 onUpdate={handleUpdate}
