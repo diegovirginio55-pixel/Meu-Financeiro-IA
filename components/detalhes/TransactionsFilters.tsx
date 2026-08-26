@@ -1,7 +1,7 @@
 "use client";
 
 import { CATEGORIES } from "@/lib/finance/categories";
-import { accountBankLabel, cardBankLabel } from "@/lib/finance/account-name";
+import { accountBankLabel, cardBankLabel, isPlaceholderAccount } from "@/lib/finance/account-name";
 import type { Account, Card } from "@/lib/finance/types";
 import { chipClass } from "@/components/ui/page-chrome";
 
@@ -89,11 +89,13 @@ export default function TransactionsFilters({
           className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
           <option value="">Todas as contas</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {accountBankLabel(a)}
-            </option>
-          ))}
+          {accounts
+            .filter((a) => !isPlaceholderAccount(a))
+            .map((a) => (
+              <option key={a.id} value={a.id}>
+                {accountBankLabel(a)}
+              </option>
+            ))}
         </select>
         <select
           value={filters.cardId}

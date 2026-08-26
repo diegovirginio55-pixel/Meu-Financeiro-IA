@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/finance/format";
-import { accountBankLabel, cardBankLabel } from "@/lib/finance/account-name";
+import { accountBankLabel, cardBankLabel, isPlaceholderAccount } from "@/lib/finance/account-name";
 import { CATEGORY_ICONS, categoryColor, resolvedCategory } from "@/lib/finance/categories";
 import {
   belongsToConnection,
@@ -140,6 +140,7 @@ export default function FluxoClient({
     const realId = connectionId === "all" ? null : realConnectionId(connectionId);
     const bank = connectionId === "all" ? null : connectionBank(connectionId);
     const list = accounts.filter((account) => {
+      if (isPlaceholderAccount(account)) return false;
       if (!realId) return true;
       if (account.bank_connection_id !== realId) return false;
       return assetMatchesBank(account.name, bank);
