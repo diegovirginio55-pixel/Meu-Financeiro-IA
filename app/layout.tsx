@@ -15,7 +15,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = "https://meu-financeiro-ia.onrender.com";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Meu Financeiro IA",
   description: "Painel financeiro pessoal com IA",
   applicationName: "Meu Financeiro IA",
@@ -32,6 +35,19 @@ export const metadata: Metadata = {
       { url: "/icon-512.png?v=2", sizes: "512x512", type: "image/png" },
     ],
     apple: [{ url: "/apple-touch-icon.png?v=2", sizes: "180x180", type: "image/png" }],
+  },
+  openGraph: {
+    title: "Meu Financeiro IA",
+    description: "Painel financeiro pessoal com IA",
+    url: SITE_URL,
+    siteName: "Meu Financeiro IA",
+    locale: "pt_BR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Meu Financeiro IA",
+    description: "Painel financeiro pessoal com IA",
   },
 };
 

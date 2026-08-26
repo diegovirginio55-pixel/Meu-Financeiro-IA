@@ -2,7 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { lastPathFromCookie } from "@/lib/ui/nav-memory";
 
-const PUBLIC_PATHS = ["/login", "/api/bank/webhook", "/api/bank/cron", "/manifest.webmanifest", "/sw.js"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/bank/webhook",
+  "/api/bank/cron",
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/opengraph-image",
+  "/twitter-image",
+];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
