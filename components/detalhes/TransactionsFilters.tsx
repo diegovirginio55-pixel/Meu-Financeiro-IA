@@ -1,7 +1,7 @@
 "use client";
 
 import { CATEGORIES } from "@/lib/finance/categories";
-import { accountBankLabel, cardBankLabel, isPlaceholderAccount } from "@/lib/finance/account-name";
+import { accountBankLabel, cardBankLabel, isPlaceholderAccount, isPlaceholderCard } from "@/lib/finance/account-name";
 import type { Account, Card } from "@/lib/finance/types";
 import { chipClass } from "@/components/ui/page-chrome";
 
@@ -103,11 +103,13 @@ export default function TransactionsFilters({
           className="col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
           <option value="">Todos os cartões</option>
-          {cards.map((c) => (
-            <option key={c.id} value={c.id}>
-              {cardBankLabel(c)}
-            </option>
-          ))}
+          {cards
+            .filter((c) => !isPlaceholderCard(c))
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {cardBankLabel(c)}
+              </option>
+            ))}
         </select>
       </div>
     </div>

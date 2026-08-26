@@ -42,3 +42,13 @@ export function isPlaceholderAccount(account: { name: string; balance: number })
   const stripped = account.name.replace(/^[^·•]+[·•]\s*/, "").trim() || account.name;
   return !getBankBrand(account.name) && /^(conta|cp)$/i.test(stripped);
 }
+
+export function isPlaceholderCard(card: {
+  name: string;
+  current_invoice: number;
+  bank_connection_id?: string | null;
+}): boolean {
+  if (card.bank_connection_id) return false;
+  if (Math.abs(Number(card.current_invoice)) >= 0.01) return false;
+  return /^cart[ãa]o\s*principal$/i.test(card.name.trim());
+}
