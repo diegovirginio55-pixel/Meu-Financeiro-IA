@@ -22,6 +22,7 @@ export default function DetalhesClient() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async (f: FiltersState) => {
     const params = new URLSearchParams();
@@ -31,12 +32,19 @@ export default function DetalhesClient() {
     if (f.cardId) params.set("card_id", f.cardId);
     if (f.type) params.set("type", f.type);
 
-    const res = await fetch(`/api/transactions?${params.toString()}`);
-    const data = await res.json();
-    setTransactions(data.transactions ?? []);
-    setAccounts(data.accounts ?? []);
-    setCards(data.cards ?? []);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/transactions?${params.toString()}`);
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = await res.json();
+      setTransactions(data.transactions ?? []);
+      setAccounts(data.accounts ?? []);
+      setCards(data.cards ?? []);
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -103,6 +111,22 @@ export default function DetalhesClient() {
         <div className="mt-5">
           {loading ? (
             <p className="text-sm text-zinc-500">Carregando lançamentos...</p>
+          ) : loadError ? (
+            <SoftPanel>
+              <p className="text-sm text-rose-400">
+                Não foi possível carregar os lançamentos agora.{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoading(true);
+                    load(filters);
+                  }}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Tentar de novo
+                </button>
+              </p>
+            </SoftPanel>
           ) : (
             <SoftPanel>
               <TransactionsTable
