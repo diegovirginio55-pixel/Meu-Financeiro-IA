@@ -1,0 +1,21 @@
+name: Sincronizar bancos e notificações
+
+on:
+  schedule:
+    # A cada 10 minutos. O GitHub pode atrasar alguns minutos em horários de
+    # pico, mas nunca deixa de rodar por muito tempo.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping-cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar endpoint de sincronização
+        env:
+          BANK_CRON_SECRET: ${{ secrets.BANK_CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://meu-financeiro-ia.onrender.com' }}
+        run: |
+          curl --fail --show-error --max-time 90 \
+            -H "Authorization: Bearer $BANK_CRON_SECRET" \
+            "$SITE_URL/api/bank/cron"
