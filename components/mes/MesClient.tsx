@@ -64,7 +64,7 @@ export default function MesClient({ snapshot }: { snapshot: FinancialSnapshot })
           <InsightsPanel insights={insights} />
         </div>
 
-        <FinancialCalendarPanel calendar={calendar} />
+        <FinancialCalendarPanel calendar={calendar} transactions={snapshot.historyTx} />
       </div>
     </PageShell>
   );

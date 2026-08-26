@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate } from "@/lib/finance/format";
+import { resolvedCategory } from "@/lib/finance/categories";
 import { compactShort } from "@/components/dashboard/chart-theme";
 import { SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
 import type { CalendarEvent, CalendarEventKind, FinancialCalendar } from "@/lib/finance/financial-calendar";
+import type { Transaction } from "@/lib/finance/types";
 
 const KIND_COLOR: Record<CalendarEventKind, string> = {
   salario: "#34d399",
@@ -36,11 +38,23 @@ function monthTitle(month: Date): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalendar }) {
+function dayDetailTitle(dateStr: string): string {
+  const raw = format(new Date(`${dateStr}T12:00:00`), "EEEE, d 'de' MMMM", { locale: ptBR });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+export function FinancialCalendarPanel({
+  calendar,
+  transactions,
+}: {
+  calendar: FinancialCalendar;
+  transactions: Transaction[];
+}) {
   const minMonth = calendar.rangeStart.slice(0, 7);
   const maxMonth = calendar.rangeEnd.slice(0, 7);
   const todayMonth = calendar.todayKey.slice(0, 7);
   const [monthKey, setMonthKey] = useState(todayMonth);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const month = useMemo(() => new Date(`${monthKey}-01T12:00:00`), [monthKey]);
 
@@ -60,6 +74,17 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
     return map;
   }, [calendar.events]);
 
+  const txByDate = useMemo(() => {
+    const map = new Map<string, Transaction[]>();
+    transactions.forEach((tx) => {
+      const list = map.get(tx.date) ?? [];
+      list.push(tx);
+      map.set(tx.date, list);
+    });
+    map.forEach((list) => list.sort((a, b) => Number(b.amount) - Number(a.amount)));
+    return map;
+  }, [transactions]);
+
   const upcoming = useMemo(
     () => calendar.events.filter((event) => event.date >= calendar.todayKey).slice(0, 8),
     [calendar.events, calendar.todayKey],
@@ -69,7 +94,19 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
     const next = format(addMonths(month, delta), "yyyy-MM");
     if (next < minMonth || next > maxMonth) return;
     setMonthKey(next);
+    setSelectedDate(null);
   }
+
+  function toggleDay(dateStr: string) {
+    setSelectedDate((current) => (current === dateStr ? null : dateStr));
+  }
+
+  const isPastSelected = selectedDate != null && selectedDate < calendar.todayKey;
+  const selectedTx = selectedDate ? (txByDate.get(selectedDate) ?? []) : [];
+  const selectedEvents = selectedDate ? (eventsByDate.get(selectedDate) ?? []) : [];
+  const selectedEntradas = selectedTx.filter((t) => t.type === "entrada").reduce((s, t) => s + Number(t.amount), 0);
+  const selectedSaidas = selectedTx.filter((t) => t.type === "saida").reduce((s, t) => s + Number(t.amount), 0);
+  const selectedProjectedBalance = selectedDate ? calendar.balanceByDate.get(selectedDate) : undefined;
 
   return (
     <SoftPanel className="relative overflow-hidden p-5 lg:p-6">
@@ -111,7 +148,9 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
         </button>
       </div>
 
-      <div className="relative mt-4 grid grid-cols-7 gap-1.5 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+      <p className="relative mt-3 text-[11px] text-zinc-600">Toque em um dia para ver o que aconteceu nele.</p>
+
+      <div className="relative mt-2 grid grid-cols-7 gap-1.5 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-600">
         {WEEKDAY_LABELS.map((label, index) => (
           <span key={index}>{label}</span>
         ))}
@@ -120,30 +159,57 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const inMonth = isSameMonth(day, month);
+          const isPast = dateStr < calendar.todayKey;
           const events = eventsByDate.get(dateStr) ?? [];
+          const dayTx = txByDate.get(dateStr) ?? [];
           const balance = calendar.balanceByDate.get(dateStr);
           const isToday = dateStr === calendar.todayKey;
-          const showBalance = inMonth && balance != null && dateStr >= calendar.todayKey;
-          return (
-            <div
-              key={dateStr}
-              className={`flex min-h-[58px] flex-col items-center rounded-xl border p-1 pt-1.5 text-[10px] transition ${
-                inMonth
-                  ? isToday
-                    ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(16,185,129,0.15)]"
-                    : "border-zinc-800/70 bg-zinc-950/40 hover:border-zinc-700"
-                  : "border-transparent"
+          const isSelected = dateStr === selectedDate;
+          const showFutureBalance = inMonth && !isPast && balance != null;
+
+          const dayEntradas = dayTx.filter((t) => t.type === "entrada").reduce((s, t) => s + Number(t.amount), 0);
+          const daySaidas = dayTx.filter((t) => t.type === "saida").reduce((s, t) => s + Number(t.amount), 0);
+          const dayNet = dayEntradas - daySaidas;
+
+          const cellClasses = `flex min-h-[58px] w-full flex-col items-center rounded-xl border p-1 pt-1.5 text-[10px] transition ${
+            inMonth
+              ? isSelected
+                ? "border-white/70 bg-white/10"
+                : isToday
+                  ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(16,185,129,0.15)]"
+                  : "border-zinc-800/70 bg-zinc-950/40 hover:border-zinc-700"
+              : "border-transparent"
+          }`;
+
+          const dayNumber = (
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
+                isToday ? "bg-emerald-400 font-bold text-zinc-950" : inMonth ? "text-zinc-400" : "text-zinc-700"
               }`}
             >
-              <span
-                className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
-                  isToday ? "bg-emerald-400 font-bold text-zinc-950" : inMonth ? "text-zinc-400" : "text-zinc-700"
-                }`}
-              >
-                {day.getDate()}
-              </span>
-              {inMonth && events.length > 0 && (
-                <span className="mt-1 flex flex-wrap justify-center gap-0.5">
+              {day.getDate()}
+            </span>
+          );
+
+          if (!inMonth) {
+            return (
+              <div key={dateStr} className={cellClasses}>
+                {dayNumber}
+              </div>
+            );
+          }
+
+          return (
+            <button key={dateStr} type="button" onClick={() => toggleDay(dateStr)} className={cellClasses}>
+              {dayNumber}
+              {isPast && dayTx.length > 0 && (
+                <span className="mt-0.5 flex flex-wrap justify-center gap-0.5">
+                  {dayEntradas > 0 && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
+                  {daySaidas > 0 && <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />}
+                </span>
+              )}
+              {!isPast && events.length > 0 && (
+                <span className="mt-0.5 flex flex-wrap justify-center gap-0.5">
                   {events.slice(0, 4).map((event) => (
                     <span
                       key={event.id}
@@ -153,7 +219,13 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
                   ))}
                 </span>
               )}
-              {showBalance && (
+              {isPast && dayTx.length > 0 && (
+                <span className={`mt-auto truncate text-[9px] font-medium ${dayNet < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                  {dayNet >= 0 ? "+" : ""}
+                  {compactShort(dayNet)}
+                </span>
+              )}
+              {showFutureBalance && (
                 <span
                   className={`mt-auto truncate text-[9px] font-medium ${
                     (balance as number) < 0 ? "text-rose-400" : "text-zinc-500"
@@ -162,10 +234,85 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
                   {compactShort(balance as number)}
                 </span>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
+
+      {selectedDate && (
+        <div className="relative mt-4 overflow-hidden rounded-xl border border-white/15 bg-zinc-950/60 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium text-zinc-100">{dayDetailTitle(selectedDate)}</p>
+            <button
+              type="button"
+              onClick={() => setSelectedDate(null)}
+              className="shrink-0 text-zinc-500 hover:text-white"
+              aria-label="Fechar"
+            >
+              ✕
+            </button>
+          </div>
+
+          {isPastSelected ? (
+            selectedTx.length === 0 ? (
+              <p className="mt-3 text-sm text-zinc-500">Nenhuma movimentação registrada nesse dia.</p>
+            ) : (
+              <>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-zinc-400">
+                  <span className="text-emerald-400">Entrou {formatCurrency(selectedEntradas)}</span>
+                  <span className="text-rose-300">Saiu {formatCurrency(selectedSaidas)}</span>
+                  <span>Saldo do dia {formatCurrency(selectedEntradas - selectedSaidas)}</span>
+                </div>
+                <ul className="mt-3 flex flex-col divide-y divide-zinc-800/80">
+                  {selectedTx.map((tx) => (
+                    <li key={tx.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                      <span className="min-w-0">
+                        <span className="block truncate text-zinc-200">{tx.description}</span>
+                        <span className="text-[11px] text-zinc-500">{resolvedCategory(tx)}</span>
+                      </span>
+                      <span
+                        className={`shrink-0 font-medium ${tx.type === "entrada" ? "text-emerald-400" : "text-rose-300"}`}
+                      >
+                        {tx.type === "entrada" ? "+" : "-"}
+                        {formatCurrency(Number(tx.amount))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )
+          ) : selectedEvents.length === 0 ? (
+            <p className="mt-3 text-sm text-zinc-500">Nenhum evento previsto para esse dia.</p>
+          ) : (
+            <>
+              {selectedProjectedBalance != null && (
+                <p className="mt-2 text-xs text-zinc-400">
+                  Saldo projetado nesse dia:{" "}
+                  <span className={selectedProjectedBalance < 0 ? "text-rose-400" : "text-zinc-200"}>
+                    {formatCurrency(selectedProjectedBalance)}
+                  </span>
+                </p>
+              )}
+              <ul className="mt-3 flex flex-col divide-y divide-zinc-800/80">
+                {selectedEvents.map((event) => (
+                  <li key={event.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: KIND_COLOR[event.kind] }} />
+                      <span className="min-w-0 truncate text-zinc-200">{event.description}</span>
+                    </span>
+                    <span
+                      className={`shrink-0 font-medium ${event.type === "entrada" ? "text-emerald-400" : "text-rose-300"}`}
+                    >
+                      {event.type === "entrada" ? "+" : "-"}
+                      {formatCurrency(event.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="relative mt-4 flex flex-wrap gap-2">
         {(Object.keys(KIND_LABEL) as CalendarEventKind[]).map((kind) => (
@@ -177,6 +324,12 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
             {KIND_LABEL[kind]}
           </span>
         ))}
+        <span className="flex items-center gap-1.5 rounded-full bg-zinc-800/60 px-2.5 py-1 text-[11px] text-zinc-400">
+          <span className="h-2 w-2 rounded-full bg-emerald-400" /> Recebido (dias passados)
+        </span>
+        <span className="flex items-center gap-1.5 rounded-full bg-zinc-800/60 px-2.5 py-1 text-[11px] text-zinc-400">
+          <span className="h-2 w-2 rounded-full bg-rose-400" /> Gasto (dias passados)
+        </span>
       </div>
 
       <div className="relative mt-6">
