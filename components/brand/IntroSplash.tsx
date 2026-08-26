@@ -83,7 +83,7 @@ export default function IntroSplash() {
         }}
       />
 
-      <div className="relative flex h-44 w-44 items-center justify-center">
+      <div className="relative flex h-60 w-60 items-center justify-center">
         <div
           className="intro-anim absolute inset-0 rounded-full opacity-80 blur-[2px]"
           style={{
@@ -95,52 +95,59 @@ export default function IntroSplash() {
         <div
           className="intro-anim absolute rounded-full opacity-60 blur-[1px]"
           style={{
-            inset: "10px",
+            inset: "12px",
             background:
               "conic-gradient(from 180deg, rgba(34,211,238,0) 0deg, rgba(34,211,238,0.7) 110deg, rgba(16,185,129,0) 200deg)",
             animation: "intro-spin-reverse 3.6s linear infinite",
           }}
         />
-        <div className="absolute rounded-full bg-zinc-950" style={{ inset: "22px" }} />
+        <div className="absolute rounded-full bg-zinc-950" style={{ inset: "28px" }} />
 
         <img
           src="/logo.png?v=2"
           alt=""
-          width={92}
-          height={92}
-          className="intro-anim relative h-[5.75rem] w-[5.75rem] rounded-[1.6rem]"
+          width={128}
+          height={128}
+          className="intro-anim relative h-32 w-32 rounded-[2rem]"
           style={{ animation: "intro-breathe 2.2s ease-in-out infinite" }}
         />
       </div>
 
       <div
-        className="intro-anim flex flex-col items-center gap-1.5"
+        className="intro-anim flex flex-col items-center gap-2"
         style={{ animation: "intro-fade-up 650ms ease-out 200ms both" }}
       >
-        <span className="text-[11px] font-medium uppercase tracking-[0.35em] text-emerald-400/90">
+        <span className="text-sm font-medium uppercase tracking-[0.4em] text-emerald-400/90">
           Meu Financeiro
         </span>
-        <span className="text-2xl font-semibold tracking-tight text-white">IA</span>
+        <span className="text-5xl font-bold tracking-tight text-white">IA</span>
+        <span className="mt-1 text-sm text-zinc-400">Sua vida financeira, organizada.</span>
       </div>
 
       <div
-        className="intro-anim flex items-end gap-1.5"
+        className="intro-anim flex items-end gap-2"
         style={{ animation: "intro-fade-up 650ms ease-out 350ms both" }}
       >
         {EQ_BARS.map((bar, index) => (
           <span
             key={index}
-            className="intro-anim block h-6 w-1.5 origin-bottom rounded-full bg-gradient-to-t from-emerald-500 to-cyan-300"
+            className="intro-anim block h-7 w-2 origin-bottom rounded-full bg-gradient-to-t from-emerald-500 to-cyan-300"
             style={{ animation: `intro-eq ${bar.duration} ease-in-out ${bar.delay} infinite` }}
           />
         ))}
       </div>
 
-      <div className="relative mt-1 h-1 w-40 overflow-hidden rounded-full bg-zinc-800">
-        <div
-          className="intro-anim h-full w-full origin-left rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400"
-          style={{ animation: `intro-bar ${HOLD_MS - 150}ms ease-in-out 150ms both` }}
-        />
+      <div
+        className="intro-anim flex flex-col items-center gap-2"
+        style={{ animation: "intro-fade-up 650ms ease-out 450ms both" }}
+      >
+        <span className="text-xs text-zinc-500">Carregando seu painel financeiro…</span>
+        <div className="relative h-1.5 w-48 overflow-hidden rounded-full bg-zinc-800">
+          <div
+            className="intro-anim h-full w-full origin-left rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400"
+            style={{ animation: `intro-bar ${HOLD_MS - 150}ms ease-in-out 150ms both` }}
+          />
+        </div>
       </div>
     </div>
   );
