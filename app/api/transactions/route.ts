@@ -7,6 +7,11 @@ import {
   saoPauloYearStartKey,
 } from "@/lib/finance/fluxo";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" };
+
 function resolveDateFrom(period: string | null): string | null {
   switch (period) {
     case "hoje":
@@ -26,7 +31,7 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
   }
 
   const { searchParams } = new URL(request.url);
@@ -56,7 +61,7 @@ export async function GET(request: Request) {
     ]);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 
   const bankNameById = new Map((connections ?? []).map((c) => [c.id, c.institution_name]));
@@ -69,9 +74,12 @@ export async function GET(request: Request) {
     institution_name: c.bank_connection_id ? bankNameById.get(c.bank_connection_id) ?? null : null,
   }));
 
-  return NextResponse.json({
-    transactions: transactions ?? [],
-    accounts: accountsWithBank,
-    cards: cardsWithBank,
-  });
+  return NextResponse.json(
+    {
+      transactions: transactions ?? [],
+      accounts: accountsWithBank,
+      cards: cardsWithBank,
+    },
+    { headers: NO_STORE_HEADERS },
+  );
 }

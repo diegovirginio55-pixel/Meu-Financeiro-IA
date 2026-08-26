@@ -33,7 +33,7 @@ export default function DetalhesClient() {
     if (f.type) params.set("type", f.type);
 
     try {
-      const res = await fetch(`/api/transactions?${params.toString()}`);
+      const res = await fetch(`/api/transactions?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = await res.json();
       setTransactions(data.transactions ?? []);
