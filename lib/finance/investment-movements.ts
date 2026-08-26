@@ -172,6 +172,14 @@ export async function promoteInvestmentsFromTransactions(
       await supabase.from("investments").delete().eq("pluggy_investment_id", syntheticId);
       continue;
     }
+
+    // Já existe um investimento sintético com o mesmo valor: nada mudou desde a
+    // última vez, então não vale a pena regravar tudo de novo a cada navegação.
+    const existingSynthetic = remaining.find((row) => row.pluggy_investment_id === syntheticId);
+    if (existingSynthetic && Math.abs(Number(existingSynthetic.amount) - item.amount) < 0.005) {
+      continue;
+    }
+
     const bank = inferInstitutionName([account?.name, item.name], "");
     const displayName = withInstitutionPrefix(item.name, bank || null);
     const { data: row, error } = await supabase

@@ -11,11 +11,9 @@ export default async function VisaoPage() {
   const supabase = await createClient();
   const from = `${lastNMonthKeys(12)[0]}-01`;
 
-  const [snapshot, connections] = await Promise.all([
+  const [snapshot, connections, historyRes, snapRes, txRes] = await Promise.all([
     getFinancialSnapshot(supabase),
     getBankConnectionsWithAssets(supabase),
-  ]);
-  const [historyRes, snapRes, txRes] = await Promise.all([
     supabase.from("transactions").select("*").gte("date", from).order("date", { ascending: true }),
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", from),
     supabase.from("investment_transactions").select("*").gte("date", from),
