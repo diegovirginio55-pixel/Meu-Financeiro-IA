@@ -11,7 +11,7 @@ import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
   { href: "/dashboard", label: "Início", icon: HomeIcon },
-  { href: "/ativos", label: "Ativos", icon: AtivosIcon },
+  { href: "/mes", label: "Meu mês", icon: MesIcon },
   { href: "/visao", label: "Dashboard", icon: DashboardIcon },
   { href: "/chat", label: "Chat IA", icon: ChatIcon },
 ] as const;
@@ -30,18 +30,14 @@ function HomeIcon({ active }: { active?: boolean }) {
   );
 }
 
-function AtivosIcon({ active }: { active?: boolean }) {
+function MesIcon({ active }: { active?: boolean }) {
   const color = active ? "#10B981" : "#71717A";
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
-      <path
-        d="M4 16.5 9.2 11l3.4 3.3L20 7"
-        stroke={color}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M15.5 7H20v4.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="4" y="5" width="16" height="15" rx="2" stroke={color} strokeWidth="1.6" />
+      <path d="M4 9.5h16" stroke={color} strokeWidth="1.6" />
+      <path d="M8 3.5v3M16 3.5v3" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M7.5 13h3M7.5 16h6M13.5 13h3" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -85,7 +81,7 @@ function MenuIcon({ active }: { active?: boolean }) {
   );
 }
 
-const MENU_ROUTES = ["/detalhes", "/bancos", "/fluxo"];
+const MENU_ROUTES = ["/detalhes", "/bancos", "/fluxo", "/ativos"];
 
 export default function BottomNav() {
   const router = useRouter();
@@ -113,6 +109,7 @@ export default function BottomNav() {
             <div className="mt-3 flex flex-col gap-1">
               {[
                 { href: "/detalhes", label: "Extrato" },
+                { href: "/ativos", label: "Investimentos" },
                 { href: "/bancos", label: "Bancos conectados" },
                 { href: "/fluxo", label: "Fluxo de caixa" },
               ].map((item) => (
@@ -151,7 +148,7 @@ export default function BottomNav() {
               <Link
                 key={tab.href}
                 href={tab.href}
-                prefetch={tab.href !== "/visao" && tab.href !== "/ativos"}
+                prefetch={tab.href !== "/visao" && tab.href !== "/mes"}
                 onClick={() => onNavigate(tab.href)}
                 className="flex flex-col items-center gap-0.5 text-[11px]"
               >

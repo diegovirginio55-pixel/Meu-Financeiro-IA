@@ -60,6 +60,8 @@ export interface FinancialSnapshot {
   proximos30Dias: UpcomingItem[];
   saldoPrevisto30Dias: number;
   evolucaoMensal: { mes: string; entradas: number; despesas: number }[];
+  historyTx: Transaction[];
+  recurringItems: RecurringItem[];
 }
 
 /**
@@ -253,5 +255,7 @@ export async function getFinancialSnapshot(
     proximos30Dias,
     saldoPrevisto30Dias,
     evolucaoMensal,
+    historyTx,
+    recurringItems,
   };
 }

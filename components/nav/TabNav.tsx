@@ -10,6 +10,7 @@ import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
   { href: "/dashboard", label: "Início" },
+  { href: "/mes", label: "Meu mês" },
   { href: "/visao", label: "Dashboard" },
   { href: "/detalhes", label: "Extrato" },
   { href: "/fluxo", label: "Fluxo" },
@@ -42,7 +43,7 @@ export default function TabNav() {
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  prefetch={tab.href !== "/visao" && tab.href !== "/ativos"}
+                  prefetch={tab.href !== "/visao" && tab.href !== "/ativos" && tab.href !== "/mes"}
                   onClick={() => onNavigate(tab.href)}
                   className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active ? "bg-white font-medium text-zinc-950" : "text-zinc-400 hover:text-zinc-100"

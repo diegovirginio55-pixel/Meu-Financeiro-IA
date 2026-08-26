@@ -12,6 +12,7 @@ import {
 } from "./fluxo";
 import { resolvedCategory } from "./categories";
 import { formatCurrency } from "./format";
+import { groupSubscriptions, subscriptionKey } from "./subscriptions";
 
 export interface AlertCandidate {
   kind: string;
@@ -27,20 +28,6 @@ const CATEGORY_SPIKE_MIN_AVERAGE = 30;
 const SUBSCRIPTION_STABLE_TOLERANCE = 0.03;
 const SUBSCRIPTION_MIN_INCREASE_PCT = 0.05;
 const SUBSCRIPTION_MIN_INCREASE_ABS = 2;
-
-function subscriptionKey(description: string): string {
-  return description
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[0-9]/g, " ")
-    .replace(/[^a-z\s]/g, " ")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" ")
-    .trim();
-}
 
 /**
  * Calcula os alertas inteligentes pendentes para um usuário: fatura de
@@ -183,25 +170,9 @@ export async function computeSmartAlerts(
   }
 
   // 4) Assinatura/gasto recorrente que ficou mais caro de um mês para o outro
-  const bySubscription = new Map<string, { date: string; amount: number; description: string }[]>();
-  tx.filter(isGasto).forEach((t) => {
-    const key = subscriptionKey(t.description);
-    if (key.length < 4) return;
-    const list = bySubscription.get(key) ?? [];
-    list.push({ date: t.date, amount: Number(t.amount), description: t.description });
-    bySubscription.set(key, list);
-  });
+  const subscriptionGroups = groupSubscriptions(tx);
 
-  bySubscription.forEach((entries) => {
-    const byMonth = new Map<string, { date: string; amount: number; description: string }>();
-    entries.forEach((entry) => {
-      const monthKey = entry.date.slice(0, 7);
-      const existing = byMonth.get(monthKey);
-      if (!existing || entry.date > existing.date) byMonth.set(monthKey, entry);
-    });
-    const months = Array.from(byMonth.keys()).sort();
-    if (months.length < 3) return;
-
+  subscriptionGroups.forEach(({ byMonth, months }) => {
     const lastMonth = months[months.length - 1];
     if (lastMonth !== thisMonth && lastMonth !== shiftMonthKey(thisMonth, -1)) return;
 
