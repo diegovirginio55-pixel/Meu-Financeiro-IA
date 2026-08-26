@@ -19,11 +19,21 @@ export default async function FluxoPage() {
     supabase.from("debts").select("*").eq("paid", false),
   ]);
 
+  const bankNameById = new Map(connections.map((c) => [c.id, c.institution_name]));
+  const accounts = ((accRes.data ?? []) as Account[]).map((a) => ({
+    ...a,
+    institution_name: a.bank_connection_id ? bankNameById.get(a.bank_connection_id) ?? null : null,
+  }));
+  const cards = ((cardRes.data ?? []) as Card[]).map((c) => ({
+    ...c,
+    institution_name: c.bank_connection_id ? bankNameById.get(c.bank_connection_id) ?? null : null,
+  }));
+
   return (
     <FluxoClient
       transactions={(txRes.data ?? []) as Transaction[]}
-      accounts={(accRes.data ?? []) as Account[]}
-      cards={(cardRes.data ?? []) as Card[]}
+      accounts={accounts}
+      cards={cards}
       connections={connections}
       recurring={(recRes.data ?? []) as RecurringItem[]}
       debts={(debtRes.data ?? []) as Debt[]}

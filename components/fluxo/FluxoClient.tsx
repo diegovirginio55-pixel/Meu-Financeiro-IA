@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/finance/format";
-import { friendlyAccountName } from "@/lib/finance/account-name";
+import { accountBankLabel, cardBankLabel } from "@/lib/finance/account-name";
 import { CATEGORY_ICONS, categoryColor, resolvedCategory } from "@/lib/finance/categories";
 import {
   belongsToConnection,
@@ -333,12 +333,12 @@ export default function FluxoClient({
               <option value="all">Todas contas</option>
               {visibleAccounts.list.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {friendlyAccountName(account.name, account.type)}
+                  {accountBankLabel(account)}
                 </option>
               ))}
               {visibleAccounts.cardList.map((card) => (
                 <option key={card.id} value={card.id}>
-                  {card.name}
+                  {cardBankLabel(card)}
                 </option>
               ))}
             </select>
