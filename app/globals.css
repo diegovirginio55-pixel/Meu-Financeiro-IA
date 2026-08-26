@@ -155,10 +155,3 @@ html.light * {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .intro-anim {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-}
