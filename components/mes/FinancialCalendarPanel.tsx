@@ -15,6 +15,13 @@ const KIND_COLOR: Record<CalendarEventKind, string> = {
   divida: "#fb7185",
 };
 
+const KIND_ICON: Record<CalendarEventKind, string> = {
+  salario: "💰",
+  conta_fixa: "🏠",
+  cartao: "💳",
+  divida: "🧾",
+};
+
 const KIND_LABEL: Record<CalendarEventKind, string> = {
   salario: "Salário/receita",
   conta_fixa: "Conta fixa",
@@ -32,7 +39,8 @@ function monthTitle(month: Date): string {
 export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalendar }) {
   const minMonth = calendar.rangeStart.slice(0, 7);
   const maxMonth = calendar.rangeEnd.slice(0, 7);
-  const [monthKey, setMonthKey] = useState(calendar.todayKey.slice(0, 7));
+  const todayMonth = calendar.todayKey.slice(0, 7);
+  const [monthKey, setMonthKey] = useState(todayMonth);
 
   const month = useMemo(() => new Date(`${monthKey}-01T12:00:00`), [monthKey]);
 
@@ -64,51 +72,78 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
   }
 
   return (
-    <SoftPanel className="p-5 lg:p-6">
-      <SectionLabel>Calendário financeiro</SectionLabel>
+    <SoftPanel className="relative overflow-hidden p-5 lg:p-6">
+      <div className="pointer-events-none absolute -left-12 -top-16 h-56 w-56 rounded-full bg-cyan-500/10 blur-3xl" />
 
-      <div className="flex items-center justify-between gap-2">
+      <div className="relative flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-800 text-sm">📅</span>
+        <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">Calendário financeiro</h2>
+      </div>
+
+      <div className="relative mt-4 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => shiftMonth(-1)}
           disabled={monthKey <= minMonth}
-          className="rounded-full border border-zinc-800 px-2 py-1 text-zinc-400 hover:text-white disabled:opacity-30"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-800 text-zinc-400 transition hover:border-zinc-700 hover:text-white disabled:opacity-30"
         >
           ‹
         </button>
-        <p className="text-sm font-medium text-zinc-100">{monthTitle(month)}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-zinc-100">{monthTitle(month)}</p>
+          {monthKey !== todayMonth && (
+            <button
+              type="button"
+              onClick={() => setMonthKey(todayMonth)}
+              className="rounded-full border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 hover:border-emerald-700 hover:text-emerald-300"
+            >
+              Hoje
+            </button>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => shiftMonth(1)}
           disabled={monthKey >= maxMonth}
-          className="rounded-full border border-zinc-800 px-2 py-1 text-zinc-400 hover:text-white disabled:opacity-30"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-800 text-zinc-400 transition hover:border-zinc-700 hover:text-white disabled:opacity-30"
         >
           ›
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-zinc-500">
+      <div className="relative mt-4 grid grid-cols-7 gap-1.5 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-600">
         {WEEKDAY_LABELS.map((label, index) => (
           <span key={index}>{label}</span>
         ))}
       </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
+      <div className="relative mt-1.5 grid grid-cols-7 gap-1.5">
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const inMonth = isSameMonth(day, month);
           const events = eventsByDate.get(dateStr) ?? [];
           const balance = calendar.balanceByDate.get(dateStr);
           const isToday = dateStr === calendar.todayKey;
+          const showBalance = inMonth && balance != null && dateStr >= calendar.todayKey;
           return (
             <div
               key={dateStr}
-              className={`flex min-h-[52px] flex-col rounded-lg border p-1 text-[10px] ${
-                inMonth ? "border-zinc-800/80 bg-zinc-950/40" : "border-transparent"
-              } ${isToday ? "ring-1 ring-emerald-400/70" : ""}`}
+              className={`flex min-h-[58px] flex-col items-center rounded-xl border p-1 pt-1.5 text-[10px] transition ${
+                inMonth
+                  ? isToday
+                    ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(16,185,129,0.15)]"
+                    : "border-zinc-800/70 bg-zinc-950/40 hover:border-zinc-700"
+                  : "border-transparent"
+              }`}
             >
-              <span className={inMonth ? "text-zinc-400" : "text-zinc-700"}>{day.getDate()}</span>
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
+                  isToday ? "bg-emerald-400 font-bold text-zinc-950" : inMonth ? "text-zinc-400" : "text-zinc-700"
+                }`}
+              >
+                {day.getDate()}
+              </span>
               {inMonth && events.length > 0 && (
-                <span className="mt-0.5 flex flex-wrap gap-0.5">
+                <span className="mt-1 flex flex-wrap justify-center gap-0.5">
                   {events.slice(0, 4).map((event) => (
                     <span
                       key={event.id}
@@ -118,46 +153,62 @@ export function FinancialCalendarPanel({ calendar }: { calendar: FinancialCalend
                   ))}
                 </span>
               )}
-              {inMonth && balance != null && dateStr >= calendar.todayKey && (
-                <span className="mt-auto truncate text-[9px] text-zinc-500">{compactShort(balance)}</span>
+              {showBalance && (
+                <span
+                  className={`mt-auto truncate text-[9px] font-medium ${
+                    (balance as number) < 0 ? "text-rose-400" : "text-zinc-500"
+                  }`}
+                >
+                  {compactShort(balance as number)}
+                </span>
               )}
             </div>
           );
         })}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-3 text-[11px] text-zinc-500">
+      <div className="relative mt-4 flex flex-wrap gap-2">
         {(Object.keys(KIND_LABEL) as CalendarEventKind[]).map((kind) => (
-          <span key={kind} className="flex items-center gap-1.5">
+          <span
+            key={kind}
+            className="flex items-center gap-1.5 rounded-full bg-zinc-800/60 px-2.5 py-1 text-[11px] text-zinc-400"
+          >
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: KIND_COLOR[kind] }} />
             {KIND_LABEL[kind]}
           </span>
         ))}
       </div>
 
-      <div className="mt-5">
+      <div className="relative mt-6">
         <SectionLabel>Próximos eventos</SectionLabel>
         {upcoming.length === 0 ? (
           <p className="text-sm text-zinc-500">Nenhum evento previsto.</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-zinc-800/80">
+          <ul className="flex flex-col gap-2">
             {upcoming.map((event) => (
-              <li key={event.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <span className="flex min-w-0 items-center gap-2">
+              <li
+                key={event.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-3"
+              >
+                <span className="flex min-w-0 items-center gap-3">
                   <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: KIND_COLOR[event.kind] }}
-                  />
-                  <span className="min-w-0 truncate text-zinc-200">{event.description}</span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span
-                    className={`block font-medium ${event.type === "entrada" ? "text-emerald-400" : "text-rose-300"}`}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base"
+                    style={{ backgroundColor: `${KIND_COLOR[event.kind]}22` }}
                   >
-                    {event.type === "entrada" ? "+" : "-"}
-                    {formatCurrency(event.amount)}
+                    {KIND_ICON[event.kind]}
                   </span>
-                  <span className="text-[11px] text-zinc-500">{formatDate(event.date)}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm text-zinc-200">{event.description}</span>
+                    <span className="text-[11px] text-zinc-500">{formatDate(event.date)}</span>
+                  </span>
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    event.type === "entrada" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-300"
+                  }`}
+                >
+                  {event.type === "entrada" ? "+" : "-"}
+                  {formatCurrency(event.amount)}
                 </span>
               </li>
             ))}
