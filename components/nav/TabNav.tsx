@@ -9,14 +9,14 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
 
 const TABS = [
-  { href: "/dashboard", label: "Início" },
-  { href: "/mes", label: "Meu mês" },
-  { href: "/visao", label: "Dashboard" },
-  { href: "/detalhes", label: "Extrato" },
-  { href: "/fluxo", label: "Fluxo" },
-  { href: "/chat", label: "Chat IA" },
-  { href: "/ativos", label: "Investimentos" },
-  { href: "/bancos", label: "Bancos" },
+  { href: "/dashboard", label: "Início", icon: "🏠" },
+  { href: "/mes", label: "Meu mês", icon: "📊" },
+  { href: "/visao", label: "Dashboard", icon: "📈" },
+  { href: "/detalhes", label: "Extrato", icon: "🧾" },
+  { href: "/fluxo", label: "Fluxo", icon: "🔄" },
+  { href: "/chat", label: "Chat IA", icon: "💬" },
+  { href: "/ativos", label: "Investimentos", icon: "💹" },
+  { href: "/bancos", label: "Bancos", icon: "🏦" },
 ] as const;
 
 export default function TabNav() {
@@ -45,10 +45,11 @@ export default function TabNav() {
                   href={tab.href}
                   prefetch={tab.href !== "/visao" && tab.href !== "/ativos" && tab.href !== "/mes"}
                   onClick={() => onNavigate(tab.href)}
-                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active ? "bg-white font-medium text-zinc-950" : "text-zinc-400 hover:text-zinc-100"
                   }`}
                 >
+                  <span aria-hidden>{tab.icon}</span>
                   {tab.label}
                 </Link>
               );
