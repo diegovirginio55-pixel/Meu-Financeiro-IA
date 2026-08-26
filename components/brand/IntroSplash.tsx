@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const HOLD_MS = 3400;
+const HOLD_MS = 4300;
 const FADE_MS = 600;
 const RESUME_THRESHOLD_MS = 8000;
-const MESSAGE_MS = 680;
+const MESSAGE_MS = 830;
 
 const MESSAGES = [
   "Conectando aos seus bancos…",
