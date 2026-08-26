@@ -5,6 +5,7 @@ import TransactionsFilters, { type FiltersState } from "./TransactionsFilters";
 import TransactionsTable from "./TransactionsTable";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
 import { formatCurrency, formatPercent } from "@/lib/finance/format";
+import { isPlaceholderAccount, isPlaceholderCard } from "@/lib/finance/account-name";
 import { HeroAmount, PageHero, PageShell, SoftPanel } from "@/components/ui/page-chrome";
 import { usePersistedState } from "@/lib/ui/use-persisted-state";
 
@@ -52,6 +53,27 @@ export default function DetalhesClient() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(filters);
   }, [filters, filtersReady, load]);
+
+  // Filtros de conta/cartão salvos localmente podem apontar para uma conta/cartão
+  // "fantasma" (placeholder) que foi removido da lista de opções — isso zerava o
+  // extrato silenciosamente. Corrige automaticamente voltando para "todas".
+  useEffect(() => {
+    if (accounts.length === 0 && cards.length === 0) return;
+    let accountId = filters.accountId;
+    let cardId = filters.cardId;
+    if (accountId) {
+      const account = accounts.find((a) => a.id === accountId);
+      if (!account || isPlaceholderAccount(account)) accountId = "";
+    }
+    if (cardId) {
+      const card = cards.find((c) => c.id === cardId);
+      if (!card || isPlaceholderCard(card)) cardId = "";
+    }
+    if (accountId !== filters.accountId || cardId !== filters.cardId) {
+      setFilters({ ...filters, accountId, cardId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, cards]);
 
   async function handleUpdate(id: string, patch: Record<string, unknown>) {
     await fetch(`/api/transactions/${id}`, {

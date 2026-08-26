@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/finance/format";
@@ -71,6 +71,22 @@ export default function FluxoClient({
     const parsed = parseISO(`${monthKey}-01`);
     return Number.isNaN(parsed.getTime()) ? startOfMonth(new Date()) : startOfMonth(parsed);
   }, [monthKey]);
+
+  // Filtro de conta/cartão salvo localmente pode apontar para uma conta/cartão
+  // "fantasma" (placeholder) que foi removido da lista — isso zerava o fluxo
+  // silenciosamente. Corrige automaticamente voltando para "todas".
+  useEffect(() => {
+    if (accountId === "all") return;
+    if (accounts.length === 0 && cards.length === 0) return;
+    const account = accounts.find((a) => a.id === accountId);
+    if (account) {
+      if (isPlaceholderAccount(account)) setAccountId("all");
+      return;
+    }
+    const card = cards.find((c) => c.id === accountId);
+    if (!card || isPlaceholderCard(card)) setAccountId("all");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, cards, accountId]);
 
   const scoped = useMemo(() => {
     return transactions.filter((transaction) => {
