@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -20,6 +20,16 @@ import {
 import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/finance/format";
 import { barMoneyLabel, chartTooltipStyle, compactAxis, compactShort } from "@/components/dashboard/chart-theme";
 import type { AssetPnlRow, YieldPoint } from "@/lib/finance/investment-pnl";
+
+// O ResponsiveContainer do Recharts só sabe o tamanho real depois de montar no
+// navegador; renderizá-lo no servidor produz um SVG diferente do que aparece
+// no cliente e pode gerar erro de hidratação. Esses três gráficos (usados no
+// painel de lucro dos investimentos) esperam montar antes de desenhar.
+function useMounted(): boolean {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted;
+}
 
 export function EconomiaMensalChart({
   data,
@@ -314,6 +324,7 @@ function LucroAtivoTooltip({
 }
 
 export function LucroAtivosBarChart({ rows }: { rows: AssetPnlRow[] }) {
+  const mounted = useMounted();
   const uid = useId().replace(/:/g, "");
   const chartData = rows.slice(0, 10).map((row) => ({
     nome: row.label,
@@ -325,6 +336,10 @@ export function LucroAtivosBarChart({ rows }: { rows: AssetPnlRow[] }) {
 
   if (chartData.length === 0) {
     return <p className="flex h-[280px] items-center justify-center text-sm text-zinc-500">Sem lucro no período.</p>;
+  }
+
+  if (!mounted) {
+    return <div className="w-full animate-pulse rounded-xl bg-zinc-900/40" style={{ height }} />;
   }
 
   return (
@@ -419,12 +434,17 @@ function YieldTooltip({
 }
 
 export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
+  const mounted = useMounted();
   const uid = useId().replace(/:/g, "");
   const hasValues = data.some((point) => point.lucro !== 0 || point.rendimento !== 0);
   const peak = data.reduce(
     (best, item) => (item.lucro > best.lucro ? item : best),
     data[0] ?? { date: "", label: "", lucro: 0, capital: 0, rendimento: 0 },
   );
+
+  if (!mounted) {
+    return <div className="h-[268px] w-full animate-pulse rounded-xl bg-zinc-900/40 lg:h-[312px]" />;
+  }
 
   return (
     <div className="relative h-[268px] w-full lg:h-[312px]">
@@ -499,7 +519,13 @@ export function RendimentoDiarioChart({ data }: { data: YieldPoint[] }) {
 }
 
 export function RendimentoMensalChart({ data }: { data: YieldPoint[] }) {
+  const mounted = useMounted();
   const hasValues = data.some((point) => point.rendimento !== 0 || point.lucro !== 0);
+
+  if (!mounted) {
+    return <div className="h-[256px] w-full animate-pulse rounded-xl bg-zinc-900/40 lg:h-[296px]" />;
+  }
+
   return (
     <div className="relative h-[256px] w-full lg:h-[296px]">
       {!hasValues && (
