@@ -42,19 +42,31 @@ export default function ChatWindow() {
     };
   }, []);
 
+  const limitedNow =
+    Boolean(quota?.limited) ||
+    (quota != null && quota.remaining <= 0) ||
+    Boolean(quota?.lockedUntil && new Date(quota.lockedUntil).getTime() > Date.now());
+
   useEffect(() => {
-    if (!quota?.lockedUntil) return;
-    const wait = new Date(quota.lockedUntil).getTime() - Date.now();
-    const timer = window.setTimeout(() => {
+    if (!limitedNow) return;
+    let cancelled = false;
+    function check() {
       fetch("/api/chat")
         .then((res) => res.json())
         .then((data: { quota?: ChatQuotaView }) => {
-          if (data.quota) setQuota(data.quota);
+          if (!cancelled && data.quota) setQuota(data.quota);
         })
         .catch(() => undefined);
-    }, Math.max(400, wait + 250));
-    return () => window.clearTimeout(timer);
-  }, [quota?.lockedUntil]);
+    }
+    // Reconsulta o limite periodicamente enquanto bloqueado: mais confiável do que um
+    // único temporizador cronometrado, que pode travar a tela se o horário previsto
+    // já tiver passado por qualquer diferença de relógio ou falha de rede.
+    const id = window.setInterval(check, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [limitedNow]);
 
   function revealText(id: string, text: string) {
     let i = 0;
@@ -158,10 +170,7 @@ export default function ChatWindow() {
   }
 
   const canClear = messages.length > 0 && !loadingHistory;
-  const limited =
-    Boolean(quota?.limited) ||
-    (quota != null && quota.remaining <= 0) ||
-    Boolean(quota?.lockedUntil && new Date(quota.lockedUntil).getTime() > Date.now());
+  const limited = limitedNow;
   const remaining = limited ? 0 : (quota?.remaining ?? 0);
 
   return (
