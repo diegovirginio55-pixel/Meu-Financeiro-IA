@@ -24,6 +24,23 @@ export interface AlertCandidate {
 const LOW_BALANCE_HORIZON_DAYS = 7;
 const CATEGORY_SPIKE_MULTIPLIER = 1.4;
 const CATEGORY_SPIKE_MIN_AVERAGE = 30;
+const SUBSCRIPTION_STABLE_TOLERANCE = 0.03;
+const SUBSCRIPTION_MIN_INCREASE_PCT = 0.05;
+const SUBSCRIPTION_MIN_INCREASE_ABS = 2;
+
+function subscriptionKey(description: string): string {
+  return description
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[0-9]/g, " ")
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" ")
+    .trim();
+}
 
 /**
  * Calcula os alertas inteligentes pendentes para um usuário: fatura de
@@ -39,7 +56,7 @@ export async function computeSmartAlerts(
   const now = new Date();
   const todayStr = saoPauloTodayKey(now);
   const thisMonth = saoPauloMonthKey(now);
-  const monthKeys = lastNMonthKeys(4, thisMonth);
+  const monthKeys = lastNMonthKeys(5, thisMonth);
   const historyStart = `${monthKeys[0]}-01`;
 
   const [accountsRes, cardsRes, recurringRes, debtsRes, txRes] = await Promise.all([
@@ -164,6 +181,51 @@ export async function computeSmartAlerts(
       }
     });
   }
+
+  // 4) Assinatura/gasto recorrente que ficou mais caro de um mês para o outro
+  const bySubscription = new Map<string, { date: string; amount: number; description: string }[]>();
+  tx.filter(isGasto).forEach((t) => {
+    const key = subscriptionKey(t.description);
+    if (key.length < 4) return;
+    const list = bySubscription.get(key) ?? [];
+    list.push({ date: t.date, amount: Number(t.amount), description: t.description });
+    bySubscription.set(key, list);
+  });
+
+  bySubscription.forEach((entries) => {
+    const byMonth = new Map<string, { date: string; amount: number; description: string }>();
+    entries.forEach((entry) => {
+      const monthKey = entry.date.slice(0, 7);
+      const existing = byMonth.get(monthKey);
+      if (!existing || entry.date > existing.date) byMonth.set(monthKey, entry);
+    });
+    const months = Array.from(byMonth.keys()).sort();
+    if (months.length < 3) return;
+
+    const lastMonth = months[months.length - 1];
+    if (lastMonth !== thisMonth && lastMonth !== shiftMonthKey(thisMonth, -1)) return;
+
+    const latest = byMonth.get(lastMonth)!;
+    const priorMonths = months.slice(0, -1).slice(-3);
+    if (priorMonths.length < 2) return;
+    const priorAmounts = priorMonths.map((m) => byMonth.get(m)!.amount);
+    const priorAvg = priorAmounts.reduce((s, v) => s + v, 0) / priorAmounts.length;
+    const priorStable = priorAmounts.every(
+      (a) => Math.abs(a - priorAvg) <= Math.max(1, priorAvg * SUBSCRIPTION_STABLE_TOLERANCE),
+    );
+    if (!priorStable) return;
+
+    const increase = latest.amount - priorAvg;
+    if (increase > Math.max(SUBSCRIPTION_MIN_INCREASE_ABS, priorAvg * SUBSCRIPTION_MIN_INCREASE_PCT)) {
+      alerts.push({
+        kind: "subscription_price_change",
+        refKey: `${subscriptionKey(latest.description)}:${lastMonth}`,
+        title: "Assinatura ficou mais cara 💸",
+        body: `"${latest.description.trim()}" custava ${formatCurrency(priorAvg)} e agora está ${formatCurrency(latest.amount)} (+${formatCurrency(increase)}).`,
+        url: "/detalhes",
+      });
+    }
+  });
 
   return alerts;
 }
