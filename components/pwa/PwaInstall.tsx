@@ -116,7 +116,7 @@ export function InstallAppButton({
     variant === "nav"
       ? "text-sm text-emerald-400 hover:text-emerald-300"
       : variant === "menu"
-        ? "w-full rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
+        ? "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
         : variant === "dark"
           ? "mt-6 w-full rounded-full bg-white px-4 py-2.5 text-sm font-medium text-zinc-950"
           : "w-full rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-100";
@@ -131,6 +131,11 @@ export function InstallAppButton({
         }}
         className={className}
       >
+        {variant === "menu" && (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-base">
+            📲
+          </span>
+        )}
         Instalar aplicativo
       </button>
       {open && (

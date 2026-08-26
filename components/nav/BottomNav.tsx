@@ -112,10 +112,10 @@ export default function BottomNav() {
             <p className="mt-4 text-sm font-semibold text-zinc-400">Menu</p>
             <div className="mt-3 flex flex-col gap-1">
               {[
-                { href: "/detalhes", label: "Extrato" },
-                { href: "/mes", label: "Meu mês" },
-                { href: "/bancos", label: "Bancos conectados" },
-                { href: "/fluxo", label: "Fluxo de caixa" },
+                { href: "/detalhes", label: "Extrato", icon: "🧾" },
+                { href: "/mes", label: "Meu mês", icon: "📊" },
+                { href: "/bancos", label: "Bancos conectados", icon: "🏦" },
+                { href: "/fluxo", label: "Fluxo de caixa", icon: "🔄" },
               ].map((item) => (
                 <Link
                   key={item.href}
@@ -124,8 +124,11 @@ export default function BottomNav() {
                     onNavigate(item.href);
                     setMenuOpen(false);
                   }}
-                  className="rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
                 >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-base">
+                    {item.icon}
+                  </span>
                   {item.label}
                 </Link>
               ))}
@@ -134,8 +137,11 @@ export default function BottomNav() {
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                className="rounded-xl px-3 py-3 text-left text-[15px] text-red-400 hover:bg-red-950/40"
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] text-red-400 hover:bg-red-950/40"
               >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-base">
+                  🚪
+                </span>
                 Sair
               </button>
             </div>

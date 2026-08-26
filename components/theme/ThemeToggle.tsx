@@ -39,10 +39,12 @@ export function ThemeToggle({ variant = "icon" }: { variant?: "icon" | "nav" | "
       <button
         type="button"
         onClick={toggleTheme}
-        className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
+        className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
       >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-zinc-300">
+          {isLight ? <MoonIcon /> : <SunIcon />}
+        </span>
         <span>{label}</span>
-        <span className="text-zinc-400">{isLight ? <MoonIcon /> : <SunIcon />}</span>
       </button>
     );
   }
