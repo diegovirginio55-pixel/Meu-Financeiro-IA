@@ -45,8 +45,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           return NextResponse.json({ needsWidget: true });
         }
       } catch (error) {
-        console.error("Atualização silenciosa da Pluggy indisponível, usar widget:", error);
-        return NextResponse.json({ needsWidget: true });
+        // Conexões feitas via "MeuPluggy" (conector 200) não aceitam pedido de
+        // atualização sob demanda — a Pluggy retorna 400 "item cant be updated"
+        // e só sincroniza esses itens automaticamente 1x por dia. Nesse caso não
+        // há widget para abrir: seguimos e buscamos os dados mais recentes que a
+        // Pluggy já tiver em cache, em vez de encerrar sem sincronizar nada.
+        console.error("Não foi possível pedir atualização à Pluggy, buscando dados em cache:", error);
       }
     }
     await syncBankConnection(supabase, user.id, connection.id, connection.pluggy_item_id);

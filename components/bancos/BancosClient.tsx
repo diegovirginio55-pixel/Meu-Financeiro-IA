@@ -32,8 +32,9 @@ function formatLastSync(value: string | null): string {
   if (!value) return "Nunca atualizado";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Nunca atualizado";
-  if (isToday(date)) return "Hoje";
-  if (isYesterday(date)) return "Ontem";
+  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  if (isToday(date)) return `Hoje às ${time}`;
+  if (isYesterday(date)) return `Ontem às ${time}`;
   const days = differenceInCalendarDays(new Date(), date);
   if (days < 7) return `Há ${days} dias`;
   return date.toLocaleDateString("pt-BR");
@@ -151,7 +152,21 @@ function DetailsPanel({
           )}
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <p className="mt-4 text-xs leading-relaxed text-zinc-500">
+          Os bancos atualizam automaticamente até 1x por dia. Se o saldo aqui parecer atrasado, o banco ainda não
+          liberou dados novos — para forçar agora, entre em{" "}
+          <a
+            href="https://meu.pluggy.ai"
+            target="_blank"
+            rel="noreferrer"
+            className="text-emerald-400 underline hover:text-emerald-300"
+          >
+            meu.pluggy.ai
+          </a>{" "}
+          e sincronize a conta por lá.
+        </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onSync}
