@@ -7,6 +7,7 @@ import { InstallAppButton } from "@/components/pwa/PwaInstall";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const TABS = [
   { href: "/dashboard", label: "Início", icon: "🏠" },
@@ -14,6 +15,7 @@ const TABS = [
   { href: "/visao", label: "Dashboard", icon: "📈" },
   { href: "/detalhes", label: "Extrato", icon: "🧾" },
   { href: "/fluxo", label: "Fluxo", icon: "🔄" },
+  { href: "/metas", label: "Metas", icon: "🎯" },
   { href: "/chat", label: "Chat IA", icon: "💬" },
   { href: "/ativos", label: "Investimentos", icon: "💹" },
   { href: "/bancos", label: "Bancos", icon: "🏦" },
@@ -43,7 +45,7 @@ export default function TabNav() {
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  prefetch={tab.href !== "/visao" && tab.href !== "/ativos" && tab.href !== "/mes"}
+                  prefetch={tab.href !== "/visao" && tab.href !== "/ativos" && tab.href !== "/mes" && tab.href !== "/metas"}
                   onClick={() => onNavigate(tab.href)}
                   className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active ? "bg-white font-medium text-zinc-950" : "text-zinc-400 hover:text-zinc-100"
@@ -58,6 +60,14 @@ export default function TabNav() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-4">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("mf:open-search"))}
+            className="flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-300"
+          >
+            🔎 Buscar <kbd className="rounded border border-zinc-700 px-1 text-[10px]">⌘K</kbd>
+          </button>
+          <NotificationBell variant="nav" />
           <ThemeToggle variant="nav" />
           <InstallAppButton variant="nav" />
           <button

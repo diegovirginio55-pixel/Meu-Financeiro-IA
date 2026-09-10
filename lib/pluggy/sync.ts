@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isInvestmentDescription, promoteInvestmentsFromTransactions } from "@/lib/finance/investment-movements";
-import { inferCategoryFromDescription } from "@/lib/finance/categories";
+import { applyCategoryRules, inferCategoryFromDescription, type CategoryRule } from "@/lib/finance/categories";
 import type { Account, Investment } from "@/lib/finance/types";
 import { CDI_ANNUAL_FALLBACK } from "@/lib/finance/investment-yield";
 import { pluggyApi, pluggyInvestmentAmount, resolvePluggyPosition, type PluggyAccount, type PluggyInvestment } from "./client";
@@ -49,7 +49,12 @@ function mapCategory(
   pluggyCategory: string | null | undefined,
   isCredit: boolean,
   description?: string | null,
+  customRules: CategoryRule[] = [],
 ): string {
+  if (description) {
+    const custom = applyCategoryRules(description, customRules);
+    if (custom) return custom;
+  }
   if (description && isInvestmentDescription(description)) return "Investimentos";
   const inferred = description ? inferCategoryFromDescription(description) : null;
   if (inferred) return inferred;
@@ -88,13 +93,15 @@ async function syncTransactionsForAccount(
 
   const ids = transactions.map((item) => item.id);
   const already = await knownPluggyIds(supabase, "transactions", ids);
+  const { data: ruleRows } = await supabase.from("category_rules").select("pattern, category").eq("user_id", userId);
+  const customRules = (ruleRows ?? []) as CategoryRule[];
 
   const rows = transactions.map((t) => ({
     user_id: userId,
     description: t.description || "Transação importada",
     amount: Math.abs(t.amount),
     type: t.type === "CREDIT" ? "entrada" : "saida",
-    category: mapCategory(t.category, t.type === "CREDIT", t.description),
+    category: mapCategory(t.category, t.type === "CREDIT", t.description, customRules),
     date: toSaoPauloDateOnly(t.date),
     account_id: accountId,
     card_id: cardId,
@@ -273,6 +280,7 @@ export async function syncBankConnection(
   const item = await pluggyApi.waitForItemIdle(pluggyItemId);
   const { results: accounts } = await pluggyApi.fetchAccounts(pluggyItemId);
   const onlyBank = singleInstitutionFromAccounts(accounts);
+  const todaySnapshotDate = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
   const institutionName = inferInstitutionName(
     [
@@ -308,6 +316,20 @@ export async function syncBankConnection(
 
       const created = await syncTransactionsForAccount(supabase, userId, account.id, accountRow?.id ?? null, null);
       newMovements.push(...created);
+
+      if (accountRow?.id) {
+        const { error: snapshotError } = await supabase.from("account_balance_snapshots").upsert(
+          {
+            user_id: userId,
+            account_id: accountRow.id,
+            bank_connection_id: bankConnectionId,
+            snapshot_date: todaySnapshotDate,
+            balance: account.balance,
+          },
+          { onConflict: "account_id,snapshot_date" },
+        );
+        if (snapshotError) console.error("Erro ao gravar snapshot de saldo:", snapshotError);
+      }
     } else if (account.type === "CREDIT") {
       const credit = account.creditData;
       const { data: cardRow } = await supabase

@@ -10,6 +10,7 @@ import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 import { PageHero, PageShell, SectionLabel } from "@/components/ui/page-chrome";
 import { BankLogo } from "@/components/bancos/BankLogo";
+import { BalanceHistoryChart } from "@/components/bancos/BalanceHistoryChart";
 import { realConnectionId } from "@/lib/finance/connection-filter";
 
 const PluggyConnect = dynamic(
@@ -151,6 +152,8 @@ function DetailsPanel({
             <p className="text-sm text-zinc-500">Nenhuma conta importada ainda. Sincronize para trazer os dados.</p>
           )}
         </div>
+
+        <BalanceHistoryChart connectionId={connection.id} />
 
         <p className="mt-4 text-xs leading-relaxed text-zinc-500">
           Os bancos atualizam automaticamente até 1x por dia. Se o saldo aqui parecer atrasado, o banco ainda não

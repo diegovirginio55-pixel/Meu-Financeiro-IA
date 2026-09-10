@@ -1,8 +1,9 @@
 import type { Transaction } from "./types";
-import { isGasto, isRenda, saoPauloMonthKey, shiftMonthKey } from "./fluxo";
+import { isGasto, isRenda, saoPauloMonthKey, saoPauloTodayKey, shiftMonthKey } from "./fluxo";
 import { inferCategoryFromDescription, isTransferDescription, resolvedCategory } from "./categories";
 import { groupSubscriptions } from "./subscriptions";
 import { formatCurrency, formatDate } from "./format";
+import type { AlertCandidate } from "./alert-checks";
 
 export type InsightSeverity = "info" | "atencao" | "critico";
 
@@ -262,6 +263,39 @@ function detectUnusualTransfer(transactions: Transaction[], thisMonth: string): 
 }
 
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { critico: 0, atencao: 1, info: 2 };
+
+const ALERT_SEVERITY: Record<string, InsightSeverity> = {
+  card_due: "atencao",
+  low_balance: "critico",
+  category_spike: "atencao",
+  subscription_price_change: "atencao",
+  weekly_summary: "info",
+};
+
+const ALERT_ICON: Record<string, string> = {
+  card_due: "💳",
+  low_balance: "⚠️",
+  category_spike: "📈",
+  subscription_price_change: "💸",
+  weekly_summary: "📊",
+};
+
+/**
+ * Converte um alerta inteligente (os mesmos que disparam push) para o
+ * mesmo formato dos insights/anomalias, para poderem aparecer juntos no
+ * Centro de Alertas da tela "Meu mês" mesmo sem notificação push ativada.
+ */
+export function alertCandidateToInsight(candidate: AlertCandidate, now: Date = new Date()): Insight {
+  return {
+    id: `alert:${candidate.kind}:${candidate.refKey}`,
+    kind: candidate.kind,
+    severity: ALERT_SEVERITY[candidate.kind] ?? "info",
+    icon: ALERT_ICON[candidate.kind] ?? "🔔",
+    title: candidate.title.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").trim(),
+    description: candidate.body,
+    date: saoPauloTodayKey(now),
+  };
+}
 
 /**
  * Centro de Alertas/Insights: roda todos os detectores de anomalia sobre o

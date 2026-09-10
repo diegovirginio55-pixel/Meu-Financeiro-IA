@@ -8,6 +8,7 @@ import { InstallAppButton } from "@/components/pwa/PwaInstall";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const TABS = [
   { href: "/dashboard", label: "Início", icon: HomeIcon },
@@ -85,7 +86,7 @@ function MenuIcon({ active }: { active?: boolean }) {
   );
 }
 
-const MENU_ROUTES = ["/detalhes", "/bancos", "/fluxo", "/mes"];
+const MENU_ROUTES = ["/detalhes", "/bancos", "/fluxo", "/mes", "/metas"];
 
 export default function BottomNav() {
   const router = useRouter();
@@ -114,6 +115,7 @@ export default function BottomNav() {
               {[
                 { href: "/detalhes", label: "Extrato", icon: "🧾" },
                 { href: "/mes", label: "Meu mês", icon: "📊" },
+                { href: "/metas", label: "Metas", icon: "🎯" },
                 { href: "/bancos", label: "Bancos conectados", icon: "🏦" },
                 { href: "/fluxo", label: "Fluxo de caixa", icon: "🔄" },
               ].map((item) => (
@@ -132,6 +134,7 @@ export default function BottomNav() {
                   {item.label}
                 </Link>
               ))}
+              <NotificationBell variant="menu" />
               <ThemeToggle variant="menu" />
               <InstallAppButton variant="menu" />
               <button

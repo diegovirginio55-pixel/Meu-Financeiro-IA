@@ -30,35 +30,32 @@ const SUBSCRIPTION_MIN_INCREASE_PCT = 0.05;
 const SUBSCRIPTION_MIN_INCREASE_ABS = 2;
 
 /**
- * Calcula os alertas inteligentes pendentes para um usuário: fatura de
- * cartão perto de vencer, saldo previsto ficando negativo nos próximos
- * dias, e gasto de alguma categoria muito acima da média dos últimos
- * meses. Não envia nada — apenas retorna candidatos; quem chama decide
- * se já foi avisado antes (notification_log) e dispara o push.
+ * Núcleo (puro, sem banco de dados) do cálculo dos alertas inteligentes:
+ * fatura de cartão perto de vencer, saldo previsto ficando negativo nos
+ * próximos dias, gasto de alguma categoria muito acima da média e assinatura
+ * que ficou mais cara. Recebe os dados já carregados (útil tanto no
+ * servidor/cron quanto no cliente, que já tem o snapshot financeiro em
+ * memória) e apenas retorna candidatos — quem chama decide se já avisou
+ * antes e dispara o push ou mostra na tela.
  */
-export async function computeSmartAlerts(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<AlertCandidate[]> {
-  const now = new Date();
+export function computeSmartAlertsFromData({
+  accounts,
+  cards,
+  recurring,
+  debts,
+  tx,
+  now = new Date(),
+}: {
+  accounts: Account[];
+  cards: Card[];
+  recurring: RecurringItem[];
+  debts: Debt[];
+  tx: Transaction[];
+  now?: Date;
+}): AlertCandidate[] {
   const todayStr = saoPauloTodayKey(now);
   const thisMonth = saoPauloMonthKey(now);
   const monthKeys = lastNMonthKeys(5, thisMonth);
-  const historyStart = `${monthKeys[0]}-01`;
-
-  const [accountsRes, cardsRes, recurringRes, debtsRes, txRes] = await Promise.all([
-    supabase.from("accounts").select("*").eq("user_id", userId),
-    supabase.from("cards").select("*").eq("user_id", userId),
-    supabase.from("recurring_items").select("*").eq("user_id", userId).eq("active", true),
-    supabase.from("debts").select("*").eq("user_id", userId).eq("paid", false),
-    supabase.from("transactions").select("*").eq("user_id", userId).gte("date", historyStart),
-  ]);
-
-  const accounts = (accountsRes.data ?? []) as Account[];
-  const cards = (cardsRes.data ?? []) as Card[];
-  const recurring = (recurringRes.data ?? []) as RecurringItem[];
-  const debts = (debtsRes.data ?? []) as Debt[];
-  const tx = (txRes.data ?? []) as Transaction[];
 
   const alerts: AlertCandidate[] = [];
   const totalBalance = accounts.reduce((sum, account) => sum + Number(account.balance), 0);
@@ -202,9 +199,78 @@ export async function computeSmartAlerts(
 }
 
 /**
- * Resumo da semana anterior (entradas, saídas, saldo), enviado uma vez
- * por semana. Retorna null se ainda não passou uma semana completa ou
- * se não houve nenhuma movimentação para resumir.
+ * Versão que busca os dados no Supabase e delega para o núcleo puro. Usada
+ * pelo cron (`runAlertsAndSummaries`) para todos os usuários.
+ */
+export async function computeSmartAlerts(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<AlertCandidate[]> {
+  const now = new Date();
+  const thisMonth = saoPauloMonthKey(now);
+  const monthKeys = lastNMonthKeys(5, thisMonth);
+  const historyStart = `${monthKeys[0]}-01`;
+
+  const [accountsRes, cardsRes, recurringRes, debtsRes, txRes] = await Promise.all([
+    supabase.from("accounts").select("*").eq("user_id", userId),
+    supabase.from("cards").select("*").eq("user_id", userId),
+    supabase.from("recurring_items").select("*").eq("user_id", userId).eq("active", true),
+    supabase.from("debts").select("*").eq("user_id", userId).eq("paid", false),
+    supabase.from("transactions").select("*").eq("user_id", userId).gte("date", historyStart),
+  ]);
+
+  return computeSmartAlertsFromData({
+    accounts: (accountsRes.data ?? []) as Account[],
+    cards: (cardsRes.data ?? []) as Card[],
+    recurring: (recurringRes.data ?? []) as RecurringItem[],
+    debts: (debtsRes.data ?? []) as Debt[],
+    tx: (txRes.data ?? []) as Transaction[],
+    now,
+  });
+}
+
+/**
+ * Núcleo puro do resumo semanal (entradas, saídas, saldo). Retorna null se
+ * ainda não passou uma semana completa ou se não houve nenhuma movimentação
+ * para resumir.
+ */
+export function computeWeeklySummaryFromData({
+  tx,
+  now = new Date(),
+}: {
+  tx: Transaction[];
+  now?: Date;
+}): AlertCandidate | null {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", weekday: "short" }).format(now);
+  if (weekday !== "Mon") return null;
+
+  const currentWeekStart = saoPauloWeekStartKey(now);
+  const previousWeekStart = new Date(`${currentWeekStart}T12:00:00`);
+  previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+  const from = previousWeekStart.toISOString().slice(0, 10);
+  const to = new Date(`${currentWeekStart}T12:00:00`);
+  to.setDate(to.getDate() - 1);
+  const toStr = to.toISOString().slice(0, 10);
+
+  const weekTx = tx.filter((t) => t.date >= from && t.date <= toStr);
+  if (weekTx.length === 0) return null;
+
+  const entradas = weekTx.filter(isRenda).reduce((s, t) => s + Number(t.amount), 0);
+  const saidas = weekTx.filter(isGasto).reduce((s, t) => s + Number(t.amount), 0);
+  const saldo = entradas - saidas;
+
+  return {
+    kind: "weekly_summary",
+    refKey: from,
+    title: "Resumo da semana 📊",
+    body: `Entrou ${formatCurrency(entradas)}, saiu ${formatCurrency(saidas)} · saldo da semana: ${formatCurrency(saldo)}`,
+    url: "/visao",
+  };
+}
+
+/**
+ * Resumo da semana anterior, buscando os dados no Supabase. Enviado uma vez
+ * por semana (toda segunda-feira) pelo cron.
  */
 export async function computeWeeklySummary(
   supabase: SupabaseClient,
@@ -229,18 +295,5 @@ export async function computeWeeklySummary(
     .gte("date", from)
     .lte("date", toStr);
 
-  const tx = (data ?? []) as Transaction[];
-  if (tx.length === 0) return null;
-
-  const entradas = tx.filter(isRenda).reduce((s, t) => s + Number(t.amount), 0);
-  const saidas = tx.filter(isGasto).reduce((s, t) => s + Number(t.amount), 0);
-  const saldo = entradas - saidas;
-
-  return {
-    kind: "weekly_summary",
-    refKey: from,
-    title: "Resumo da semana 📊",
-    body: `Entrou ${formatCurrency(entradas)}, saiu ${formatCurrency(saidas)} · saldo da semana: ${formatCurrency(saldo)}`,
-    url: "/visao",
-  };
+  return computeWeeklySummaryFromData({ tx: (data ?? []) as Transaction[], now });
 }

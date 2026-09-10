@@ -31,6 +31,12 @@ export async function PATCH(
       return NextResponse.json({ error: fetchError?.message ?? "Meta não encontrada." }, { status: 404 });
     }
     updates.current_amount = Math.max(0, Number(current.current_amount) + body.add_amount);
+
+    await supabase.from("goal_contributions").insert({
+      user_id: userData.user.id,
+      goal_id: id,
+      amount: body.add_amount,
+    });
   }
 
   for (const field of EDITABLE_FIELDS) {

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { FactorStatus, HealthScoreResult } from "@/lib/finance/health-score";
 import { healthScoreLabel, healthScoreTone } from "@/lib/finance/health-score";
 import { SoftPanel } from "@/components/ui/page-chrome";
@@ -86,6 +87,14 @@ export function HealthScoreCard({ result }: { result: HealthScoreResult }) {
                     style={{ width: `${Math.max(4, Math.min(100, factor.score))}%` }}
                   />
                 </div>
+                {factor.key === "metas" && (
+                  <Link
+                    href="/metas"
+                    className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                  >
+                    Ver e gerenciar metas →
+                  </Link>
+                )}
               </div>
             </li>
           );

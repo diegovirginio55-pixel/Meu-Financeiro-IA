@@ -101,6 +101,25 @@ export function resolvedCategory(transaction: { category: string; description: s
   return inferCategoryFromDescription(transaction.description) ?? transaction.category ?? "Outros";
 }
 
+export interface CategoryRule {
+  pattern: string;
+  category: string;
+}
+
+/**
+ * Regras de categorização criadas manualmente pelo usuário (ex: "toda
+ * transação com 'Uber' vira Transporte"). Têm prioridade sobre a inferência
+ * automática por palavra-chave. Retorna null se nenhuma regra bater.
+ */
+export function applyCategoryRules(description: string, rules: CategoryRule[]): string | null {
+  const text = normalizeDescription(description);
+  for (const rule of rules) {
+    const pattern = normalizeDescription(rule.pattern);
+    if (pattern && text.includes(pattern)) return rule.category;
+  }
+  return null;
+}
+
 export function isTransferDescription(description: string): boolean {
   if (inferCategoryFromDescription(description)) return false;
   const text = normalizeDescription(description);

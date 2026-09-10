@@ -8,6 +8,8 @@ import SaveLastPath from "@/components/nav/SaveLastPath";
 import { PushEnable } from "@/components/pwa/PushEnable";
 import IntroSplash from "@/components/brand/IntroSplash";
 import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
+import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
+import { CommandPalette } from "@/components/search/CommandPalette";
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const phone = usePhoneLayout();
@@ -35,6 +37,8 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       {phone && <BottomNav />}
+      <CommandPalette />
+      <OnboardingModal />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { applyTransactionEffect, type TransactionEffect } from "@/lib/finance/apply-transaction-effect";
 
 const EDITABLE_FIELDS = [
   "description",
@@ -10,6 +11,20 @@ const EDITABLE_FIELDS = [
   "account_id",
   "card_id",
 ] as const;
+
+function effectOf(row: {
+  account_id: string | null;
+  card_id: string | null;
+  type: "entrada" | "saida";
+  amount: number;
+}): TransactionEffect {
+  return {
+    account_id: row.account_id,
+    card_id: row.card_id,
+    type: row.type,
+    amount: Number(row.amount),
+  };
+}
 
 export async function PATCH(
   request: Request,
@@ -36,6 +51,14 @@ export async function PATCH(
     return NextResponse.json({ error: "Nada para atualizar." }, { status: 400 });
   }
 
+  // Busca a transação atual para saber o efeito que ela tinha no saldo da
+  // conta/fatura do cartão, e reverter esse efeito antes de aplicar o novo.
+  const { data: before } = await supabase
+    .from("transactions")
+    .select("account_id, card_id, type, amount")
+    .eq("id", id)
+    .single();
+
   const { data, error } = await supabase
     .from("transactions")
     .update(updates)
@@ -45,6 +68,15 @@ export async function PATCH(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (before) {
+    try {
+      await applyTransactionEffect(supabase, effectOf(before), -1);
+      await applyTransactionEffect(supabase, effectOf(data), 1);
+    } catch (balanceError) {
+      console.error("Erro ao reajustar saldo após editar lançamento:", balanceError);
+    }
   }
 
   return NextResponse.json({ transaction: data });
@@ -61,10 +93,24 @@ export async function DELETE(
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const { data: before } = await supabase
+    .from("transactions")
+    .select("account_id, card_id, type, amount")
+    .eq("id", id)
+    .single();
+
   const { error } = await supabase.from("transactions").delete().eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (before) {
+    try {
+      await applyTransactionEffect(supabase, effectOf(before), -1);
+    } catch (balanceError) {
+      console.error("Erro ao reajustar saldo após excluir lançamento:", balanceError);
+    }
   }
 
   return NextResponse.json({ success: true });

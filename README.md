@@ -19,7 +19,7 @@ Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Pos
 ## 2. Criar o projeto no Supabase
 
 1. Crie um novo projeto em [supabase.com](https://supabase.com/dashboard).
-2. Vá em **SQL Editor** e execute as migrations em [`supabase/migrations/`](supabase/migrations/) (na ordem: `0001_init.sql`, `0002_bank_connections.sql`, `0003_cards_bank_connection.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
+2. Vá em **SQL Editor** e execute todas as migrations em [`supabase/migrations/`](supabase/migrations/), em ordem numérica (`0001_init.sql` até a mais recente, ex: `0008_app_improvements.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
 3. Em **Authentication > Providers**, deixe o provedor **Email** habilitado. O login é pessoal (sem cadastro público na tela).
 4. Em **Project Settings > API**, copie a **Project URL** e a **anon public key**.
 

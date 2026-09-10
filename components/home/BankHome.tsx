@@ -18,6 +18,10 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { accumulatedProfit } from "@/lib/finance/investment-pnl";
 import { useConnectionFilter, usePersistedState } from "@/lib/ui/use-persisted-state";
+import { CronHealthBanner } from "@/components/ui/CronHealthBanner";
+import { StickyBalanceBar } from "@/components/ui/StickyBalanceBar";
+
+const STALE_SYNC_HOURS = 20;
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
@@ -138,6 +142,19 @@ export default function BankHome({
   const dailyBudget = dailyBudgetFromBalance(saldoConta, todayKey);
   const dailyUntilLabel = format(parseISO(`${dailyBudget.until}T12:00:00`), "d 'de' MMMM", { locale: ptBR });
 
+  const oldestSyncAgeHours = useMemo(() => {
+    const pluggyConnections = connections.filter((c) => c.last_synced_at);
+    if (pluggyConnections.length === 0) return null;
+    // eslint-disable-next-line react-hooks/purity -- horário atual só pra exibir "atrasado", não precisa ser puro
+    const now = Date.now();
+    const oldestAge = pluggyConnections.reduce((max, c) => {
+      const age = now - new Date(c.last_synced_at as string).getTime();
+      return Math.max(max, age);
+    }, 0);
+    return oldestAge / 3_600_000;
+  }, [connections]);
+  const dataStale = oldestSyncAgeHours != null && oldestSyncAgeHours > STALE_SYNC_HOURS;
+
   if (connections.length === 0) {
     return (
       <div className="flex min-h-[70vh] flex-col justify-end pb-8 lg:justify-center lg:pb-0">
@@ -169,9 +186,14 @@ export default function BankHome({
 
   return (
     <div className="-mx-4 pb-6 text-zinc-100 lg:-mx-6 xl:-mx-10 2xl:-mx-14">
+      <StickyBalanceBar label={bankLabel} value={money(hidden, displayedBalance)} />
       <section className="relative overflow-hidden px-4 pb-7 pt-1 lg:px-6 lg:pb-10 xl:px-10 2xl:px-14">
         <div className="pointer-events-none absolute -right-16 -top-10 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl lg:h-[22rem] lg:w-[22rem]" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
+
+        <div className="relative">
+          <CronHealthBanner />
+        </div>
 
         <div className="relative lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-end lg:gap-16 xl:gap-24">
           <div>
@@ -208,7 +230,17 @@ export default function BankHome({
               </div>
             </header>
 
-            <p className="mt-8 text-sm text-zinc-500 lg:mt-10">{bankLabel}</p>
+            <p className="mt-8 flex items-center gap-2 text-sm text-zinc-500 lg:mt-10">
+              {bankLabel}
+              {dataStale && (
+                <span
+                  title="Alguns bancos ainda não liberaram dados novos — o saldo pode estar atrasado."
+                  className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300"
+                >
+                  saldo pode estar atrasado
+                </span>
+              )}
+            </p>
             <p className="mt-1 text-[44px] font-semibold leading-none tracking-tight text-white lg:text-[64px]">
               {money(hidden, displayedBalance)}
             </p>

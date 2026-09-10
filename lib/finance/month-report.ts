@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Card, Goal, Transaction } from "./types";
-import { isGasto, isRenda, saoPauloMonthKey, saoPauloTodayKey } from "./fluxo";
+import { isGasto, isRenda, saoPauloMonthKey, saoPauloTodayKey, shiftMonthKey } from "./fluxo";
 import { isInvestmentMovement } from "./investment-movements";
 import { resolvedCategory } from "./categories";
 import { formatCurrency } from "./format";
@@ -31,6 +31,7 @@ export interface MonthReport {
   mediaHistorica: number;
   motivoPrincipal: CategoryDiff | null;
   recomendacoes: string[];
+  comparacaoAnoAnterior: { gastoAnoPassado: number; diffPct: number } | null;
 }
 
 function daysInMonthOf(monthKey: string): number {
@@ -156,6 +157,17 @@ export function computeMonthReport({
     recomendacoes.push("Seu ritmo está normal este mês — continue assim.");
   }
 
+  // Comparação com o mesmo mês do ano passado (sazonalidade) — só mostra se
+  // houver dado suficiente naquele mês (histórico limitado a ~13 meses).
+  const lastYearMonth = shiftMonthKey(monthKey, -12);
+  const lastYearTx = transactions.filter((t) => t.date.startsWith(lastYearMonth) && isGasto(t));
+  let comparacaoAnoAnterior: MonthReport["comparacaoAnoAnterior"] = null;
+  if (lastYearTx.length > 0) {
+    const gastoAnoPassado = lastYearTx.reduce((s, t) => s + Number(t.amount), 0);
+    const diffPct = gastoAnoPassado > 0 ? ((previsaoFimMes - gastoAnoPassado) / gastoAnoPassado) * 100 : 0;
+    comparacaoAnoAnterior = { gastoAnoPassado, diffPct: Number(diffPct.toFixed(1)) };
+  }
+
   return {
     monthKey,
     monthLabel: fullMonthLabel(monthKey),
@@ -173,6 +185,7 @@ export function computeMonthReport({
     mediaHistorica,
     motivoPrincipal,
     recomendacoes: recomendacoes.slice(0, 3),
+    comparacaoAnoAnterior,
   };
 }
 

@@ -32,5 +32,13 @@ export async function GET(request: Request) {
     console.error("Erro ao rodar alertas inteligentes:", error);
   }
 
+  try {
+    await supabase
+      .from("system_heartbeats")
+      .upsert({ key: "bank_cron", last_run_at: new Date().toISOString() }, { onConflict: "key" });
+  } catch (error) {
+    console.error("Erro ao registrar heartbeat do cron:", error);
+  }
+
   return NextResponse.json({ ...result, alerts });
 }

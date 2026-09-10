@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import { computeMonthReport } from "@/lib/finance/month-report";
 import { computeHealthScore } from "@/lib/finance/health-score";
-import { computeInsights } from "@/lib/finance/insights";
+import { alertCandidateToInsight, computeInsights } from "@/lib/finance/insights";
+import { computeSmartAlertsFromData, computeWeeklySummaryFromData } from "@/lib/finance/alert-checks";
 import { buildFinancialCalendar } from "@/lib/finance/financial-calendar";
 import { PageHero, PageShell } from "@/components/ui/page-chrome";
 import { MonthReportCard } from "@/components/mes/MonthReportCard";
@@ -37,7 +38,27 @@ export default function MesClient({ snapshot }: { snapshot: FinancialSnapshot })
     [snapshot.historyTx, snapshot.cards, snapshot.debts, snapshot.goals, snapshot.totalBalance, snapshot.totalInvestments],
   );
 
-  const insights = useMemo(() => computeInsights({ transactions: snapshot.historyTx }), [snapshot.historyTx]);
+  const insights = useMemo(() => {
+    const anomalies = computeInsights({ transactions: snapshot.historyTx });
+    const smartAlerts = computeSmartAlertsFromData({
+      accounts: snapshot.accounts,
+      cards: snapshot.cards,
+      recurring: snapshot.recurringItems,
+      debts: snapshot.debts,
+      tx: snapshot.historyTx,
+    });
+    const weeklySummary = computeWeeklySummaryFromData({ tx: snapshot.historyTx });
+    const alertInsights = [...smartAlerts, ...(weeklySummary ? [weeklySummary] : [])].map((a) =>
+      alertCandidateToInsight(a),
+    );
+    // Evita duplicar quando o mesmo assunto já aparece nas duas listas (ex:
+    // aumento de assinatura detectado tanto no alerta quanto no insight).
+    const seenKinds = new Set(anomalies.map((i) => i.kind));
+    const merged = [...anomalies, ...alertInsights.filter((i) => !seenKinds.has(i.kind) || i.kind === "card_due" || i.kind === "low_balance")];
+    return merged
+      .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "critico" ? -1 : b.severity === "critico" ? 1 : 0))
+      .slice(0, 20);
+  }, [snapshot.historyTx, snapshot.accounts, snapshot.cards, snapshot.recurringItems, snapshot.debts]);
 
   const calendar = useMemo(
     () =>

@@ -7,6 +7,8 @@ import type { ChatUiMessage } from "@/lib/finance/chat-types";
 import type { ChatMessageRow } from "@/lib/finance/types";
 import type { ChatQuotaView } from "@/lib/ai/quota";
 import { PageHero, PageShell } from "@/components/ui/page-chrome";
+import { extractChatCard } from "@/lib/finance/chat-card";
+import { ChatSuggestionChips } from "./ChatSuggestionChips";
 
 export default function ChatWindow() {
   const [messages, setMessages] = useState<ChatUiMessage[]>([]);
@@ -68,17 +70,22 @@ export default function ChatWindow() {
     };
   }, [limitedNow]);
 
-  function revealText(id: string, text: string) {
+  function revealText(id: string, fullReply: string) {
+    // Se a resposta terminar com o bloco "[[CARD:{...}]]" (resumo estruturado),
+    // revela só o texto visível animando, e mostra o cartão só ao final —
+    // senão o JSON cru apareceria piscando durante a digitação.
+    const { text } = extractChatCard(fullReply);
     let i = 0;
     const step = Math.max(1, Math.floor(text.length / 60));
     const interval = setInterval(() => {
       i += step;
+      const done = i >= text.length;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === id ? { ...m, content: text.slice(0, i) } : m,
+          m.id === id ? { ...m, content: done ? fullReply : text.slice(0, i) } : m,
         ),
       );
-      if (i >= text.length) clearInterval(interval);
+      if (done) clearInterval(interval);
     }, 18);
   }
 
@@ -223,6 +230,7 @@ export default function ChatWindow() {
             {quota.label}
           </p>
         ) : null}
+        <ChatSuggestionChips disabled={sending || limited} onPick={handleSend} />
         <ChatInput
           disabled={sending || limited}
           locked={limited}

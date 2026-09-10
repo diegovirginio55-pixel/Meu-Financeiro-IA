@@ -31,17 +31,24 @@ export default function TransactionsTable({
   cards,
   onUpdate,
   onDelete,
+  selectedIds,
+  onToggleSelect,
+  onSelectAll,
 }: {
   transactions: Transaction[];
   accounts: Account[];
   cards: Card[];
   onUpdate: (id: string, patch: Record<string, unknown>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onSelectAll?: (ids: string[], select: boolean) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditableFields | null>(null);
   const [saving, setSaving] = useState(false);
   const phone = usePhoneLayout();
+  const selectable = Boolean(onToggleSelect);
 
   function accountOrCardLabel(t: Transaction) {
     if (t.card_id) {
@@ -132,12 +139,22 @@ export default function TransactionsTable({
                 </div>
               ) : (
                 <div className="flex items-start justify-between gap-3">
-                  <button type="button" onClick={() => startEdit(t)} className="min-w-0 text-left">
-                    <span className="block truncate text-sm text-zinc-100">{t.description}</span>
-                    <span className="text-xs text-zinc-500">
-                      {formatDate(t.date)} · {CATEGORY_ICONS[t.category] ?? "🔖"} {t.category}
-                    </span>
-                  </button>
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    {selectable && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds?.has(t.id) ?? false}
+                        onChange={() => onToggleSelect?.(t.id)}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-zinc-700 bg-zinc-900 accent-emerald-500"
+                      />
+                    )}
+                    <button type="button" onClick={() => startEdit(t)} className="min-w-0 text-left">
+                      <span className="block truncate text-sm text-zinc-100">{t.description}</span>
+                      <span className="text-xs text-zinc-500">
+                        {formatDate(t.date)} · {CATEGORY_ICONS[t.category] ?? "🔖"} {t.category}
+                      </span>
+                    </button>
+                  </div>
                   <div className="shrink-0 text-right">
                     <p className={`text-sm font-medium ${t.type === "entrada" ? "text-emerald-400" : "text-rose-300"}`}>
                       {t.type === "entrada" ? "+" : "−"}
@@ -161,6 +178,16 @@ export default function TransactionsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-800 text-left text-zinc-400">
+            {selectable && (
+              <th className="px-4 py-3 font-medium">
+                <input
+                  type="checkbox"
+                  checked={transactions.length > 0 && transactions.every((t) => selectedIds?.has(t.id))}
+                  onChange={(e) => onSelectAll?.(transactions.map((t) => t.id), e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-emerald-500"
+                />
+              </th>
+            )}
             <th className="px-4 py-3 font-medium">Data</th>
             <th className="px-4 py-3 font-medium">Descrição</th>
             <th className="px-4 py-3 font-medium">Categoria</th>
@@ -174,6 +201,16 @@ export default function TransactionsTable({
             const isEditing = editingId === t.id;
             return (
               <tr key={t.id} className="border-b border-zinc-800/60 last:border-0">
+                {selectable && (
+                  <td className="px-4 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds?.has(t.id) ?? false}
+                      onChange={() => onToggleSelect?.(t.id)}
+                      className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-emerald-500"
+                    />
+                  </td>
+                )}
                 <td className="px-4 py-2.5 text-zinc-300">
                   {isEditing ? (
                     <input

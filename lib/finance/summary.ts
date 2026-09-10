@@ -76,6 +76,9 @@ export async function getFinancialSnapshot(
   const monthStart = saoPauloMonthStartKey(now);
   const monthEnd = saoPauloMonthEndKey(now);
   const sixMonthsAgo = `${lastNMonthKeys(6, saoPauloMonthKey(now))[0]}-01`;
+  // historyTx precisa ir um pouco além de 12 meses pra dar pra comparar o mês
+  // atual com o mesmo mês do ano passado em "Meu mês".
+  const thirteenMonthsAgo = `${lastNMonthKeys(13, saoPauloMonthKey(now))[0]}-01`;
 
   const [
     accountsRes,
@@ -103,7 +106,7 @@ export async function getFinancialSnapshot(
       .select("*")
       .gte("date", monthStart)
       .lte("date", monthEnd),
-    supabase.from("transactions").select("*").gte("date", sixMonthsAgo),
+    supabase.from("transactions").select("*").gte("date", thirteenMonthsAgo),
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", sixMonthsAgo),
     supabase.from("investment_transactions").select("*").gte("date", sixMonthsAgo),
   ]);

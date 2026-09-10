@@ -70,6 +70,16 @@ export function MonthReportCard({ report }: { report: MonthReport }) {
           Previsão para o fim do mês:{" "}
           <span className="font-medium text-zinc-200">{formatCurrency(report.previsaoFimMes)}</span> em saídas
         </p>
+        {report.comparacaoAnoAnterior && (
+          <p className="mt-1.5 text-sm text-zinc-500">
+            Mesmo mês do ano passado: {formatCurrency(report.comparacaoAnoAnterior.gastoAnoPassado)} —{" "}
+            <span className={report.comparacaoAnoAnterior.diffPct > 0 ? "text-rose-300" : "text-emerald-300"}>
+              {report.comparacaoAnoAnterior.diffPct > 0 ? "+" : ""}
+              {report.comparacaoAnoAnterior.diffPct.toFixed(0)}%
+            </span>{" "}
+            {report.comparacaoAnoAnterior.diffPct > 0 ? "mais" : "menos"} este ano
+          </p>
+        )}
       </div>
 
       <div className="mt-5">

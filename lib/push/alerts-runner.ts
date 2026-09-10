@@ -11,7 +11,14 @@ async function markAsSent(supabase: SupabaseClient, userId: string, candidate: A
   const { data, error } = await supabase
     .from("notification_log")
     .upsert(
-      { user_id: userId, kind: candidate.kind, ref_key: candidate.refKey },
+      {
+        user_id: userId,
+        kind: candidate.kind,
+        ref_key: candidate.refKey,
+        title: candidate.title,
+        body: candidate.body,
+        url: candidate.url,
+      },
       { onConflict: "user_id,kind,ref_key", ignoreDuplicates: true },
     )
     .select();

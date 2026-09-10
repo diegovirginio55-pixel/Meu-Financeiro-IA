@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import TransactionsFilters, { type FiltersState } from "./TransactionsFilters";
 import TransactionsTable from "./TransactionsTable";
+import { CategoryRulesPanel } from "./CategoryRulesPanel";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
 import { formatCurrency, formatPercent } from "@/lib/finance/format";
 import { isPlaceholderAccount, isPlaceholderCard } from "@/lib/finance/account-name";
+import { CATEGORIES } from "@/lib/finance/categories";
 import { HeroAmount, PageHero, PageShell, SoftPanel } from "@/components/ui/page-chrome";
 import { usePersistedState } from "@/lib/ui/use-persisted-state";
 import { exportTransactionsPdf } from "@/lib/finance/export-pdf";
+import { exportTransactionsCsv } from "@/lib/finance/export-csv";
 
 const PERIOD_LABELS: Record<FiltersState["period"], string> = {
   hoje: "Hoje",
@@ -45,6 +49,7 @@ function matchesSearch(transaction: Transaction, search: string | undefined): bo
 }
 
 export default function DetalhesClient() {
+  const searchParams = useSearchParams();
   const [filters, setFilters, filtersReady] = usePersistedState<FiltersState>("mf-detalhes-filters", DEFAULT_FILTERS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -52,6 +57,18 @@ export default function DetalhesClient() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState<string>(CATEGORIES[0]);
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  // Busca global (Ctrl+K) pode mandar pra cá com "?q=algo" pra já aplicar a busca.
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q && filtersReady) {
+      setFilters((prev) => ({ ...prev, search: q }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, filtersReady]);
 
   const load = useCallback(async (f: FiltersState) => {
     const params = new URLSearchParams();
@@ -118,6 +135,43 @@ export default function DetalhesClient() {
     await load(filters);
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll(ids: string[], select: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (select ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  }
+
+  async function handleBulkCategorize() {
+    if (selectedIds.size === 0) return;
+    setBulkSaving(true);
+    try {
+      await fetch("/api/transactions/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds), category: bulkCategory }),
+      });
+      setSelectedIds(new Set());
+      await load(filters);
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  function handleExportCsv() {
+    exportTransactionsCsv({ transactions: filteredTransactions, accounts, cards });
+  }
+
   async function handleExportPdf() {
     setExporting(true);
     try {
@@ -156,14 +210,24 @@ export default function DetalhesClient() {
         title={<HeroAmount>{formatCurrency(saldo)}</HeroAmount>}
         subtitle={`${filteredTransactions.length} lançamentos neste filtro`}
         trailing={
-          <button
-            type="button"
-            onClick={() => void handleExportPdf()}
-            disabled={exporting || filteredTransactions.length === 0}
-            className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {exporting ? "Gerando…" : "Exportar PDF"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={filteredTransactions.length === 0}
+              className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              Exportar CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExportPdf()}
+              disabled={exporting || filteredTransactions.length === 0}
+              className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {exporting ? "Gerando…" : "Exportar PDF"}
+            </button>
+          </div>
         }
       >
         <div className="mb-1.5 flex justify-between text-sm">
@@ -187,6 +251,40 @@ export default function DetalhesClient() {
           accounts={accounts}
           cards={cards}
         />
+
+        <CategoryRulesPanel onApplied={() => load(filters)} />
+
+        {selectedIds.size > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-emerald-800/50 bg-emerald-950/20 p-3">
+            <span className="text-xs text-emerald-200">{selectedIds.size} selecionado(s)</span>
+            <select
+              value={bulkCategory}
+              onChange={(e) => setBulkCategory(e.target.value)}
+              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100 outline-none"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => void handleBulkCategorize()}
+              disabled={bulkSaving}
+              className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {bulkSaving ? "Aplicando…" : "Aplicar categoria"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs text-zinc-400 hover:text-zinc-200"
+            >
+              Limpar seleção
+            </button>
+          </div>
+        )}
 
         <div className="mt-5">
           {loading ? (
@@ -215,13 +313,16 @@ export default function DetalhesClient() {
                 cards={cards}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onSelectAll={selectAll}
               />
             </SoftPanel>
           )}
         </div>
 
         <p className="mt-4 text-xs text-zinc-500">
-          Editar aqui corrige a descrição, categoria, valor ou data — mas não reajusta o saldo da conta.
+          Editar ou excluir aqui já reajusta o saldo da conta ou a fatura do cartão vinculado automaticamente.
         </p>
       </div>
     </PageShell>
