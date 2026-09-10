@@ -45,7 +45,7 @@ export default function TabNav() {
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  prefetch={tab.href !== "/visao" && tab.href !== "/ativos" && tab.href !== "/mes" && tab.href !== "/metas"}
+                  prefetch
                   onClick={() => onNavigate(tab.href)}
                   className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active ? "bg-white font-medium text-zinc-950" : "text-zinc-400 hover:text-zinc-100"

@@ -122,6 +122,7 @@ export default function BottomNav() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch
                   onClick={() => {
                     onNavigate(item.href);
                     setMenuOpen(false);
@@ -161,7 +162,7 @@ export default function BottomNav() {
               <Link
                 key={tab.href}
                 href={tab.href}
-                prefetch={tab.href !== "/visao" && tab.href !== "/ativos"}
+                prefetch
                 onClick={() => onNavigate(tab.href)}
                 className="flex flex-col items-center gap-0.5 text-[11px]"
               >
