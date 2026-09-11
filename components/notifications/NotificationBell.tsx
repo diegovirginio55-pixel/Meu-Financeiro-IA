@@ -94,8 +94,8 @@ function Panel({
   onClose: () => void;
 }) {
   return (
-    <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
-      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+    <div className="flex max-h-[70vh] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-3">
         <p className="text-sm font-semibold text-white">Notificações</p>
         <div className="flex items-center gap-3">
           {notifications.some((n) => !n.read_at) && (
@@ -108,7 +108,7 @@ function Panel({
           </button>
         </div>
       </div>
-      <div className="max-h-96 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {notifications.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-500">Nenhuma notificação por aqui ainda.</p>
         ) : (
@@ -166,10 +166,10 @@ export function NotificationBell({ variant = "nav" }: { variant?: "nav" | "menu"
         </button>
         {open && (
           <div
-            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-4 sm:items-center"
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-4 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:items-center sm:pb-4"
             onClick={() => setOpen(false)}
           >
-            <div onClick={(e) => e.stopPropagation()}>
+            <div className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
               <Panel
                 notifications={notifications}
                 onItemClick={handleItemClick}
