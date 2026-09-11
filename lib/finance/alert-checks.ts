@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Account, Card, Debt, RecurringItem, Transaction } from "./types";
 import {
+  dailyBudgetFromBalance,
   isGasto,
   isRenda,
   lastNMonthKeys,
@@ -9,6 +10,7 @@ import {
   saoPauloTodayKey,
   saoPauloWeekStartKey,
   shiftMonthKey,
+  sumGastosInRange,
 } from "./fluxo";
 import { resolvedCategory } from "./categories";
 import { formatCurrency } from "./format";
@@ -28,6 +30,11 @@ const CATEGORY_SPIKE_MIN_AVERAGE = 30;
 const SUBSCRIPTION_STABLE_TOLERANCE = 0.03;
 const SUBSCRIPTION_MIN_INCREASE_PCT = 0.05;
 const SUBSCRIPTION_MIN_INCREASE_ABS = 2;
+const OVERSPEND_TODAY_MULTIPLIER = 1.3;
+const OVERSPEND_TODAY_MIN_AMOUNT = 30;
+const MONTH_PACE_HIGH_PCT = 20;
+const MONTH_PACE_GOOD_PCT = -15;
+const MONTH_PACE_MIN_AVERAGE = 100;
 
 /**
  * Núcleo (puro, sem banco de dados) do cálculo dos alertas inteligentes:
@@ -163,6 +170,75 @@ export function computeSmartAlertsFromData({
           url: "/detalhes",
         });
       }
+    });
+  }
+
+  // 3b) Ritmo geral do mês (todas as categorias somadas) — avisa se está
+  // gastando bem acima ou bem abaixo da média histórica, pra dar tempo de
+  // ajustar (ou parabenizar quando está indo bem).
+  const totalCurrentGasto = Array.from(currentByCategory.values()).reduce((s, v) => s + v, 0);
+  const pastTotalGastos = pastMonths
+    .map((monthKey) => tx.filter((t) => t.date.startsWith(monthKey) && isGasto(t)).reduce((s, t) => s + Number(t.amount), 0))
+    .filter((v) => v > 0);
+  if (dayOfMonth >= 5 && pastTotalGastos.length >= 2) {
+    const mediaHistoricaTotal = pastTotalGastos.reduce((s, v) => s + v, 0) / pastTotalGastos.length;
+    if (mediaHistoricaTotal >= MONTH_PACE_MIN_AVERAGE) {
+      const previsaoFimMes = (totalCurrentGasto / dayOfMonth) * daysInMonth;
+      const ritmoPct = ((previsaoFimMes - mediaHistoricaTotal) / mediaHistoricaTotal) * 100;
+      if (ritmoPct > MONTH_PACE_HIGH_PCT) {
+        alerts.push({
+          kind: "month_pace_high",
+          refKey: thisMonth,
+          title: "Ritmo de gastos acima do normal 📈",
+          body: `Nesse ritmo, o mês deve fechar com ${formatCurrency(previsaoFimMes)} em gastos — ${Math.round(ritmoPct)}% acima da sua média de ${formatCurrency(mediaHistoricaTotal)}. Ainda dá tempo de ajustar.`,
+          url: "/mes",
+        });
+      } else if (ritmoPct < MONTH_PACE_GOOD_PCT) {
+        alerts.push({
+          kind: "month_pace_good",
+          refKey: thisMonth,
+          title: "Você está economizando bem 🎉",
+          body: `Nesse ritmo, o mês deve fechar com ${formatCurrency(previsaoFimMes)} em gastos — ${Math.round(Math.abs(ritmoPct))}% abaixo da sua média de ${formatCurrency(mediaHistoricaTotal)}. Continue assim!`,
+          url: "/mes",
+        });
+      }
+    }
+  }
+
+  // 3c) Quanto ainda pode gastar hoje sem comprometer o mês (baseado no
+  // saldo em conta até o dia 5 do mês seguinte) e aviso se já passou bem
+  // disso.
+  const dailyBudget = dailyBudgetFromBalance(totalBalance, todayStr);
+  const gastosHojeTotal = sumGastosInRange(tx, todayStr, todayStr);
+  if (dailyBudget.perDay > 1) {
+    const restante = Math.max(0, dailyBudget.perDay - gastosHojeTotal);
+    alerts.push({
+      kind: "daily_budget",
+      refKey: todayStr,
+      title: "Seu limite de hoje 💰",
+      body:
+        gastosHojeTotal > 0
+          ? `Limite do dia: ${formatCurrency(dailyBudget.perDay)} · você já gastou ${formatCurrency(gastosHojeTotal)} hoje · ainda pode gastar ${formatCurrency(restante)}.`
+          : `Hoje você pode gastar até ${formatCurrency(dailyBudget.perDay)} sem comprometer o resto do mês (baseado no saldo em conta).`,
+      url: "/dashboard",
+    });
+
+    if (gastosHojeTotal > dailyBudget.perDay * OVERSPEND_TODAY_MULTIPLIER && gastosHojeTotal >= OVERSPEND_TODAY_MIN_AMOUNT) {
+      alerts.push({
+        kind: "overspend_today",
+        refKey: todayStr,
+        title: "Você passou do limite de hoje 🚨",
+        body: `Já gastou ${formatCurrency(gastosHojeTotal)} hoje, ${formatCurrency(gastosHojeTotal - dailyBudget.perDay)} acima do limite diário de ${formatCurrency(dailyBudget.perDay)}. Tente compensar reduzindo gastos nos próximos dias.`,
+        url: "/detalhes",
+      });
+    }
+  } else if (totalBalance <= 0) {
+    alerts.push({
+      kind: "daily_budget",
+      refKey: todayStr,
+      title: "Saldo baixo hoje ⚠️",
+      body: "Seu saldo em conta está zerado ou negativo. Se puder, evite novos gastos até a próxima entrada.",
+      url: "/dashboard",
     });
   }
 

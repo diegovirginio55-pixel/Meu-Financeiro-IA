@@ -270,6 +270,10 @@ const ALERT_SEVERITY: Record<string, InsightSeverity> = {
   category_spike: "atencao",
   subscription_price_change: "atencao",
   weekly_summary: "info",
+  daily_budget: "info",
+  overspend_today: "atencao",
+  month_pace_high: "atencao",
+  month_pace_good: "info",
 };
 
 const ALERT_ICON: Record<string, string> = {
@@ -278,6 +282,10 @@ const ALERT_ICON: Record<string, string> = {
   category_spike: "📈",
   subscription_price_change: "💸",
   weekly_summary: "📊",
+  daily_budget: "💰",
+  overspend_today: "🚨",
+  month_pace_high: "📈",
+  month_pace_good: "🎉",
 };
 
 /**

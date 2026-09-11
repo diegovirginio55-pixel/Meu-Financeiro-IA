@@ -1,6 +1,23 @@
-import type { Card, Goal, Transaction } from "../types";
+import type { Account, Card, Goal, Transaction } from "../types";
 
 let counter = 0;
+
+export function makeAccount(overrides: Partial<Account> = {}): Account {
+  counter += 1;
+  return {
+    id: `account-${counter}`,
+    user_id: "user-1",
+    name: "Conta teste",
+    type: "corrente",
+    balance: 1000,
+    pluggy_account_id: null,
+    bank_connection_id: null,
+    source: "manual",
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 export function makeTx(overrides: Partial<Transaction> = {}): Transaction {
   counter += 1;

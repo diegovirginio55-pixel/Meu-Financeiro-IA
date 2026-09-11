@@ -1,6 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeSmartAlerts, computeWeeklySummary, type AlertCandidate } from "@/lib/finance/alert-checks";
+import { saoPauloHour } from "@/lib/finance/fluxo";
 import { sendPushToUser } from "./send";
+
+const DAILY_BUDGET_PUSH_START_HOUR = 7;
+const DAILY_BUDGET_PUSH_END_HOUR = 10;
+
+/**
+ * O aviso "quanto você pode gastar hoje" só é enviado por push pela manhã
+ * (o resto do dia ele já ficou obsoleto pra decisão do dia). Fora dessa
+ * janela o candidato simplesmente não é despachado ainda — como ele não é
+ * marcado como enviado, a próxima execução do cron (a cada 10 min) tenta
+ * de novo até cair dentro do horário. Continua aparecendo normalmente no
+ * Centro de Alertas do app, que não passa por aqui.
+ */
+function isDailyBudgetPushWindow(now: Date): boolean {
+  const hour = saoPauloHour(now);
+  return hour >= DAILY_BUDGET_PUSH_START_HOUR && hour < DAILY_BUDGET_PUSH_END_HOUR;
+}
 
 /**
  * Registra que um alerta foi enviado (dedupe por user+kind+ref_key). Se
@@ -45,6 +62,7 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
   const { data: accountRows } = await supabase.from("accounts").select("user_id");
   const userIds = Array.from(new Set((accountRows ?? []).map((row) => row.user_id as string)));
 
+  const now = new Date();
   let sent = 0;
   for (const userId of userIds) {
     try {
@@ -52,6 +70,7 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
       const summary = await computeWeeklySummary(supabase, userId);
       const candidates = summary ? [...alerts, summary] : alerts;
       for (const candidate of candidates) {
+        if (candidate.kind === "daily_budget" && !isDailyBudgetPushWindow(now)) continue;
         if (await dispatch(supabase, userId, candidate)) sent += 1;
       }
     } catch (error) {
