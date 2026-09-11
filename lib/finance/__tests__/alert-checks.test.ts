@@ -112,3 +112,67 @@ describe("computeSmartAlertsFromData — limite diário e ritmo do mês", () => 
     expect(pace).toBeDefined();
   });
 });
+
+describe("computeSmartAlertsFromData — orçamento definido pelo usuário", () => {
+  it("usa o orçamento definido (não a média histórica) para o ritmo do mês", () => {
+    // Sem orçamento, a média histórica (baixa) não geraria alerta. Com um
+    // orçamento baixo definido pelo usuário, o gasto do mês já projeta
+    // acima dele e deve disparar o alerta baseado no orçamento.
+    const tx = [
+      makeTx({ date: `${TODAY.slice(0, 7)}-05`, amount: 400, type: "saida", category: "Compras" }),
+      makeTx({ date: `${TODAY.slice(0, 7)}-15`, amount: 400, type: "saida", category: "Compras" }),
+    ];
+
+    const alerts = computeSmartAlertsFromData({
+      accounts: [makeAccount({ balance: 5000 })],
+      cards: [],
+      recurring: [],
+      debts: [],
+      tx,
+      budget: { monthKey: TODAY.slice(0, 7), spendingLimit: 500, savingsTarget: null },
+      now: NOW,
+    });
+
+    const pace = alerts.find((a) => a.kind === "month_pace_high");
+    expect(pace).toBeDefined();
+    expect(pace?.body).toContain("orçamento");
+  });
+
+  it("avisa quando a meta de economia do mês está em risco", () => {
+    const tx = [
+      makeTx({ date: `${TODAY.slice(0, 7)}-05`, amount: 1000, type: "entrada", category: "Salário" }),
+      makeTx({ date: `${TODAY.slice(0, 7)}-06`, amount: 950, type: "saida", category: "Compras" }),
+    ];
+
+    const alerts = computeSmartAlertsFromData({
+      accounts: [makeAccount({ balance: 1000 })],
+      cards: [],
+      recurring: [],
+      debts: [],
+      tx,
+      budget: { monthKey: TODAY.slice(0, 7), spendingLimit: null, savingsTarget: 2000 },
+      now: NOW,
+    });
+
+    expect(alerts.find((a) => a.kind === "savings_target_at_risk")).toBeDefined();
+  });
+
+  it("comemora quando a meta de economia do mês foi batida", () => {
+    const tx = [
+      makeTx({ date: `${TODAY.slice(0, 7)}-05`, amount: 3000, type: "entrada", category: "Salário" }),
+      makeTx({ date: `${TODAY.slice(0, 7)}-06`, amount: 500, type: "saida", category: "Compras" }),
+    ];
+
+    const alerts = computeSmartAlertsFromData({
+      accounts: [makeAccount({ balance: 1000 })],
+      cards: [],
+      recurring: [],
+      debts: [],
+      tx,
+      budget: { monthKey: TODAY.slice(0, 7), spendingLimit: null, savingsTarget: 1000 },
+      now: NOW,
+    });
+
+    expect(alerts.find((a) => a.kind === "savings_target_reached")).toBeDefined();
+  });
+});

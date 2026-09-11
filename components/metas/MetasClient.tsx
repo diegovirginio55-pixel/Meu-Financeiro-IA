@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/finance/format";
 import { suggestMonthlyContribution } from "@/lib/finance/goal-suggestion";
+import type { MonthlyBudget } from "@/lib/finance/budget";
 import type { Goal, Transaction } from "@/lib/finance/types";
 import { PageHero, PageShell, SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
+import { MonthlyBudgetCard } from "@/components/metas/MonthlyBudgetCard";
 
 interface Contribution {
   id: string;
@@ -186,9 +188,11 @@ function GoalCard({ goal, onRefresh }: { goal: Goal; onRefresh: () => Promise<vo
 export default function MetasClient({
   initialGoals,
   historyTx,
+  initialBudget,
 }: {
   initialGoals: Goal[];
   historyTx: Transaction[];
+  initialBudget: MonthlyBudget | null;
 }) {
   const [goals, setGoals] = useState(initialGoals);
   const [formOpen, setFormOpen] = useState(false);
@@ -250,6 +254,8 @@ export default function MetasClient({
       <PageHero kicker="Metas" title="Suas metas de economia" subtitle={`${goals.length} meta(s) cadastrada(s)`} />
 
       <div className="flex flex-col gap-6 px-4 pb-2 lg:px-6 xl:px-10 2xl:px-14">
+        <MonthlyBudgetCard historyTx={historyTx} initialBudget={initialBudget} />
+
         {suggestion > 0 && (
           <SoftPanel className="border-emerald-800/50 bg-emerald-950/15 p-4">
             <p className="text-sm text-emerald-100">

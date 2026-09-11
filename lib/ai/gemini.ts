@@ -37,6 +37,19 @@ export function buildSystemPrompt(snapshot: FinancialSnapshot): string {
       .map((g) => `- ${g.name}: ${formatCurrency(Number(g.current_amount))} de ${formatCurrency(Number(g.target_amount))}${g.deadline ? ` (até ${g.deadline})` : ""}`)
       .join("\n") || "- Nenhuma meta criada ainda.";
 
+  const orcamentoResumo = snapshot.monthlyBudget
+    ? [
+        snapshot.monthlyBudget.spendingLimit != null
+          ? `- Pretende gastar até ${formatCurrency(snapshot.monthlyBudget.spendingLimit)} este mês.`
+          : null,
+        snapshot.monthlyBudget.savingsTarget != null
+          ? `- Pretende economizar ${formatCurrency(snapshot.monthlyBudget.savingsTarget)} este mês.`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n") || "- Orçamento do mês ainda não definido (sugira definir em /metas se relevante)."
+    : "- Orçamento do mês ainda não definido (sugira definir em /metas se relevante).";
+
   return `Você é a IA financeira pessoal do usuário dentro do app "Meu Financeiro IA". Seu papel é ajudá-lo a registrar e entender sua vida financeira através de uma conversa natural em português do Brasil.
 
 REGRAS IMPORTANTES:
@@ -79,6 +92,9 @@ ${proximosResumo}
 
 Metas de economia:
 ${metasResumo}
+
+Orçamento definido para este mês:
+${orcamentoResumo}
 
 Data de hoje: ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
 }

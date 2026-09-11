@@ -8,5 +8,11 @@ export default async function MetasPage() {
   const supabase = await createClient();
   const snapshot = await getFinancialSnapshot(supabase);
 
-  return <MetasClient initialGoals={snapshot.goals} historyTx={snapshot.historyTx} />;
+  return (
+    <MetasClient
+      initialGoals={snapshot.goals}
+      historyTx={snapshot.historyTx}
+      initialBudget={snapshot.monthlyBudget}
+    />
+  );
 }

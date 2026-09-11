@@ -46,6 +46,7 @@ export default function MesClient({ snapshot }: { snapshot: FinancialSnapshot })
       recurring: snapshot.recurringItems,
       debts: snapshot.debts,
       tx: snapshot.historyTx,
+      budget: snapshot.monthlyBudget,
     });
     const weeklySummary = computeWeeklySummaryFromData({ tx: snapshot.historyTx });
     const alertInsights = [...smartAlerts, ...(weeklySummary ? [weeklySummary] : [])].map((a) =>
@@ -58,7 +59,7 @@ export default function MesClient({ snapshot }: { snapshot: FinancialSnapshot })
     return merged
       .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "critico" ? -1 : b.severity === "critico" ? 1 : 0))
       .slice(0, 20);
-  }, [snapshot.historyTx, snapshot.accounts, snapshot.cards, snapshot.recurringItems, snapshot.debts]);
+  }, [snapshot.historyTx, snapshot.accounts, snapshot.cards, snapshot.recurringItems, snapshot.debts, snapshot.monthlyBudget]);
 
   const calendar = useMemo(
     () =>

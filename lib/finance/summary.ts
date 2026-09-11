@@ -27,6 +27,7 @@ import {
 import { resolvedCategory } from "./categories";
 import { uniqueInvestments } from "./bank-connections";
 import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
+import type { MonthlyBudget } from "./budget";
 
 export interface UpcomingItem {
   description: string;
@@ -62,6 +63,7 @@ export interface FinancialSnapshot {
   evolucaoMensal: { mes: string; entradas: number; despesas: number }[];
   historyTx: Transaction[];
   recurringItems: RecurringItem[];
+  monthlyBudget: MonthlyBudget | null;
 }
 
 /**
@@ -91,6 +93,7 @@ export async function getFinancialSnapshot(
     historyTxRes,
     snapRes,
     invTxRes,
+    budgetRes,
   ] = await Promise.all([
     supabase.from("accounts").select("*").order("created_at"),
     supabase.from("cards").select("*").order("created_at"),
@@ -109,6 +112,7 @@ export async function getFinancialSnapshot(
     supabase.from("transactions").select("*").gte("date", thirteenMonthsAgo),
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", sixMonthsAgo),
     supabase.from("investment_transactions").select("*").gte("date", sixMonthsAgo),
+    supabase.from("monthly_budgets").select("*").eq("month_key", saoPauloMonthKey(now)).maybeSingle(),
   ]);
 
   const accounts = (accountsRes.data ?? []) as Account[];
@@ -234,6 +238,15 @@ export async function getFinancialSnapshot(
     ([mes, v]) => ({ mes, ...v }),
   );
 
+  const budgetRow = budgetRes.data as { spending_limit: number | null; savings_target: number | null } | null;
+  const monthlyBudget: MonthlyBudget | null = budgetRow
+    ? {
+        monthKey: saoPauloMonthKey(now),
+        spendingLimit: budgetRow.spending_limit,
+        savingsTarget: budgetRow.savings_target,
+      }
+    : null;
+
   return {
     accounts,
     cards,
@@ -260,5 +273,6 @@ export async function getFinancialSnapshot(
     evolucaoMensal,
     historyTx,
     recurringItems,
+    monthlyBudget,
   };
 }

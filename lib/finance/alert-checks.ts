@@ -15,6 +15,7 @@ import {
 import { resolvedCategory } from "./categories";
 import { formatCurrency } from "./format";
 import { groupSubscriptions, subscriptionKey } from "./subscriptions";
+import type { MonthlyBudget } from "./budget";
 
 export interface AlertCandidate {
   kind: string;
@@ -35,6 +36,9 @@ const OVERSPEND_TODAY_MIN_AMOUNT = 30;
 const MONTH_PACE_HIGH_PCT = 20;
 const MONTH_PACE_GOOD_PCT = -15;
 const MONTH_PACE_MIN_AVERAGE = 100;
+const BUDGET_PACE_HIGH_MULTIPLIER = 1.05;
+const SAVINGS_AT_RISK_MIN_DAY = 10;
+const SAVINGS_AT_RISK_PACE_RATIO = 0.7;
 
 /**
  * Núcleo (puro, sem banco de dados) do cálculo dos alertas inteligentes:
@@ -51,6 +55,7 @@ export function computeSmartAlertsFromData({
   recurring,
   debts,
   tx,
+  budget = null,
   now = new Date(),
 }: {
   accounts: Account[];
@@ -58,6 +63,7 @@ export function computeSmartAlertsFromData({
   recurring: RecurringItem[];
   debts: Debt[];
   tx: Transaction[];
+  budget?: MonthlyBudget | null;
   now?: Date;
 }): AlertCandidate[] {
   const todayStr = saoPauloTodayKey(now);
@@ -173,66 +179,90 @@ export function computeSmartAlertsFromData({
     });
   }
 
-  // 3b) Ritmo geral do mês (todas as categorias somadas) — avisa se está
-  // gastando bem acima ou bem abaixo da média histórica, pra dar tempo de
-  // ajustar (ou parabenizar quando está indo bem).
+  // 3b) Ritmo geral do mês (todas as categorias somadas) — compara com o
+  // orçamento que o usuário definiu para o mês (se ele existir) ou, na
+  // falta disso, com a média histórica. Avisa se está gastando bem acima
+  // ou bem abaixo do esperado, pra dar tempo de ajustar (ou parabenizar
+  // quando está indo bem).
   const totalCurrentGasto = Array.from(currentByCategory.values()).reduce((s, v) => s + v, 0);
-  const pastTotalGastos = pastMonths
-    .map((monthKey) => tx.filter((t) => t.date.startsWith(monthKey) && isGasto(t)).reduce((s, t) => s + Number(t.amount), 0))
-    .filter((v) => v > 0);
-  if (dayOfMonth >= 5 && pastTotalGastos.length >= 2) {
-    const mediaHistoricaTotal = pastTotalGastos.reduce((s, v) => s + v, 0) / pastTotalGastos.length;
-    if (mediaHistoricaTotal >= MONTH_PACE_MIN_AVERAGE) {
-      const previsaoFimMes = (totalCurrentGasto / dayOfMonth) * daysInMonth;
-      const ritmoPct = ((previsaoFimMes - mediaHistoricaTotal) / mediaHistoricaTotal) * 100;
-      if (ritmoPct > MONTH_PACE_HIGH_PCT) {
-        alerts.push({
-          kind: "month_pace_high",
-          refKey: thisMonth,
-          title: "Ritmo de gastos acima do normal 📈",
-          body: `Nesse ritmo, o mês deve fechar com ${formatCurrency(previsaoFimMes)} em gastos — ${Math.round(ritmoPct)}% acima da sua média de ${formatCurrency(mediaHistoricaTotal)}. Ainda dá tempo de ajustar.`,
-          url: "/mes",
-        });
-      } else if (ritmoPct < MONTH_PACE_GOOD_PCT) {
-        alerts.push({
-          kind: "month_pace_good",
-          refKey: thisMonth,
-          title: "Você está economizando bem 🎉",
-          body: `Nesse ritmo, o mês deve fechar com ${formatCurrency(previsaoFimMes)} em gastos — ${Math.round(Math.abs(ritmoPct))}% abaixo da sua média de ${formatCurrency(mediaHistoricaTotal)}. Continue assim!`,
-          url: "/mes",
-        });
+  const spendingLimit = budget?.spendingLimit && budget.spendingLimit > 0 ? budget.spendingLimit : null;
+
+  let paceTarget: number | null = spendingLimit;
+  let paceSourceLabel = "o orçamento que você definiu para este mês";
+  if (paceTarget == null) {
+    const pastTotalGastos = pastMonths
+      .map((monthKey) => tx.filter((t) => t.date.startsWith(monthKey) && isGasto(t)).reduce((s, t) => s + Number(t.amount), 0))
+      .filter((v) => v > 0);
+    if (pastTotalGastos.length >= 2) {
+      const media = pastTotalGastos.reduce((s, v) => s + v, 0) / pastTotalGastos.length;
+      if (media >= MONTH_PACE_MIN_AVERAGE) {
+        paceTarget = media;
+        paceSourceLabel = `sua média histórica de ${formatCurrency(media)}`;
       }
     }
   }
 
-  // 3c) Quanto ainda pode gastar hoje sem comprometer o mês (baseado no
-  // saldo em conta até o dia 5 do mês seguinte) e aviso se já passou bem
-  // disso.
-  const dailyBudget = dailyBudgetFromBalance(totalBalance, todayStr);
+  if (dayOfMonth >= 5 && paceTarget != null && paceTarget > 0) {
+    const previsaoFimMes = (totalCurrentGasto / dayOfMonth) * daysInMonth;
+    const ritmoPct = ((previsaoFimMes - paceTarget) / paceTarget) * 100;
+    if (ritmoPct > (spendingLimit != null ? (BUDGET_PACE_HIGH_MULTIPLIER - 1) * 100 : MONTH_PACE_HIGH_PCT)) {
+      alerts.push({
+        kind: "month_pace_high",
+        refKey: thisMonth,
+        title: "Ritmo de gastos acima do normal 📈",
+        body: `Nesse ritmo, o mês deve fechar com ${formatCurrency(previsaoFimMes)} em gastos — acima de ${paceSourceLabel}. Ainda dá tempo de ajustar.`,
+        url: "/mes",
+      });
+    } else if (ritmoPct < MONTH_PACE_GOOD_PCT) {
+      alerts.push({
+        kind: "month_pace_good",
+        refKey: thisMonth,
+        title: "Você está economizando bem 🎉",
+        body: `Nesse ritmo, o mês deve fechar com ${formatCurrency(previsaoFimMes)} em gastos — ${Math.round(Math.abs(ritmoPct))}% abaixo de ${paceSourceLabel}. Continue assim!`,
+        url: "/mes",
+      });
+    }
+  }
+
+  // 3c) Quanto ainda pode gastar hoje sem comprometer o mês. Se houver um
+  // orçamento definido, usa (orçamento - já gasto) / dias restantes; senão
+  // cai no cálculo pelo saldo em conta até o dia 5 do mês seguinte. Avisa
+  // se já passou bem do limite diário.
   const gastosHojeTotal = sumGastosInRange(tx, todayStr, todayStr);
-  if (dailyBudget.perDay > 1) {
-    const restante = Math.max(0, dailyBudget.perDay - gastosHojeTotal);
+  let perDayBudget: number;
+  let perDaySourceNote: string;
+  if (spendingLimit != null) {
+    const daysLeftInMonth = Math.max(1, daysInMonth - dayOfMonth + 1);
+    perDayBudget = Math.max(0, spendingLimit - totalCurrentGasto) / daysLeftInMonth;
+    perDaySourceNote = "sem passar do orçamento deste mês";
+  } else {
+    perDayBudget = dailyBudgetFromBalance(totalBalance, todayStr).perDay;
+    perDaySourceNote = "sem comprometer o resto do mês (baseado no saldo em conta)";
+  }
+
+  if (perDayBudget > 1) {
+    const restante = Math.max(0, perDayBudget - gastosHojeTotal);
     alerts.push({
       kind: "daily_budget",
       refKey: todayStr,
       title: "Seu limite de hoje 💰",
       body:
         gastosHojeTotal > 0
-          ? `Limite do dia: ${formatCurrency(dailyBudget.perDay)} · você já gastou ${formatCurrency(gastosHojeTotal)} hoje · ainda pode gastar ${formatCurrency(restante)}.`
-          : `Hoje você pode gastar até ${formatCurrency(dailyBudget.perDay)} sem comprometer o resto do mês (baseado no saldo em conta).`,
+          ? `Limite do dia: ${formatCurrency(perDayBudget)} · você já gastou ${formatCurrency(gastosHojeTotal)} hoje · ainda pode gastar ${formatCurrency(restante)}.`
+          : `Hoje você pode gastar até ${formatCurrency(perDayBudget)} ${perDaySourceNote}.`,
       url: "/dashboard",
     });
 
-    if (gastosHojeTotal > dailyBudget.perDay * OVERSPEND_TODAY_MULTIPLIER && gastosHojeTotal >= OVERSPEND_TODAY_MIN_AMOUNT) {
+    if (gastosHojeTotal > perDayBudget * OVERSPEND_TODAY_MULTIPLIER && gastosHojeTotal >= OVERSPEND_TODAY_MIN_AMOUNT) {
       alerts.push({
         kind: "overspend_today",
         refKey: todayStr,
         title: "Você passou do limite de hoje 🚨",
-        body: `Já gastou ${formatCurrency(gastosHojeTotal)} hoje, ${formatCurrency(gastosHojeTotal - dailyBudget.perDay)} acima do limite diário de ${formatCurrency(dailyBudget.perDay)}. Tente compensar reduzindo gastos nos próximos dias.`,
+        body: `Já gastou ${formatCurrency(gastosHojeTotal)} hoje, ${formatCurrency(gastosHojeTotal - perDayBudget)} acima do limite diário de ${formatCurrency(perDayBudget)}. Tente compensar reduzindo gastos nos próximos dias.`,
         url: "/detalhes",
       });
     }
-  } else if (totalBalance <= 0) {
+  } else if (totalBalance <= 0 && spendingLimit == null) {
     alerts.push({
       kind: "daily_budget",
       refKey: todayStr,
@@ -240,6 +270,36 @@ export function computeSmartAlertsFromData({
       body: "Seu saldo em conta está zerado ou negativo. Se puder, evite novos gastos até a próxima entrada.",
       url: "/dashboard",
     });
+  }
+
+  // 3d) Meta de economia do mês (definida pelo usuário) — avisa se já
+  // bateu a meta ou se o ritmo atual está longe de alcançá-la.
+  const savingsTarget = budget?.savingsTarget && budget.savingsTarget > 0 ? budget.savingsTarget : null;
+  if (savingsTarget != null) {
+    const entradasMes = tx.filter((t) => t.date >= monthStart && isRenda(t)).reduce((s, t) => s + Number(t.amount), 0);
+    const economiaAtual = entradasMes - totalCurrentGasto;
+    if (economiaAtual >= savingsTarget) {
+      alerts.push({
+        kind: "savings_target_reached",
+        refKey: thisMonth,
+        title: "Meta de economia batida! 🎉",
+        body: `Você já guardou ${formatCurrency(economiaAtual)} este mês, alcançando a meta de ${formatCurrency(savingsTarget)} que você definiu.`,
+        url: "/metas",
+      });
+    } else if (dayOfMonth >= SAVINGS_AT_RISK_MIN_DAY) {
+      const requiredPerDay = savingsTarget / daysInMonth;
+      const currentPerDay = economiaAtual / dayOfMonth;
+      if (currentPerDay < requiredPerDay * SAVINGS_AT_RISK_PACE_RATIO) {
+        const faltam = Math.max(0, savingsTarget - economiaAtual);
+        alerts.push({
+          kind: "savings_target_at_risk",
+          refKey: thisMonth,
+          title: "Meta de economia em risco ⚠️",
+          body: `Pra guardar ${formatCurrency(savingsTarget)} este mês, ainda faltam ${formatCurrency(faltam)} e restam ${Math.max(0, daysInMonth - dayOfMonth)} dia(s). Vale reduzir gastos variáveis pra recuperar o ritmo.`,
+          url: "/metas",
+        });
+      }
+    }
   }
 
   // 4) Assinatura/gasto recorrente que ficou mais caro de um mês para o outro
@@ -287,13 +347,16 @@ export async function computeSmartAlerts(
   const monthKeys = lastNMonthKeys(5, thisMonth);
   const historyStart = `${monthKeys[0]}-01`;
 
-  const [accountsRes, cardsRes, recurringRes, debtsRes, txRes] = await Promise.all([
+  const [accountsRes, cardsRes, recurringRes, debtsRes, txRes, budgetRes] = await Promise.all([
     supabase.from("accounts").select("*").eq("user_id", userId),
     supabase.from("cards").select("*").eq("user_id", userId),
     supabase.from("recurring_items").select("*").eq("user_id", userId).eq("active", true),
     supabase.from("debts").select("*").eq("user_id", userId).eq("paid", false),
     supabase.from("transactions").select("*").eq("user_id", userId).gte("date", historyStart),
+    supabase.from("monthly_budgets").select("*").eq("user_id", userId).eq("month_key", thisMonth).maybeSingle(),
   ]);
+
+  const budgetRow = budgetRes.data as { spending_limit: number | null; savings_target: number | null } | null;
 
   return computeSmartAlertsFromData({
     accounts: (accountsRes.data ?? []) as Account[],
@@ -301,6 +364,7 @@ export async function computeSmartAlerts(
     recurring: (recurringRes.data ?? []) as RecurringItem[],
     debts: (debtsRes.data ?? []) as Debt[],
     tx: (txRes.data ?? []) as Transaction[],
+    budget: budgetRow ? { monthKey: thisMonth, spendingLimit: budgetRow.spending_limit, savingsTarget: budgetRow.savings_target } : null,
     now,
   });
 }

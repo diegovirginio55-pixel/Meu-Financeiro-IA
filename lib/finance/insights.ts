@@ -274,6 +274,8 @@ const ALERT_SEVERITY: Record<string, InsightSeverity> = {
   overspend_today: "atencao",
   month_pace_high: "atencao",
   month_pace_good: "info",
+  savings_target_reached: "info",
+  savings_target_at_risk: "atencao",
 };
 
 const ALERT_ICON: Record<string, string> = {
@@ -286,6 +288,8 @@ const ALERT_ICON: Record<string, string> = {
   overspend_today: "🚨",
   month_pace_high: "📈",
   month_pace_good: "🎉",
+  savings_target_reached: "🎉",
+  savings_target_at_risk: "⚠️",
 };
 
 /**
