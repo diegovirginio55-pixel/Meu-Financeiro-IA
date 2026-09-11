@@ -63,9 +63,16 @@ export default function TabNav() {
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event("mf:open-search"))}
-            className="flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-300"
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-300"
           >
-            🔎 Buscar <kbd className="rounded border border-zinc-700 px-1 text-[10px]">⌘K</kbd>
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" aria-hidden>
+              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Buscar
+            <kbd className="flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-zinc-700 px-1.5 py-0.5 text-[10px]">
+              ⌘K
+            </kbd>
           </button>
           <NotificationBell variant="nav" />
           <ThemeToggle variant="nav" />
