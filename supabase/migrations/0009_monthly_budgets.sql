@@ -8,7 +8,7 @@ create table if not exists public.monthly_budgets (
   month_key text not null,
   spending_limit numeric(14,2),
   savings_target numeric(14,2),
-    10|  created_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
@@ -18,7 +18,7 @@ create unique index if not exists idx_monthly_budgets_unique
 alter table public.monthly_budgets enable row level security;
 
 drop policy if exists "own monthly_budgets" on public.monthly_budgets;
-    20|create policy "own monthly_budgets" on public.monthly_budgets
+create policy "own monthly_budgets" on public.monthly_budgets
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 grant select, insert, update, delete on public.monthly_budgets to service_role;
