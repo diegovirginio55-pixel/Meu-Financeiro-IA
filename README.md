@@ -20,8 +20,7 @@ Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Pos
 
 1. Crie um novo projeto em [supabase.com](https://supabase.com/dashboard).
 2. Vá em **SQL Editor** e execute todas as migrations em [`supabase/migrations/`](supabase/migrations/), em ordem numérica (`0001_init.sql` até a mais recente, `0012_bill_payments.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
-   - Antes da `0011`, guarde o segredo do cron no Vault (mesmo valor de `BANK_CRON_SECRET`):
-     `select vault.create_secret('SEU-BANK_CRON_SECRET', 'bank_cron_secret');`
+   - A `0011` não precisa de configuração: ela mesma gera o token que autoriza a chamada.
    - A `0011` agenda, de dentro do Supabase, uma chamada ao app a cada 5 minutos. Isso mantém o servidor do Render acordado (o webhook da Pluggy é atendido na hora, então as notificações chegam sem atraso) e roda os alertas no horário certo. O agendamento do GitHub Actions continua só como reserva: na prática o GitHub o executa a cada 3–8 horas.
 3. Em **Authentication > Providers**, deixe o provedor **Email** habilitado e **desligue "Allow new users to sign up"** (Authentication > Sign In / Providers). O app é pessoal: a chave anon fica no navegador e, com o cadastro ligado, qualquer pessoa poderia criar conta pela API. Como proteção extra, defina `ALLOWED_EMAILS` (veja abaixo).
 4. Em **Project Settings > API**, copie a **Project URL** e a **anon public key**.

@@ -21,6 +21,35 @@ function sameSecret(received: string | null, secret: string): boolean {
   return timingSafeEqual(a, b);
 }
 
+const TOKEN_CACHE_MS = 5 * 60 * 1000;
+let cachedInternalToken: { value: string | null; at: number } | null = null;
+
+/**
+ * Token gerado pela migration 0011 e usado pelo pg_cron do Supabase (tabela
+ * internal_settings, que só o servidor lê). Evita ter de copiar o
+ * BANK_CRON_SECRET para dentro do banco.
+ */
+async function internalCronToken(supabase: SupabaseClient): Promise<string | null> {
+  if (cachedInternalToken && Date.now() - cachedInternalToken.at < TOKEN_CACHE_MS) return cachedInternalToken.value;
+  const { data, error } = await supabase
+    .from("internal_settings")
+    .select("value")
+    .eq("key", "cron_token")
+    .maybeSingle();
+  const value = error ? null : ((data?.value as string | undefined) ?? null);
+  cachedInternalToken = { value, at: Date.now() };
+  return value;
+}
+
+async function isAuthorized(request: Request, supabase: SupabaseClient): Promise<boolean> {
+  const received = request.headers.get("authorization");
+  if (!received) return false;
+  const secret = process.env.BANK_CRON_SECRET;
+  if (secret && sameSecret(received, secret)) return true;
+  const token = await internalCronToken(supabase);
+  return Boolean(token && sameSecret(received, token));
+}
+
 async function runCronJobs(supabase: SupabaseClient, origin: string | null) {
   const errors: string[] = [];
 
@@ -67,12 +96,11 @@ async function runCronJobs(supabase: SupabaseClient, origin: string | null) {
  * todos os syncs terminarem e estourava o limite de 90 s do GitHub Actions.
  */
 export async function GET(request: Request) {
-  const secret = process.env.BANK_CRON_SECRET;
-  if (!secret || !sameSecret(request.headers.get("authorization"), secret)) {
+  const supabase = createAdminClient();
+  if (!(await isAuthorized(request, supabase))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const supabase = createAdminClient();
   await recordHeartbeat(supabase, "bank_cron", { last_run_at: new Date().toISOString() });
 
   if (running) {

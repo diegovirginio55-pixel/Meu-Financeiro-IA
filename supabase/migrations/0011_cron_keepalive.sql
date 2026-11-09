@@ -9,18 +9,29 @@
 -- servidor fica acordado, o webhook é atendido na hora e o cron de alertas
 -- roda no horário certo.
 --
--- ANTES DE RODAR: guarde o segredo do cron (o MESMO valor de BANK_CRON_SECRET
--- do Render) no Vault do Supabase, uma única vez, no SQL Editor:
---
---   select vault.create_secret('COLE-AQUI-O-BANK_CRON_SECRET', 'bank_cron_secret');
---
--- (Para trocar depois: select vault.update_secret(id, 'novo-valor') usando o
--- id de vault.secrets where name = 'bank_cron_secret'.)
---
--- Se o endereço do app mudar, ajuste a URL abaixo e rode este arquivo de novo.
+-- Não precisa configurar nada: o token que autoriza a chamada é gerado aqui
+-- e fica numa tabela que só o servidor (service role) consegue ler.
+-- Pode ser executada mais de uma vez. Se o endereço do app mudar, ajuste a
+-- URL abaixo e rode de novo.
 
-create extension if not exists pg_cron;
+create extension if not exists pg_cron with schema pg_catalog;
 create extension if not exists pg_net with schema extensions;
+
+-- Configurações internas: RLS ligada e SEM políticas = o navegador (anon /
+-- authenticated) não lê nada; só o servidor (service_role) e o próprio banco.
+create table if not exists public.internal_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.internal_settings enable row level security;
+revoke all on public.internal_settings from anon, authenticated;
+grant select, insert, update, delete on public.internal_settings to service_role;
+
+insert into public.internal_settings (key, value)
+values ('cron_token', replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''))
+on conflict (key) do nothing;
 
 -- Remove a versão anterior do agendamento (se existir) e cria de novo.
 select cron.unschedule(jobid) from cron.job where jobname = 'meu-financeiro-sync';
@@ -33,10 +44,7 @@ select cron.schedule(
     url := 'https://meu-financeiro-ia.onrender.com/api/bank/cron',
     headers := jsonb_build_object(
       'Authorization',
-      'Bearer ' || coalesce(
-        (select decrypted_secret from vault.decrypted_secrets where name = 'bank_cron_secret' limit 1),
-        ''
-      )
+      'Bearer ' || coalesce((select value from public.internal_settings where key = 'cron_token'), '')
     ),
     timeout_milliseconds := 30000
   );
