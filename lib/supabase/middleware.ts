@@ -6,6 +6,8 @@ const PUBLIC_PATHS = [
   "/login",
   "/api/bank/webhook",
   "/api/bank/cron",
+  // Botões das notificações: autorizados por token assinado, não por sessão.
+  "/api/push/action",
   "/manifest.webmanifest",
   "/sw.js",
   "/opengraph-image",

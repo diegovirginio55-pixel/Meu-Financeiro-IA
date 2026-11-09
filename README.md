@@ -19,7 +19,7 @@ Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Pos
 ## 2. Criar o projeto no Supabase
 
 1. Crie um novo projeto em [supabase.com](https://supabase.com/dashboard).
-2. Vá em **SQL Editor** e execute todas as migrations em [`supabase/migrations/`](supabase/migrations/), em ordem numérica (`0001_init.sql` até a mais recente, `0011_cron_keepalive.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
+2. Vá em **SQL Editor** e execute todas as migrations em [`supabase/migrations/`](supabase/migrations/), em ordem numérica (`0001_init.sql` até a mais recente, `0012_bill_payments.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
    - Antes da `0011`, guarde o segredo do cron no Vault (mesmo valor de `BANK_CRON_SECRET`):
      `select vault.create_secret('SEU-BANK_CRON_SECRET', 'bank_cron_secret');`
    - A `0011` agenda, de dentro do Supabase, uma chamada ao app a cada 5 minutos. Isso mantém o servidor do Render acordado (o webhook da Pluggy é atendido na hora, então as notificações chegam sem atraso) e roda os alertas no horário certo. O agendamento do GitHub Actions continua só como reserva: na prática o GitHub o executa a cada 3–8 horas.
@@ -112,6 +112,13 @@ O repositório já inclui um [`render.yaml`](render.yaml) (Blueprint), então o 
 Observações do plano gratuito do Render: o serviço "dorme" depois de 15 minutos sem tráfego e demora ~1 minuto para acordar na próxima requisição — normal para uso pessoal, sem custo.
 
 Cada novo `git push` na branch `main` gera um novo deploy automático.
+
+## Notificações com botões
+
+- **Gasto novo:** o push traz 2 botões com as categorias que você mais usa (o Android mostra no máximo 2). Tocar na notificação abre a tela para escolher qualquer categoria e, se quiser, criar uma regra para os próximos.
+- **Contas a pagar:** lembrete na véspera e no dia do vencimento (recorrências e dívidas; fatura de cartão no dia), com o botão **"Já paguei"**. Depois disso o app não lembra mais daquele vencimento.
+- **Atalhos no ícone:** segurando o ícone do app aparecem "Novo gasto", "Extrato" e "Conversar".
+- No iPhone, as notificações de PWA não mostram botões: o toque abre a tela com as mesmas opções.
 
 ## Variáveis opcionais
 

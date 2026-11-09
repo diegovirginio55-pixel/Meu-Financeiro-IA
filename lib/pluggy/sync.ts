@@ -198,12 +198,12 @@ async function syncTransactionsForAccount(
   // ignoreDuplicates + select devolve só as linhas realmente inseridas:
   // se dois syncs rodarem juntos, só um deles "vê" cada transação nova e
   // a notificação sai uma vez só.
-  let inserted: { description: string; amount: number; type: string; date: string }[] = [];
+  let inserted: { id: string; description: string; amount: number; type: string; date: string; category: string }[] = [];
   if (newRows.length > 0) {
     const { data, error } = await supabase
       .from("transactions")
       .upsert(newRows, { onConflict: "pluggy_transaction_id", ignoreDuplicates: true })
-      .select("description, amount, type, date");
+      .select("id, description, amount, type, date, category");
     if (error) console.error("Erro ao gravar transações novas da Pluggy:", error);
     else inserted = data ?? [];
   }
@@ -218,10 +218,12 @@ async function syncTransactionsForAccount(
   return inserted
     .filter((row) => isRecentMovementDate(row.date))
     .map((row) => ({
+      id: row.id,
       description: row.description,
       amount: Number(row.amount),
       type: row.type,
       date: row.date,
+      category: row.category,
     }));
 }
 

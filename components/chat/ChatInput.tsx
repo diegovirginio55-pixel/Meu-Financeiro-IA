@@ -22,13 +22,16 @@ export default function ChatInput({
   locked,
   onSend,
   onQuota,
+  initialValue,
 }: {
   disabled: boolean;
   locked?: boolean;
   onSend: (message: string) => void;
   onQuota?: (quota: ChatQuotaView) => void;
+  /** Texto inicial (atalho "Novo gasto" abre com "Gastei "): o campo já vem focado. */
+  initialValue?: string;
 }) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue ?? "");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -48,6 +51,15 @@ export default function ChatInput({
   useEffect(() => {
     return () => stopTracks();
   }, []);
+
+  // Veio do atalho "Novo gasto": foca o campo com o cursor no fim do texto.
+  useEffect(() => {
+    if (!initialValue) return;
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }, [initialValue]);
 
   function stopTracks() {
     if (timerRef.current) {

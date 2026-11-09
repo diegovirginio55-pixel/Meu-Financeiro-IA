@@ -37,6 +37,29 @@
       "purpose": "maskable"
     }
   ],
+  "shortcuts": [
+    {
+      "name": "Novo gasto",
+      "short_name": "Novo gasto",
+      "description": "Registrar um gasto pela conversa com a IA",
+      "url": "/chat?novo=gasto",
+      "icons": [{ "src": "/icon-192.png?v=2", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Extrato",
+      "short_name": "Extrato",
+      "description": "Ver os lançamentos",
+      "url": "/detalhes",
+      "icons": [{ "src": "/icon-192.png?v=2", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Conversar com a IA",
+      "short_name": "Conversar",
+      "description": "Perguntar sobre o seu dinheiro",
+      "url": "/chat",
+      "icons": [{ "src": "/icon-192.png?v=2", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "screenshots": [
     {
       "src": "/screenshots/desktop.png",

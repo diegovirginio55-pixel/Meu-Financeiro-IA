@@ -107,6 +107,10 @@ self.addEventListener("push", (event) => {
   // Se o servidor mandar uma tag, a nova substitui a antiga e avisa de novo (renotify).
   const tag = payload.tag || `mf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+  // Botões (ex.: "🍔 Alimentação", "✅ Já paguei"). O Android mostra no máximo 2;
+  // o iPhone não mostra botões — lá o toque abre a tela equivalente no app.
+  const actions = Array.isArray(payload.actions) && payload.actionToken ? payload.actions.slice(0, 2) : [];
+
   event.waitUntil(
     Promise.all([
       self.registration.showNotification(payload.title, {
@@ -115,7 +119,8 @@ self.addEventListener("push", (event) => {
         badge: "/icon-192.png?v=2",
         tag,
         renotify: true,
-        data: { url },
+        actions,
+        data: { url, actionToken: actions.length > 0 ? payload.actionToken : null },
       }),
       // Avisa as janelas abertas para recarregarem a lista de notificações na hora.
       self.clients
@@ -128,9 +133,50 @@ self.addEventListener("push", (event) => {
   );
 });
 
+function notifyOpenWindows() {
+  return self.clients
+    .matchAll({ type: "window", includeUncontrolled: true })
+    .then((windowClients) => {
+      windowClients.forEach((client) => client.postMessage({ type: "mf:push-received" }));
+    })
+    .catch(() => undefined);
+}
+
+// Executa o botão da notificação direto no servidor, sem abrir o app, e troca a
+// notificação por uma confirmação. Se falhar (sem internet, token vencido), abre o app.
+function runNotificationAction(data, action) {
+  return fetch("/api/push/action", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ token: data.actionToken, action }),
+  })
+    .then((res) => res.json().catch(() => ({})).then((result) => ({ ok: res.ok, result })))
+    .then(({ ok, result }) => {
+      if (!ok) throw new Error(result.error || "falha");
+      return Promise.all([
+        self.registration.showNotification(result.title || "Pronto ✅", {
+          body: result.body || "",
+          icon: "/icon-192.png?v=2",
+          badge: "/icon-192.png?v=2",
+          tag: `mf-ok-${Date.now()}`,
+          silent: true,
+          data: { url: data.url || "/detalhes" },
+        }),
+        notifyOpenWindows(),
+      ]);
+    })
+    .catch(() => self.clients.openWindow(data.url || "/detalhes"));
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = event.notification.data?.url || "/detalhes";
+  const data = event.notification.data || {};
+  if (event.action && data.actionToken) {
+    event.waitUntil(runNotificationAction(data, event.action));
+    return;
+  }
+  const target = data.url || "/detalhes";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
       const existing = windowClients.find((client) => "focus" in client);

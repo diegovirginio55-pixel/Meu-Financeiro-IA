@@ -17,7 +17,7 @@ const REVEAL_STEPS = 30;
 const STICK_THRESHOLD_PX = 80;
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
-export default function ChatWindow() {
+export default function ChatWindow({ initialMessage }: { initialMessage?: string } = {}) {
   const [messages, setMessages] = useState<ChatUiMessage[]>([]);
   const [quota, setQuota] = useState<ChatQuotaView | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -280,6 +280,7 @@ export default function ChatWindow() {
           locked={limited}
           onSend={handleSend}
           onQuota={setQuota}
+          initialValue={initialMessage}
         />
       </div>
     </PageShell>

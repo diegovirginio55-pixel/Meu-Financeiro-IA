@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeSmartAlerts, computeWeeklySummary, type AlertCandidate } from "@/lib/finance/alert-checks";
 import { saoPauloHour } from "@/lib/finance/fluxo";
 import { sendPushToUser } from "./send";
+import { signPushAction } from "./actions";
+import type { PushPayload } from "./payload";
+import { billKey, computeBillRemindersForUser, type BillRef } from "@/lib/finance/bill-reminders";
 
 const DAILY_BUDGET_PUSH_START_HOUR = 7;
 const DAILY_BUDGET_PUSH_END_HOUR = 10;
@@ -58,10 +61,20 @@ async function markAsSent(supabase: SupabaseClient, userId: string, candidate: A
   return Boolean(data && data.length > 0);
 }
 
-async function dispatch(supabase: SupabaseClient, userId: string, candidate: AlertCandidate): Promise<boolean> {
+async function dispatch(
+  supabase: SupabaseClient,
+  userId: string,
+  candidate: AlertCandidate,
+  extras: Partial<PushPayload> = {},
+): Promise<boolean> {
   const isNew = await markAsSent(supabase, userId, candidate);
   if (!isNew) return false;
-  const result = await sendPushToUser(userId, { title: candidate.title, body: candidate.body, url: candidate.url });
+  const result = await sendPushToUser(userId, {
+    title: candidate.title,
+    body: candidate.body,
+    url: candidate.url,
+    ...extras,
+  });
   // Nenhuma entrega e alguma falha foi temporária (sem resposta, 429, 5xx):
   // desfaz o registro para a próxima execução tentar de novo (antes o
   // alerta se perdia). Falha permanente (ex.: 403 de inscrição antiga) não
@@ -97,14 +110,24 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
     try {
       const alerts = await computeSmartAlerts(supabase, userId);
       const summary = await computeWeeklySummary(supabase, userId);
-      const candidates = summary ? [...alerts, summary] : alerts;
+      const { reminders, paidKeys } = await computeBillRemindersForUser(supabase, userId, now);
+      const candidates: (AlertCandidate & { bill?: BillRef })[] = [
+        ...alerts.map((alert) => withCardBill(alert)),
+        ...(summary ? [summary] : []),
+        ...reminders,
+      ];
       for (const candidate of candidates) {
         if (candidate.kind === "daily_budget") {
           if (!isDailyBudgetPushWindow(now)) continue;
         } else if (!isAwakeHours(now)) {
           continue;
         }
-        if (await dispatch(supabase, userId, candidate)) sent += 1;
+        // Fatura já marcada como paga: não avisa mais.
+        if (candidate.bill && paidKeys.has(billKey(candidate.bill))) continue;
+        const extras = candidate.bill ? billActionExtras(userId, candidate.bill) : {};
+        // A central de notificações guarda o mesmo link (tela com o botão "Já paguei").
+        const stored = extras.url ? { ...candidate, url: extras.url } : candidate;
+        if (await dispatch(supabase, userId, stored, extras)) sent += 1;
       }
     } catch (error) {
       console.error("Erro ao calcular alertas para usuário:", userId, error);
@@ -112,4 +135,25 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
   }
 
   return { users: userIds.length, sent };
+}
+
+/** "Fatura chegando" (refKey = cartão:vencimento) também ganha o botão "Já paguei". */
+function withCardBill(alert: AlertCandidate): AlertCandidate & { bill?: BillRef } {
+  if (alert.kind !== "card_due") return alert;
+  const [id, dueDate] = alert.refKey.split(":");
+  return id && dueDate ? { ...alert, bill: { kind: "card", id, dueDate } } : alert;
+}
+
+/**
+ * Botão "Já paguei" (Android) e, ao tocar na notificação, a tela /lembrete
+ * com o mesmo botão (iPhone não mostra botões em notificações de PWA).
+ */
+function billActionExtras(userId: string, bill: BillRef): Partial<PushPayload> {
+  const token = signPushAction({ k: "bill", u: userId, b: bill.kind, r: bill.id, d: bill.dueDate });
+  if (!token) return {};
+  return {
+    actions: [{ action: "paid", title: "✅ Já paguei" }],
+    actionToken: token,
+    url: `/lembrete?t=${encodeURIComponent(token)}`,
+  };
 }

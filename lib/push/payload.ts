@@ -3,16 +3,27 @@ import { formatCurrency } from "@/lib/finance/format";
 export const NOTIFY_MAX_AGE_DAYS = 2;
 
 export type MovementNotice = {
+  /** Id do lançamento no app (para os botões de categoria). */
+  id?: string;
   description: string;
   amount: number;
   type: "entrada" | "saida" | string;
   date?: string;
+  category?: string;
 };
+
+export type PushAction = { action: string; title: string };
 
 export type PushPayload = {
   title: string;
   body: string;
   url: string;
+  /** Mesma tag substitui a notificação anterior (usada na confirmação das ações). */
+  tag?: string;
+  /** Botões da notificação (Android mostra no máximo 2). */
+  actions?: PushAction[];
+  /** Token assinado que autoriza as ações (ver lib/push/actions.ts). */
+  actionToken?: string;
 };
 
 function calendarAgeDays(date: string, today: string): number {
@@ -57,10 +68,13 @@ export function movementPayloads(bankName: string, movements: MovementNotice[]):
 
   return movements.map((item) => {
     const kind = item.type === "entrada" ? "Entrada" : item.type === "saida" ? "Saída" : "Movimentação";
+    const base = `${kind} de ${formatCurrency(Number(item.amount))} · ${item.description}`;
+    // Gasto com id: o toque abre a tela de escolher a categoria daquele lançamento.
+    const canCategorize = item.type === "saida" && Boolean(item.id);
     return {
       title: bankName,
-      body: `${kind} de ${formatCurrency(Number(item.amount))} · ${item.description}`,
-      url: "/detalhes",
+      body: canCategorize && item.category ? `${base}\nCategoria: ${item.category} · toque para mudar` : base,
+      url: canCategorize ? `/categorizar/${item.id}` : "/detalhes",
     };
   });
 }
