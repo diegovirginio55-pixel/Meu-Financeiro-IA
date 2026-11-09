@@ -21,9 +21,23 @@ function str(value: unknown, max = 1000): string {
   return typeof value === "string" ? value.slice(0, max) : "";
 }
 
+const MAGIC_TEXT = /^\s*[\[{][a-z_ ]+[\]}]\s*$/i;
+
 /** Campo do MacroDroid que não foi substituído (ex.: "[app_name]" literal): trata como vazio. */
 function withoutMagicText(value: string): string {
-  return /^\s*[\[{][a-z_ ]+[\]}]\s*$/i.test(value) ? "" : value;
+  return MAGIC_TEXT.test(value) ? "" : value;
+}
+
+/** Explica no registro por que um aviso sem conteúdo chegou — para o usuário saber se está tudo certo. */
+function emptyReason(body: Body): string {
+  const fields = [body.app, body.title, body.text];
+  if (fields.every((value) => value === undefined)) {
+    return "chegou sem o corpo — no MacroDroid, confira a aba Corpo/Conteúdo (application/json)";
+  }
+  if (fields.some((value) => typeof value === "string" && MAGIC_TEXT.test(value)) || fields.every((value) => value === "")) {
+    return "teste sem notificação real — a conexão está funcionando ✓";
+  }
+  return "notificação vazia";
 }
 
 /** Aceita JSON ou formulário (o MacroDroid e o Atalhos mandam dos dois jeitos). */
@@ -67,7 +81,8 @@ export async function POST(request: Request) {
   const preview = `${input.title ? `${input.title} — ` : ""}${input.text}`.slice(0, 120);
   const result = parseBankNotification(input);
   if (!result.ok) {
-    if (!isTest) await appendIngestLog(userId, { app: input.app, preview, result: "ignorado", detail: result.reason });
+    const detail = result.reason === "notificação vazia" ? emptyReason(body) : result.reason;
+    if (!isTest) await appendIngestLog(userId, { app: input.app, preview, result: "ignorado", detail });
     return NextResponse.json({ ok: true, ignored: result.reason });
   }
   const parsed = result.parsed;

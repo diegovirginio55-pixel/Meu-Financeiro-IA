@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { PageShell, SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
 import { formatCurrency } from "@/lib/finance/format";
 import { formatRelativeDaySP } from "@/lib/ui/datetime";
@@ -86,6 +86,15 @@ export default function RealTimeSetupClient({
   const [testText, setTestText] = useState("Compra de R$ 45,90 APROVADA em IFOOD *RESTAURANTE para o cartão com final 1062.");
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, startRefresh] = useTransition();
+
+  // A lista de notificações recebidas se atualiza sozinha enquanto a tela está aberta.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") startRefresh(() => router.refresh());
+    }, 10_000);
+    return () => window.clearInterval(id);
+  }, [router]);
 
   const url = token ? `${endpoint}?token=${token}` : "";
 
@@ -221,10 +230,10 @@ export default function RealTimeSetupClient({
                 <strong>Sem restrições</strong> — senão o Android pode pausar a automação.
               </Step>
               <Step n={6}>
-                Teste: no MacroDroid, abra a macro → <strong>⋮</strong> → <strong>Testar ações</strong>. Volte aqui e
-                toque em <strong>Atualizar</strong> na lista abaixo: deve aparecer uma linha nova (como é um teste sem
-                notificação de verdade, ela vem como “ignorado: notificação vazia” — isso confirma que a conexão
-                funciona). Depois, uma compra ou Pix real aparece como <strong>registrado</strong>.
+                Teste: no MacroDroid, abra a macro → <strong>⋮</strong> → <strong>Testar ações</strong>. Volte aqui: em
+                alguns segundos aparece uma linha nova na lista abaixo (como é um teste sem notificação de verdade, ela
+                vem como “ignorado — teste sem notificação real” — isso confirma que a conexão funciona). Depois, uma
+                compra ou Pix real aparece como <strong>registrado</strong>.
               </Step>
             </ol>
           </SoftPanel>
@@ -295,8 +304,13 @@ export default function RealTimeSetupClient({
         <SoftPanel className="flex flex-col gap-3 p-4">
           <SectionLabel
             action={
-              <button type="button" onClick={() => router.refresh()} className="text-xs text-emerald-300 hover:underline">
-                Atualizar
+              <button
+                type="button"
+                onClick={() => startRefresh(() => router.refresh())}
+                disabled={refreshing}
+                className="text-xs text-emerald-300 hover:underline disabled:opacity-60"
+              >
+                {refreshing ? "Atualizando…" : "Atualizar"}
               </button>
             }
           >
@@ -304,7 +318,7 @@ export default function RealTimeSetupClient({
           </SectionLabel>
           {log.length === 0 ? (
             <p className="text-sm text-zinc-500">
-              Nenhuma ainda. Depois de configurar o celular, faça o teste e toque em Atualizar.
+              Nenhuma ainda. Depois de configurar o celular, faça o teste — a lista se atualiza sozinha a cada 10 s.
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
