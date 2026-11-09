@@ -128,7 +128,7 @@ export async function promoteInvestmentsFromTransactions(
 
   // Sempre filtrado pelo dono: no sync em segundo plano o cliente é admin
   // (ignora RLS) e sem esse filtro lia lançamentos de todos os usuários.
-  const { data } = await fetchAllRows<Transaction>((from, to) => {
+  const { data, error: fetchError } = await fetchAllRows<Transaction>((from, to) => {
     let query = supabase
       .from("transactions")
       .select("id, user_id, description, amount, type, category, account_id, date")
@@ -137,14 +137,17 @@ export async function promoteInvestmentsFromTransactions(
     if (userId) query = query.eq("user_id", userId);
     return query.order("date", { ascending: true }).order("id", { ascending: true }).range(from, to);
   });
-  // Aplicações (saída) somam; resgates (entrada) descontam — antes só as
-  // aplicações contavam e o investimento nunca diminuía.
-  const applications = data.filter((item) => {
-    if (!isInvestmentDescription(item.description)) return false;
-    if (item.type === "saida") return true;
-    return /resgate/.test(normalizeText(item.description));
-  });
-  if (applications.length === 0) return remaining;
+  // Sem a lista completa não dá para saber o que já foi resgatado: mantém tudo como está.
+  if (fetchError) return remaining;
+
+  // Aplicações (saída) somam; qualquer crédito de investimento (entrada)
+  // desconta — "Resgate", "Crédito Renda Fixa", "Vencimento"... O Inter
+  // escreve o resgate de uma LCD como "Crédito Renda Fixa - Lcd Di Flut Tb
+  // Banco De Desenvolvimento De Minas G", sem a palavra "resgate", e com
+  // outro nome que a aplicação ("Lcd Bdmg Liquid"): antes o resgate era
+  // ignorado e a LCD resgatada continuava somando no patrimônio.
+  const applications = data.filter((item) => isInvestmentDescription(item.description));
+  if (applications.length === 0) return pruneStaleSynthetics(supabase, remaining, new Set());
 
   // Só recategoriza o que estava sem categoria definida; se o usuário
   // escolheu outra categoria, ela é mantida.
@@ -170,10 +173,25 @@ export async function promoteInvestmentsFromTransactions(
     }
   >();
 
+  // Agrupa por conta + produto (LCD, LCI, CDB...): aplicação e resgate do
+  // mesmo produto na mesma conta se anulam mesmo com descrições diferentes.
+  // Sem produto reconhecível (ex.: "Aplicação Fundo X"), agrupa pelo nome.
+  const syntheticIds = new Map<string, string>();
   for (const transaction of applications) {
     const name = investmentNameFromDescription(transaction.description);
-    const key = normalizeText(name);
-    if (!key) continue;
+    const product = investmentProductKey(transaction.description);
+    const nameKey = normalizeText(name);
+    if (!product && !nameKey) continue;
+    const account = transaction.account_id ?? "sem-conta";
+    const key = product ? `${account}:${product}` : `${account}:${nameKey}`;
+    if (!syntheticIds.has(key)) {
+      syntheticIds.set(
+        key,
+        product
+          ? `bank-tx:${product}-${account.slice(0, 8)}`
+          : `bank-tx:${nameKey.replace(/\s+/g, "-").slice(0, 80)}`,
+      );
+    }
     const current = grouped.get(key);
     const signed = transaction.type === "entrada" ? -Number(transaction.amount) : Number(transaction.amount);
     const movement = {
@@ -185,6 +203,11 @@ export async function promoteInvestmentsFromTransactions(
     if (current) {
       current.amount += signed;
       current.movements.push(movement);
+      // O nome do investimento vem da aplicação (o resgate costuma ter outro texto).
+      if (transaction.type === "saida" && current.movements.every((m) => m.amount < 0 || m.id === transaction.id)) {
+        current.name = name;
+        current.type = investmentTypeFromDescription(transaction.description);
+      }
       continue;
     }
     grouped.set(key, {
@@ -198,9 +221,11 @@ export async function promoteInvestmentsFromTransactions(
   }
 
   const created: Investment[] = [];
-  for (const item of grouped.values()) {
-    const key = normalizeText(item.name);
-    const syntheticId = `bank-tx:${key.replace(/\s+/g, "-").slice(0, 80)}`;
+  const producedIds = new Set<string>();
+  for (const [groupKey, item] of grouped) {
+    const syntheticId = syntheticIds.get(groupKey)!;
+    // Só crédito, sem aplicação no período: é resgate de algo que o app não acompanha.
+    if (!item.movements.some((movement) => movement.amount > 0)) continue;
     const realMatch = remaining.find(
       (row) =>
         isOfficialPluggyId(row.pluggy_investment_id) && investmentNamesMatch(row.name, item.name),
@@ -213,15 +238,9 @@ export async function promoteInvestmentsFromTransactions(
       continue;
     }
 
-    // Tudo resgatado: o investimento acabou.
-    if (item.amount < 0.01) {
-      const syntheticIndex = remaining.findIndex((row) => row.pluggy_investment_id === syntheticId);
-      if (syntheticIndex >= 0) {
-        remaining.splice(syntheticIndex, 1);
-        await supabase.from("investments").delete().eq("pluggy_investment_id", syntheticId);
-      }
-      continue;
-    }
+    // Tudo resgatado: o investimento acabou (a limpeza no fim remove o registro).
+    if (item.amount < 0.01) continue;
+    producedIds.add(syntheticId);
 
     // Já existe um investimento sintético com o mesmo valor: nada mudou desde a
     // última vez, então não vale a pena regravar tudo de novo a cada navegação.
@@ -273,7 +292,51 @@ export async function promoteInvestmentsFromTransactions(
     }
   }
 
-  return [...remaining, ...created];
+  return pruneStaleSynthetics(supabase, [...remaining, ...created], producedIds);
+}
+
+/**
+ * Investimentos "deduzidos do extrato" que não existem mais: totalmente
+ * resgatados, cobertos por um investimento oficial da Pluggy ou de um
+ * formato antigo de agrupamento. Remove do banco e da lista.
+ */
+async function pruneStaleSynthetics(
+  supabase: SupabaseClient,
+  list: Investment[],
+  producedIds: Set<string>,
+): Promise<Investment[]> {
+  const stale = list.filter(
+    (row) => row.pluggy_investment_id?.startsWith("bank-tx:") && !producedIds.has(row.pluggy_investment_id),
+  );
+  if (stale.length === 0) return list;
+  const { error } = await supabase
+    .from("investments")
+    .delete()
+    .in(
+      "id",
+      stale.map((row) => row.id),
+    );
+  if (error) {
+    console.error("Erro ao remover investimentos do extrato já resgatados:", error);
+    return list;
+  }
+  const staleIds = new Set(stale.map((row) => row.id));
+  return list.filter((row) => !staleIds.has(row.id));
+}
+
+/** Produto de renda fixa na descrição (para casar aplicação e resgate do mesmo produto). */
+export function investmentProductKey(description: string): string {
+  const text = normalizeText(description);
+  if (/\blcd\b/.test(text)) return "lcd";
+  if (/\blci\b/.test(text)) return "lci";
+  if (/\blca\b/.test(text)) return "lca";
+  if (/\bcdb\b/.test(text)) return "cdb";
+  if (/\bcri\b/.test(text)) return "cri";
+  if (/\bcra\b/.test(text)) return "cra";
+  if (/tesouro/.test(text)) return "tesouro";
+  if (/debenture/.test(text)) return "debenture";
+  if (/previdencia/.test(text)) return "previdencia";
+  return "";
 }
 
 async function syncSyntheticInvestmentHistory(

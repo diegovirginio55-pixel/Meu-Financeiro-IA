@@ -99,13 +99,16 @@ function DetailsPanel({
   onClose,
   onSync,
   onDisconnect,
+  onReauthorize,
 }: {
   connection: BankConnectionWithAssets;
   syncing: boolean;
   onClose: () => void;
   onSync: () => void;
   onDisconnect: () => void;
+  onReauthorize: () => void;
 }) {
+  const needsReauth = !ACTIVE_STATUSES.has(connection.status);
   const name = officialInstitutionName(connection.institution_name);
   const hasAssets =
     connection.accounts.length > 0 ||
@@ -209,6 +212,16 @@ function DetailsPanel({
           >
             {syncing ? "Atualizando…" : "Atualizar agora"}
           </button>
+          {needsReauth && (
+            <button
+              type="button"
+              onClick={onReauthorize}
+              disabled={syncing}
+              className="rounded-full border border-amber-700 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-amber-950/40 disabled:opacity-50"
+            >
+              Reautorizar este banco
+            </button>
+          )}
           <button
             type="button"
             onClick={onDisconnect}
@@ -223,20 +236,22 @@ function DetailsPanel({
   );
 }
 
+/** Meu Pluggy (uso pessoal) permite poucas conexões; acima disso o banco novo não aparece. */
+const MEU_PLUGGY_LIMIT = 5;
+
 function AddBankDialog({
   busy,
-  importing,
+  connectedNames,
   onClose,
   onBringBanks,
-  onReauthorize,
 }: {
   busy: boolean;
-  importing: boolean;
+  connectedNames: string[];
   onClose: () => void;
   onBringBanks: () => void;
-  onReauthorize: () => void;
 }) {
   const dialogRef = useDialog<HTMLDivElement>(onClose);
+  const remaining = Math.max(0, MEU_PLUGGY_LIMIT - connectedNames.length);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-4 sm:items-center">
@@ -258,10 +273,11 @@ function AddBankDialog({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 id="add-bank-title" className="text-base font-semibold text-white">
-              Adicionar outro banco
+              Adicionar banco
             </h3>
             <p className="mt-1 text-sm text-zinc-400">
-              O Nubank já está salvo. Bancos novos entram pelo Meu Pluggy, não por uma conexão nova aqui.
+              Bradesco, Santander, Itaú, BB e outros entram pelo Meu Pluggy (grátis, via Open Finance). São dois
+              passos: conectar lá e depois autorizar aqui.
             </p>
           </div>
           <button
@@ -273,10 +289,25 @@ function AddBankDialog({
             Fechar
           </button>
         </div>
-        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-zinc-400">
-          <li>Abra o Meu Pluggy e conecte o Inter (ou outro banco).</li>
-          <li>Volte aqui e traga os bancos para o app. O Nubank continua.</li>
+        <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm text-zinc-300">
+          <li>
+            Abra o <strong>Meu Pluggy</strong>, entre com a sua conta e conecte um banco novo. Escolha o banco
+            (ex.: Bradesco) e confirme no app do próprio banco.
+          </li>
+          <li>Espere o banco aparecer como conectado no Meu Pluggy (pode levar alguns minutos).</li>
+          <li>
+            Volte aqui e toque em <strong>Já conectei — trazer para o app</strong>. Na janela que abrir, entre no Meu
+            Pluggy e autorize o banco novo. Cada banco é uma autorização.
+          </li>
         </ol>
+        {connectedNames.length > 0 && (
+          <p className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-xs leading-relaxed text-zinc-400">
+            Já no app: {connectedNames.join(", ")}.{" "}
+            {remaining > 0
+              ? `O Meu Pluggy pessoal aceita até ${MEU_PLUGGY_LIMIT} bancos — dá para adicionar mais ${remaining}.`
+              : `O Meu Pluggy pessoal aceita até ${MEU_PLUGGY_LIMIT} bancos; para incluir outro, remova um lá no Meu Pluggy.`}
+          </p>
+        )}
         <div className="mt-5 flex flex-wrap gap-2">
           <a
             href="https://meu.pluggy.ai"
@@ -284,7 +315,7 @@ function AddBankDialog({
             rel="noreferrer"
             className="rounded-full bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200"
           >
-            Abrir Meu Pluggy
+            1. Abrir Meu Pluggy
           </a>
           <button
             type="button"
@@ -292,15 +323,7 @@ function AddBankDialog({
             disabled={busy}
             className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {importing ? "Trazendo…" : "Já conectei — trazer para o app"}
-          </button>
-          <button
-            type="button"
-            onClick={onReauthorize}
-            disabled={busy}
-            className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-          >
-            Reautorizar
+            {busy ? "Abrindo…" : "2. Já conectei — trazer para o app"}
           </button>
         </div>
       </div>
@@ -328,11 +351,17 @@ export default function BancosClient({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [connectMode, setConnectMode] = useState<"create" | "update">("create");
+  const [notice, setNotice] = useState<string | null>(null);
+  // Modo do widget: criar um item novo (banco novo) ou reautorizar um item específico.
+  const [connectTarget, setConnectTarget] = useState<{ mode: "create" } | { mode: "update"; itemId: string }>({
+    mode: "create",
+  });
 
-  const existingItemId = connections[0]?.pluggy_item_id ?? null;
   const hasConnection = connections.length > 0;
+  const connectedNames = useMemo(
+    () => Array.from(new Set(connections.map((connection) => officialInstitutionName(connection.institution_name)))),
+    [connections],
+  );
 
   const selected = useMemo(
     () => connections.find((connection) => connection.id === selectedId) ?? null,
@@ -349,50 +378,66 @@ export default function BancosClient({
     router.refresh();
   }, [router, initialConnections]);
 
-  const handleConnect = useCallback(async (mode: "create" | "update" = "create") => {
-    setError(null);
-    setConnectMode(mode);
-    setLoadingToken(true);
-    try {
-      const res = await fetch("/api/bank/connect-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          mode === "update" && existingItemId
-            ? { itemId: existingItemId }
-            : { addAnother: hasConnection },
-        ),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Falha ao iniciar conexão.");
-      setConnectToken(data.accessToken);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível iniciar a conexão com o banco. Tente novamente.");
-    } finally {
-      setLoadingToken(false);
-    }
-  }, [existingItemId, hasConnection]);
+  const handleConnect = useCallback(
+    async (target: { mode: "create" } | { mode: "update"; itemId: string } = { mode: "create" }) => {
+      setError(null);
+      setNotice(null);
+      setConnectTarget(target);
+      setLoadingToken(true);
+      try {
+        const res = await fetch("/api/bank/connect-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(target.mode === "update" ? { itemId: target.itemId } : { addAnother: hasConnection }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Falha ao iniciar conexão.");
+        setConnectToken(data.accessToken);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Não foi possível iniciar a conexão com o banco. Tente novamente.");
+      } finally {
+        setLoadingToken(false);
+      }
+    },
+    [hasConnection],
+  );
 
   async function handleBringBanks() {
-    setError(null);
     setAddOpen(false);
-    await handleConnect("create");
+    await handleConnect({ mode: "create" });
   }
 
+  // "Adicionar banco" abre primeiro o passo a passo: o banco precisa estar
+  // conectado no Meu Pluggy antes — sem isso a janela não tem o que autorizar.
   function handleAddClick() {
     setError(null);
-    void handleConnect("create");
+    setNotice(null);
+    setAddOpen(true);
   }
 
   async function handleSuccess(itemData: { item: unknown }) {
     setConnectToken(null);
     setAddOpen(false);
+    const itemId = (itemData.item as { id?: string } | null)?.id;
+    const alreadyConnected = Boolean(itemId && connections.some((connection) => connection.pluggy_item_id === itemId));
     try {
-      await fetch("/api/bank/callback", {
+      const res = await fetch("/api/bank/callback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ item: itemData.item }),
       });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error || "O banco foi autorizado, mas não deu para salvar a conexão. Tente de novo.");
+      } else if (connectTarget.mode === "update") {
+        setNotice("Banco reautorizado. Os dados serão atualizados em instantes.");
+      } else if (alreadyConnected) {
+        setNotice(
+          "Esse banco já estava no app. Para trazer um banco novo, conecte-o primeiro no Meu Pluggy e depois autorize aqui.",
+        );
+      } else {
+        setNotice("Banco adicionado! As contas, o extrato e os investimentos estão sendo importados.");
+      }
     } finally {
       await refreshConnections();
     }
@@ -440,33 +485,41 @@ export default function BancosClient({
     }
   }
 
+
   return (
     <PageShell>
       <PageHero
         kicker="Bancos"
         title={`${connections.length} ${connections.length === 1 ? "conexão" : "conexões"}`}
-        subtitle="Inter, Caixa e Nubank — uma autorização cada um neste app"
+        subtitle={
+          hasConnection ? `${connectedNames.join(", ")} — uma autorização para cada banco` : "Conecte seus bancos pelo Meu Pluggy"
+        }
         trailing={
-          hasConnection ? (
-            <button
-              type="button"
-              onClick={() => void handleBringBanks()}
-              disabled={importing || loadingToken}
-              className="rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-950 disabled:opacity-50"
-            >
-              {importing || loadingToken ? "Abrindo…" : "Autorizar"}
-            </button>
-          ) : null
+          <button
+            type="button"
+            onClick={handleAddClick}
+            disabled={loadingToken}
+            className="rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-950 disabled:opacity-50"
+          >
+            {loadingToken ? "Abrindo…" : "+ Banco"}
+          </button>
         }
       >
         <p className="text-sm leading-relaxed text-zinc-400">
-          Na janela do Meu Pluggy, toque em Continuar e autorize o banco. O Nubank já fica salvo.
+          Para trazer outro banco (Bradesco, Santander...), conecte-o primeiro no Meu Pluggy e depois autorize aqui.
         </p>
       </PageHero>
 
       <div className="px-4 lg:px-6 xl:px-10 2xl:px-14">
       {error && (
-        <p className="mb-4 rounded-2xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>
+        <p role="alert" className="mb-4 rounded-2xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="mb-4 rounded-2xl border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-200">
+          {notice}
+        </p>
       )}
 
       <section>
@@ -494,20 +547,18 @@ export default function BancosClient({
           <button
             type="button"
             onClick={handleAddClick}
-            disabled={loadingToken || importing}
+            disabled={loadingToken}
             className="flex min-h-[168px] flex-col items-start rounded-2xl border border-dashed border-zinc-800 bg-transparent p-4 text-left transition-colors hover:border-zinc-600 disabled:opacity-50"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-800 text-xl text-zinc-400">
               +
             </div>
             <p className="mt-6 text-[15px] font-semibold text-white">
-              {loadingToken || importing ? "Abrindo…" : "Adicionar banco"}
+              {loadingToken ? "Abrindo…" : "Adicionar banco"}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">
-              {hasConnection ? "Inter, Caixa e outros pelo Meu Pluggy" : "Via Meu Pluggy, sem custo"}
-            </p>
+            <p className="mt-1 text-xs text-zinc-500">Bradesco, Santander e outros pelo Meu Pluggy</p>
             <span className="mt-auto border-t border-zinc-800 pt-3 text-xs text-zinc-500">
-              Adicionar &gt;
+              Ver passo a passo &gt;
             </span>
           </button>
         </div>
@@ -527,16 +578,19 @@ export default function BancosClient({
           onClose={() => setSelectedId(null)}
           onSync={() => handleSync(selected.id)}
           onDisconnect={() => handleDisconnect(selected.id)}
+          onReauthorize={() => {
+            setSelectedId(null);
+            void handleConnect({ mode: "update", itemId: selected.pluggy_item_id });
+          }}
         />
       )}
 
       {addOpen && (
         <AddBankDialog
-          busy={importing || loadingToken}
-          importing={importing}
+          busy={loadingToken}
+          connectedNames={connectedNames}
           onClose={() => setAddOpen(false)}
           onBringBanks={() => void handleBringBanks()}
-          onReauthorize={() => void handleConnect("update")}
         />
       )}
 
@@ -544,13 +598,18 @@ export default function BancosClient({
         <PluggyConnect
           connectToken={connectToken}
           includeSandbox={false}
-          {...(connectMode === "update" && existingItemId
-            ? { updateItem: existingItemId }
+          {...(connectTarget.mode === "update"
+            ? { updateItem: connectTarget.itemId }
             : { connectorIds: [200], selectedConnectorId: 200, forceOauthInBrowser: true })}
           products={["ACCOUNTS", "CREDIT_CARDS", "TRANSACTIONS", "INVESTMENTS"]}
           language="pt"
           theme="dark"
           onSuccess={handleSuccess}
+          onError={() =>
+            setError(
+              "A janela do Meu Pluggy deu erro. Confira se o banco já aparece como conectado no meu.pluggy.ai e tente de novo.",
+            )
+          }
           onClose={() => setConnectToken(null)}
         />
       )}
