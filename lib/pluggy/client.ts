@@ -122,6 +122,10 @@ export type PluggyItem = {
   } | null;
   connector: { name: string; imageUrl?: string | null };
   clientUserId?: string | null;
+  /** Quando a Pluggy buscou dados no banco pela última vez. */
+  lastUpdatedAt?: string | null;
+  /** Próxima atualização automática prevista (Meu Pluggy: a cada 24 h). */
+  nextAutoSyncAt?: string | null;
 };
 
 export type PluggyTransaction = {

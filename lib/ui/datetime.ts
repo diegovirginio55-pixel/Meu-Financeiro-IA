@@ -42,6 +42,16 @@ export function formatDateSP(value: Date | string | number): string {
   return dateFormatter.format(toDate(value));
 }
 
+/** "hoje às 15:05", "ontem às 17:33", "amanhã às 21:07" ou "em 05/11/2026 às 09:00" (fuso de São Paulo). */
+export function formatRelativeDaySP(value: Date | string | number, now: Date = new Date()): string {
+  const days = calendarDaysAgoSP(value, now);
+  const time = formatTimeSP(value);
+  if (days === 0) return `hoje às ${time}`;
+  if (days === 1) return `ontem às ${time}`;
+  if (days === -1) return `amanhã às ${time}`;
+  return `em ${formatDateSP(value)} às ${time}`;
+}
+
 /** Diferença em dias de calendário (São Paulo) entre `value` e `now`. 0 = hoje, 1 = ontem. */
 export function calendarDaysAgoSP(value: Date | string | number, now: Date = new Date()): number {
   const a = Date.parse(`${saoPauloDayKey(now)}T00:00:00Z`);

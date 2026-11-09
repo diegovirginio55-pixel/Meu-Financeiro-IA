@@ -10,7 +10,8 @@ import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 import { PageHero, PageShell, SectionLabel } from "@/components/ui/page-chrome";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { realConnectionId } from "@/lib/finance/connection-filter";
-import { calendarDaysAgoSP, formatDateSP, formatTimeSP } from "@/lib/ui/datetime";
+import { calendarDaysAgoSP, formatDateSP, formatRelativeDaySP } from "@/lib/ui/datetime";
+import { connectionFreshness } from "@/lib/finance/connection-freshness";
 import { useDialog } from "@/lib/ui/use-dialog";
 
 const PluggyConnect = dynamic(
@@ -38,17 +39,28 @@ function ClockIcon() {
   );
 }
 
-function formatLastSync(value: string | null): string {
-  if (!value) return "Nunca atualizado";
+/**
+ * "Saldo de ontem às 17:33": hora em que a Pluggy buscou os dados no banco
+ * (não a hora em que o app leu a Pluggy, que é sempre recente e enganava).
+ */
+function formatDataAge(value: string | null): string {
+  if (!value) return "Ainda sem dados do banco";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Nunca atualizado";
+  if (Number.isNaN(date.getTime())) return "Ainda sem dados do banco";
   // Sempre no fuso de São Paulo: o servidor roda em UTC e o texto precisa ser igual no SSR e no celular.
-  const time = formatTimeSP(date);
   const days = calendarDaysAgoSP(date);
-  if (days <= 0) return `Hoje às ${time}`;
-  if (days === 1) return `Ontem às ${time}`;
-  if (days < 7) return `Há ${days} dias`;
-  return formatDateSP(date);
+  if (days <= 1) return `Saldo de ${formatRelativeDaySP(date)}`;
+  if (days < 7) return `Saldo de ${days} dias atrás`;
+  return `Saldo de ${formatDateSP(date)}`;
+}
+
+/** "próxima atualização hoje às 17:33" (ou "em instantes" se a Pluggy já devia ter atualizado). */
+function formatNextUpdate(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  if (date.getTime() <= Date.now()) return "próxima atualização em instantes";
+  return `próxima atualização ${formatRelativeDaySP(date)}`;
 }
 
 function ConnectionCard({
@@ -84,7 +96,7 @@ function ConnectionCard({
       <p className="mt-6 text-[15px] font-semibold text-white">{name}</p>
       <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
         <ClockIcon />
-        {formatLastSync(connection.last_synced_at)}
+        {formatDataAge(connectionFreshness(connection).dataUpdatedAt)}
       </p>
       <span className="mt-auto w-full border-t border-zinc-800 pt-3 text-xs text-zinc-500">
         Ver detalhes &gt;
@@ -109,6 +121,8 @@ function DetailsPanel({
   onReauthorize: () => void;
 }) {
   const needsReauth = !ACTIVE_STATUSES.has(connection.status);
+  const freshness = connectionFreshness(connection);
+  const nextUpdate = formatNextUpdate(freshness.nextAutoSyncAt);
   const name = officialInstitutionName(connection.institution_name);
   const hasAssets =
     connection.accounts.length > 0 ||
@@ -140,7 +154,10 @@ function DetailsPanel({
               <h3 id="bank-details-title" className="text-base font-semibold text-white">
                 {name}
               </h3>
-              <p className="text-xs text-zinc-500">{formatLastSync(connection.last_synced_at)}</p>
+              <p className="text-xs text-zinc-500">
+                {formatDataAge(freshness.dataUpdatedAt)}
+                {nextUpdate ? ` · ${nextUpdate}` : ""}
+              </p>
             </div>
           </div>
           <button
@@ -190,17 +207,9 @@ function DetailsPanel({
         <BalanceHistoryChart key={connection.id} connectionId={connection.id} />
 
         <p className="mt-4 text-xs leading-relaxed text-zinc-500">
-          Os bancos atualizam automaticamente até 1x por dia. Se o saldo aqui parecer atrasado, o banco ainda não
-          liberou dados novos — para forçar agora, entre em{" "}
-          <a
-            href="https://meu.pluggy.ai"
-            target="_blank"
-            rel="noreferrer"
-            className="text-emerald-400 underline hover:text-emerald-300"
-          >
-            meu.pluggy.ai
-          </a>{" "}
-          e sincronize a conta por lá.
+          O Meu Pluggy busca os dados de cada banco 1 vez a cada 24 horas e não permite forçar antes disso. O app
+          confere a Pluggy a cada poucos minutos: assim que ela trouxer dados novos, eles aparecem aqui e as
+          movimentações chegam por notificação.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">

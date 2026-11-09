@@ -766,7 +766,13 @@ export async function syncBankConnection(
       institution_name: institutionName,
       institution_image_url: item.connector.imageUrl ?? null,
       status: item.status,
-      status_detail: item.statusDetail ? JSON.stringify(item.statusDetail) : null,
+      // Junto com o statusDetail, a hora real dos dados e a próxima atualização
+      // da Pluggy (ver lib/finance/connection-freshness.ts).
+      status_detail: JSON.stringify({
+        ...(item.statusDetail ?? {}),
+        dataUpdatedAt: item.lastUpdatedAt ?? null,
+        nextAutoSyncAt: item.nextAutoSyncAt ?? null,
+      }),
       last_synced_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
