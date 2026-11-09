@@ -195,9 +195,11 @@ export default function RealTimeSetupClient({
                 Toque em <strong>Adicionar macro</strong> (+). Dê o nome <em>Meu Financeiro</em>.
               </Step>
               <Step n={3}>
-                Em <strong>Gatilhos</strong> (+) → <strong>Notificação</strong> → <strong>Notificação recebida</strong> →
-                escolha <strong>Selecionar aplicativos</strong> e marque os apps dos seus bancos (Nubank, Inter, Caixa,
-                Bradesco, Santander…). Quando o celular pedir, <strong>permita o acesso às notificações</strong>.
+                Em <strong>Gatilhos</strong> (+), toque na <strong>lupa 🔍</strong> e digite <strong>notifica</strong> →
+                escolha <strong>Notificação</strong> (em muitas versões fica dentro de <strong>Aplicativos</strong>) →{" "}
+                <strong>Notificação recebida</strong> → <strong>Selecionar aplicativos</strong>: marque os apps dos seus
+                bancos (Nubank, Inter, Caixa, Bradesco, Santander…) e escolha <strong>Qualquer conteúdo</strong>. Quando o
+                celular pedir, <strong>permita o acesso às notificações</strong> para o MacroDroid.
               </Step>
               <Step n={4}>
                 Em <strong>Ações</strong> (+) → <strong>Conectividade</strong> → <strong>Requisição HTTP</strong> (HTTP
