@@ -155,3 +155,23 @@ html.light * {
   }
 }
 
+
+/*
+ * iOS dá zoom automático ao focar campos com fonte < 16px. Em telas de celular/tablet
+ * todos os campos de texto usam 16px. Fica fora de @layer de propósito: assim vence as
+ * classes utilitárias (text-sm, text-xs) sem precisar mudar cada componente.
+ */
+@media (max-width: 1023.98px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Quem pediu menos movimento no sistema vê a intro sem animações (só o fade de saída). */
+@media (prefers-reduced-motion: reduce) {
+  .intro-anim {
+    animation: none !important;
+  }
+}

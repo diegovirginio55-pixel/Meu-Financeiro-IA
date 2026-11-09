@@ -1,35 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { formatCurrency } from "@/lib/finance/format";
+import { useId, useState } from "react";
+import { formatCurrency, formatDate } from "@/lib/finance/format";
 import type { Goal } from "@/lib/finance/types";
+import { MoneyInput } from "@/components/ui/MoneyInput";
+import { GoalContributionForm } from "@/components/metas/GoalContributionForm";
+import { parseBRL } from "@/lib/ui/money";
 
 export default function GoalsPanel({ initialGoals }: { initialGoals: Goal[] }) {
-  const [goals, setGoals] = useState(initialGoals);
+  // Lista recarregada localmente vale até o servidor mandar outra (`initialGoals` muda) — derivado, sem efeito.
+  const [localGoals, setLocalGoals] = useState<{ base: Goal[]; list: Goal[] } | null>(null);
+  const goals = localGoals && localGoals.base === initialGoals ? localGoals.list : initialGoals;
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
   const [deadline, setDeadline] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setGoals(initialGoals);
-  }, [initialGoals]);
+  const [contributingId, setContributingId] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const formId = useId();
 
   async function refresh() {
     const res = await fetch("/api/goals", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      setGoals(data.goals ?? []);
+      setLocalGoals({ base: initialGoals, list: data.goals ?? [] });
     }
   }
 
   async function handleCreate() {
     setError(null);
-    const targetAmount = Number(target.replace(",", "."));
-    if (!name.trim() || !Number.isFinite(targetAmount) || targetAmount <= 0) {
-      setError("Informe um nome e um valor objetivo válido.");
+    const targetAmount = parseBRL(target);
+    if (!name.trim() || targetAmount == null || targetAmount <= 0) {
+      setError("Informe um nome e um valor objetivo válido (ex.: 1.500,00).");
       return;
     }
     setSaving(true);
@@ -53,23 +57,20 @@ export default function GoalsPanel({ initialGoals }: { initialGoals: Goal[] }) {
     }
   }
 
-  async function handleAddAmount(goal: Goal) {
-    const input = window.prompt(`Quanto guardar para "${goal.name}"?`, "");
-    if (!input) return;
-    const amount = Number(input.replace(",", "."));
-    if (!Number.isFinite(amount) || amount === 0) return;
-    await fetch(`/api/goals/${goal.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ add_amount: amount }),
-    });
-    await refresh();
-  }
-
   async function handleDelete(goal: Goal) {
     if (!window.confirm(`Excluir a meta "${goal.name}"?`)) return;
-    await fetch(`/api/goals/${goal.id}`, { method: "DELETE" });
-    await refresh();
+    setListError(null);
+    try {
+      const res = await fetch(`/api/goals/${goal.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setListError(data.error || "Não foi possível excluir a meta.");
+        return;
+      }
+      await refresh();
+    } catch {
+      setListError("Não foi possível excluir a meta. Verifique sua conexão.");
+    }
   }
 
   return (
@@ -91,24 +92,31 @@ export default function GoalsPanel({ initialGoals }: { initialGoals: Goal[] }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nome da meta (ex: Viagem, Reserva de emergência)"
+            aria-label="Nome da meta"
             className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
           />
           <div className="grid grid-cols-2 gap-2">
-            <input
+            <MoneyInput
+              id={`${formId}-target`}
               value={target}
-              onChange={(e) => setTarget(e.target.value)}
+              onValueChange={setTarget}
               placeholder="Valor objetivo"
-              inputMode="decimal"
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+              aria-label="Valor objetivo"
+              invalid={error != null && parseBRL(target) == null}
             />
             <input
               type="date"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
+              aria-label="Prazo"
               className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none"
             />
           </div>
-          {error && <p className="text-xs text-rose-400">{error}</p>}
+          {error && (
+            <p role="alert" className="text-xs text-rose-400">
+              {error}
+            </p>
+          )}
           <button
             type="button"
             onClick={() => void handleCreate()}
@@ -120,6 +128,12 @@ export default function GoalsPanel({ initialGoals }: { initialGoals: Goal[] }) {
         </div>
       )}
 
+      {listError && (
+        <p role="alert" className="mb-3 text-xs text-rose-400">
+          {listError}
+        </p>
+      )}
+
       {goals.length === 0 ? (
         <p className="text-sm text-zinc-500">Nenhuma meta criada ainda. Que tal começar uma?</p>
       ) : (
@@ -127,7 +141,7 @@ export default function GoalsPanel({ initialGoals }: { initialGoals: Goal[] }) {
           {goals.map((goal) => {
             const progress = Math.min(
               100,
-              Math.round((Number(goal.current_amount) / Number(goal.target_amount)) * 100),
+              Math.round((Number(goal.current_amount) / Math.max(1, Number(goal.target_amount))) * 100),
             );
             return (
               <li key={goal.id}>
@@ -136,7 +150,7 @@ export default function GoalsPanel({ initialGoals }: { initialGoals: Goal[] }) {
                     {goal.name}
                     {goal.deadline && (
                       <span className="ml-1.5 text-xs text-zinc-500">
-                        até {new Date(`${goal.deadline}T12:00:00`).toLocaleDateString("pt-BR")}
+                        até {formatDate(goal.deadline)}
                       </span>
                     )}
                   </span>
@@ -150,7 +164,8 @@ export default function GoalsPanel({ initialGoals }: { initialGoals: Goal[] }) {
                 <div className="mt-1.5 flex justify-end gap-3 text-[11px]">
                   <button
                     type="button"
-                    onClick={() => void handleAddAmount(goal)}
+                    onClick={() => setContributingId((current) => (current === goal.id ? null : goal.id))}
+                    aria-expanded={contributingId === goal.id}
                     className="text-emerald-400 hover:text-emerald-300"
                   >
                     + guardar
@@ -158,11 +173,22 @@ export default function GoalsPanel({ initialGoals }: { initialGoals: Goal[] }) {
                   <button
                     type="button"
                     onClick={() => void handleDelete(goal)}
-                    className="text-zinc-500 hover:text-red-400"
+                    className="text-zinc-400 hover:text-red-400"
                   >
                     excluir
                   </button>
                 </div>
+                {contributingId === goal.id && (
+                  <GoalContributionForm
+                    goalId={goal.id}
+                    goalName={goal.name}
+                    onCancel={() => setContributingId(null)}
+                    onDone={async () => {
+                      setContributingId(null);
+                      await refresh();
+                    }}
+                  />
+                )}
               </li>
             );
           })}

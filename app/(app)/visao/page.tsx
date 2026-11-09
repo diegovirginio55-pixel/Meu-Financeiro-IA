@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getFinancialSnapshot } from "@/lib/finance/summary";
 import { getBankConnectionsWithAssets } from "@/lib/finance/bank-connections";
 import { lastNMonthKeys } from "@/lib/finance/fluxo";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import DashboardClient from "@/components/dashboard/DashboardClient";
 import type { InvestmentSnapshot, InvestmentTxn, Transaction } from "@/lib/finance/types";
 
@@ -14,7 +15,17 @@ export default async function VisaoPage() {
   const [snapshot, connections, historyRes, snapRes, txRes] = await Promise.all([
     getFinancialSnapshot(supabase),
     getBankConnectionsWithAssets(supabase),
-    supabase.from("transactions").select("*").gte("date", from).order("date", { ascending: true }),
+    // Paginado: em ordem crescente, o corte de 1000 linhas descartava
+    // justamente os lançamentos mais recentes (mês atual zerado).
+    fetchAllRows<Transaction>((start, end) =>
+      supabase
+        .from("transactions")
+        .select("*")
+        .gte("date", from)
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(start, end),
+    ),
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", from),
     supabase.from("investment_transactions").select("*").gte("date", from),
   ]);

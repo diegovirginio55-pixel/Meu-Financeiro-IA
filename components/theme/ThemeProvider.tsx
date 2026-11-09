@@ -1,19 +1,21 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from "react";
+import { readStored, subscribeStored, useHydrated, writeStored } from "@/lib/ui/browser-store";
 
 export type Theme = "dark" | "light";
 
 const STORAGE_KEY = "mf-theme";
 
 function readTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) === "light" ? "light" : "dark";
-  } catch {
-    return "dark";
-  }
+  return readStored(STORAGE_KEY) === "light" ? "light" : "dark";
 }
+
+function subscribeTheme(callback: () => void) {
+  return subscribeStored(STORAGE_KEY, callback);
+}
+
+const getServerTheme = (): Theme => "dark";
 
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
@@ -29,25 +31,20 @@ const ThemeContext = createContext<{ theme: Theme; toggleTheme: () => void }>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
+  // O script "theme-init" (app/layout.tsx) já aplica a classe antes da pintura; aqui só lemos o valor salvo.
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, getServerTheme);
+  const hydrated = useHydrated();
 
+  // Sincroniza o DOM (classe, color-scheme e meta theme-color) com o tema atual — inclusive vindo de outra aba.
+  // Na hidratação o valor ainda é o do servidor ("dark"); não aplica para não desfazer o tema claro do script.
   useEffect(() => {
-    const next = readTheme();
-    setTheme(next);
-    applyTheme(next);
-  }, []);
+    if (hydrated) applyTheme(theme);
+  }, [theme, hydrated]);
 
   const toggleTheme = useCallback(() => {
-    setTheme((current) => {
-      const next: Theme = current === "dark" ? "light" : "dark";
-      try {
-        window.localStorage.setItem(STORAGE_KEY, next);
-      } catch {
-        /* ignore */
-      }
-      applyTheme(next);
-      return next;
-    });
+    const next: Theme = readTheme() === "dark" ? "light" : "dark";
+    writeStored(STORAGE_KEY, next);
+    applyTheme(next);
   }, []);
 
   return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { refreshBankConnections } from "@/lib/pluggy/auto-refresh";
 import { publicOrigin } from "@/lib/pluggy/origin";
+import { webhookUrlFor } from "@/lib/pluggy/webhook";
 
 /**
  * Atualiza os bancos sozinho: pede saldo novo na Pluggy (no máximo 1x por hora)
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
   const result = await refreshBankConnections({
     supabase,
     connections,
-    webhookUrl: origin ? `${origin}/api/bank/webhook` : undefined,
+    webhookUrl: webhookUrlFor(origin),
     pullOnly: body.pullOnly === true,
   });
 

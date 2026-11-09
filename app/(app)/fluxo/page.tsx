@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import FluxoClient from "@/components/fluxo/FluxoClient";
 import { getBankConnectionsWithAssets } from "@/lib/finance/bank-connections";
 import { lastNMonthKeys } from "@/lib/finance/fluxo";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import type { Account, Card, Debt, RecurringItem, Transaction } from "@/lib/finance/types";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,15 @@ export default async function FluxoPage() {
   const from = `${lastNMonthKeys(18)[0]}-01`;
 
   const [txRes, accRes, cardRes, connections, recRes, debtRes] = await Promise.all([
-    supabase.from("transactions").select("*").gte("date", from).order("date", { ascending: false }),
+    fetchAllRows<Transaction>((start, end) =>
+      supabase
+        .from("transactions")
+        .select("*")
+        .gte("date", from)
+        .order("date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(start, end),
+    ),
     supabase.from("accounts").select("*").order("created_at"),
     supabase.from("cards").select("*").order("created_at"),
     getBankConnectionsWithAssets(supabase),

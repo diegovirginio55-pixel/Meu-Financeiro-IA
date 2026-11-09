@@ -5,18 +5,30 @@ import { sendPushToUser } from "./send";
 
 const DAILY_BUDGET_PUSH_START_HOUR = 7;
 const DAILY_BUDGET_PUSH_END_HOUR = 10;
+/** Fora deste horário os alertas não urgentes esperam (nada de push à meia-noite). */
+const QUIET_END_HOUR = 8;
+const QUIET_START_HOUR = 22;
 
 /**
  * O aviso "quanto você pode gastar hoje" só é enviado por push pela manhã
  * (o resto do dia ele já ficou obsoleto pra decisão do dia). Fora dessa
  * janela o candidato simplesmente não é despachado ainda — como ele não é
- * marcado como enviado, a próxima execução do cron (a cada 10 min) tenta
- * de novo até cair dentro do horário. Continua aparecendo normalmente no
- * Centro de Alertas do app, que não passa por aqui.
+ * marcado como enviado, a próxima execução do cron tenta de novo até cair
+ * dentro do horário. Continua aparecendo normalmente no Centro de Alertas
+ * do app, que não passa por aqui.
  */
 function isDailyBudgetPushWindow(now: Date): boolean {
   const hour = saoPauloHour(now);
   return hour >= DAILY_BUDGET_PUSH_START_HOUR && hour < DAILY_BUDGET_PUSH_END_HOUR;
+}
+
+/**
+ * Resumo semanal, saldo baixo e avisos do mês viravam push logo depois da
+ * meia-noite (primeiro cron do dia novo). Agora esperam até as 8h.
+ */
+function isAwakeHours(now: Date): boolean {
+  const hour = saoPauloHour(now);
+  return hour >= QUIET_END_HOUR && hour < QUIET_START_HOUR;
 }
 
 /**
@@ -49,8 +61,21 @@ async function markAsSent(supabase: SupabaseClient, userId: string, candidate: A
 async function dispatch(supabase: SupabaseClient, userId: string, candidate: AlertCandidate): Promise<boolean> {
   const isNew = await markAsSent(supabase, userId, candidate);
   if (!isNew) return false;
-  await sendPushToUser(userId, { title: candidate.title, body: candidate.body, url: candidate.url });
-  return true;
+  const result = await sendPushToUser(userId, { title: candidate.title, body: candidate.body, url: candidate.url });
+  // Nenhuma entrega e alguma falha foi temporária (sem resposta, 429, 5xx):
+  // desfaz o registro para a próxima execução tentar de novo (antes o
+  // alerta se perdia). Falha permanente (ex.: 403 de inscrição antiga) não
+  // repete — senão o alerta sumia e voltava a cada execução.
+  if (result.subscriptions > 0 && result.delivered === 0 && result.transient > 0) {
+    await supabase
+      .from("notification_log")
+      .delete()
+      .eq("user_id", userId)
+      .eq("kind", candidate.kind)
+      .eq("ref_key", candidate.refKey);
+    return false;
+  }
+  return result.delivered > 0;
 }
 
 /**
@@ -63,6 +88,10 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
   const userIds = Array.from(new Set((accountRows ?? []).map((row) => row.user_id as string)));
 
   const now = new Date();
+  if (!isAwakeHours(now) && !isDailyBudgetPushWindow(now)) {
+    return { users: userIds.length, sent: 0 };
+  }
+
   let sent = 0;
   for (const userId of userIds) {
     try {
@@ -70,7 +99,11 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
       const summary = await computeWeeklySummary(supabase, userId);
       const candidates = summary ? [...alerts, summary] : alerts;
       for (const candidate of candidates) {
-        if (candidate.kind === "daily_budget" && !isDailyBudgetPushWindow(now)) continue;
+        if (candidate.kind === "daily_budget") {
+          if (!isDailyBudgetPushWindow(now)) continue;
+        } else if (!isAwakeHours(now)) {
+          continue;
+        }
         if (await dispatch(supabase, userId, candidate)) sent += 1;
       }
     } catch (error) {

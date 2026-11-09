@@ -38,7 +38,7 @@ export function HealthScoreHeroBar({ score }: { score: number }) {
         />
       </div>
 
-      <div className="mt-1.5 flex justify-between text-[10px] text-zinc-600">
+      <div className="mt-1.5 flex justify-between text-[10px] text-zinc-500">
         {SCALE_STOPS.map((stop) => (
           <span key={stop.pct}>{stop.label}</span>
         ))}

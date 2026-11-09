@@ -19,8 +19,11 @@ Stack: **Next.js 16** (App Router, TypeScript, Tailwind CSS) + **Supabase** (Pos
 ## 2. Criar o projeto no Supabase
 
 1. Crie um novo projeto em [supabase.com](https://supabase.com/dashboard).
-2. Vá em **SQL Editor** e execute todas as migrations em [`supabase/migrations/`](supabase/migrations/), em ordem numérica (`0001_init.sql` até a mais recente, ex: `0008_app_improvements.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
-3. Em **Authentication > Providers**, deixe o provedor **Email** habilitado. O login é pessoal (sem cadastro público na tela).
+2. Vá em **SQL Editor** e execute todas as migrations em [`supabase/migrations/`](supabase/migrations/), em ordem numérica (`0001_init.sql` até a mais recente, `0011_cron_keepalive.sql`). Isso cria as tabelas, os índices, as políticas de segurança (RLS) e um gatilho que cria automaticamente uma conta e um cartão padrão para qualquer usuário novo.
+   - Antes da `0011`, guarde o segredo do cron no Vault (mesmo valor de `BANK_CRON_SECRET`):
+     `select vault.create_secret('SEU-BANK_CRON_SECRET', 'bank_cron_secret');`
+   - A `0011` agenda, de dentro do Supabase, uma chamada ao app a cada 5 minutos. Isso mantém o servidor do Render acordado (o webhook da Pluggy é atendido na hora, então as notificações chegam sem atraso) e roda os alertas no horário certo. O agendamento do GitHub Actions continua só como reserva: na prática o GitHub o executa a cada 3–8 horas.
+3. Em **Authentication > Providers**, deixe o provedor **Email** habilitado e **desligue "Allow new users to sign up"** (Authentication > Sign In / Providers). O app é pessoal: a chave anon fica no navegador e, com o cadastro ligado, qualquer pessoa poderia criar conta pela API. Como proteção extra, defina `ALLOWED_EMAILS` (veja abaixo).
 4. Em **Project Settings > API**, copie a **Project URL** e a **anon public key**.
 
 ## 3. Configurar variáveis de ambiente
@@ -110,9 +113,17 @@ Observações do plano gratuito do Render: o serviço "dorme" depois de 15 minut
 
 Cada novo `git push` na branch `main` gera um novo deploy automático.
 
-## Notas e limitações da v1
+## Variáveis opcionais
 
-- Editar ou excluir um lançamento na aba Detalhes corrige o registro em si, mas **não** reajusta automaticamente o saldo da conta/fatura que já foi alterado no momento da criação.
+- `ALLOWED_EMAILS` — e-mails que podem entrar no app, separados por vírgula. Qualquer outro login é desconectado na hora.
+- `GEMINI_MODEL` — troca o modelo do Gemini sem mexer no código.
+- `PLUGGY_WEBHOOK_SECRET` — segredo enviado pela Pluggy no cabeçalho do webhook. Se ficar vazio, é derivado do `BANK_CRON_SECRET`.
+
+## Notas e limitações
+
+- Editar ou excluir um lançamento reajusta o saldo da conta/fatura **manual** só pela diferença. Contas e cartões sincronizados com o banco não são alterados, porque o saldo deles vem direto do banco.
+- Edições e exclusões de lançamentos importados do banco são preservadas: o sync não as desfaz nem traz de volta o que foi excluído.
+- **Meu Pluggy atualiza os dados 1x a cada 24 horas** e não aceita pedido de atualização manual. Isso é um limite da fonte: o app avisa em segundos depois que a Pluggy recebe a movimentação, mas não tem como saber antes disso.
 - Sem Open Finance nativo do BACEN. Uso pessoal gratuito via [Meu Pluggy](https://meu.pluggy.ai) (conector 200). Conectar contas de outros CPFs direto no widget exige plano comercial da Pluggy.
 - Sem planos e sem pagamentos — acesso pessoal (um usuário). Dados do banco entram via Meu Pluggy.
 

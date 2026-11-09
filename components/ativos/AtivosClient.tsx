@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatCurrency } from "@/lib/finance/format";
+import { formatCurrency, formatPercent } from "@/lib/finance/format";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Investment, InvestmentSnapshot, InvestmentTxn } from "@/lib/finance/types";
 import { accumulatedProfit } from "@/lib/finance/investment-pnl";
@@ -68,15 +68,12 @@ export default function AtivosClient({
     () => connections.find(isInterConnection)?.id ?? "all",
     [connections],
   );
-  const [connectionId, setConnectionId] = useState(interId);
+  const [selectedConnectionId, setConnectionId] = useState(interId);
+  // Se a conexão escolhida sumiu da lista, volta para a do Inter (derivado no render, sem efeito).
+  const connectionId =
+    selectedConnectionId === "all" || connectionIds.includes(selectedConnectionId) ? selectedConnectionId : interId;
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const router = useRouter();
-
-  useEffect(() => {
-    if (connectionId !== "all" && !connectionIds.includes(connectionId)) {
-      setConnectionId(interId);
-    }
-  }, [connectionId, connectionIds, interId]);
 
   useEffect(() => {
     function onVisible() {
@@ -231,7 +228,7 @@ export default function AtivosClient({
                                   {formatCurrency(Math.abs(profit))}
                                 </span>
                               ) : (
-                                <span className="text-xs text-zinc-500">{share.toFixed(1)}%</span>
+                                <span className="text-xs text-zinc-500">{formatPercent(share, 1)}</span>
                               )}
                             </span>
                             <span className={`text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}>
@@ -251,10 +248,10 @@ export default function AtivosClient({
                                 </p>
                               )}
                               <p>
-                                Tipo: {asset.type || "Investimento"} · Parte da carteira: {share.toFixed(1)}%
+                                Tipo: {asset.type || "Investimento"} · Parte da carteira: {formatPercent(share, 1)}
                               </p>
                               {asset.last_month_rate != null && Number(asset.last_month_rate) !== 0 && (
-                                <p>Taxa último mês: {Number(asset.last_month_rate).toFixed(2)}%</p>
+                                <p>Taxa último mês: {formatPercent(Number(asset.last_month_rate), 2)}</p>
                               )}
                             </div>
                           )}

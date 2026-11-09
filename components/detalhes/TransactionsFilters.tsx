@@ -54,6 +54,7 @@ export default function TransactionsFilters({
           value={filters.search ?? ""}
           onChange={(e) => update("search", e.target.value)}
           placeholder="Buscar por descrição ou valor…"
+          aria-label="Buscar lançamentos"
           className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 py-2.5 pl-9 pr-9 text-sm text-zinc-200 outline-none placeholder:text-zinc-500"
         />
         {filters.search && (
@@ -104,6 +105,7 @@ export default function TransactionsFilters({
         <select
           value={filters.category}
           onChange={(e) => update("category", e.target.value)}
+          aria-label="Filtrar por categoria"
           className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
           <option value="">Categoria</option>
@@ -116,6 +118,7 @@ export default function TransactionsFilters({
         <select
           value={filters.accountId}
           onChange={(e) => update("accountId", e.target.value)}
+          aria-label="Filtrar por conta"
           className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
           <option value="">Todas as contas</option>
@@ -130,6 +133,7 @@ export default function TransactionsFilters({
         <select
           value={filters.cardId}
           onChange={(e) => update("cardId", e.target.value)}
+          aria-label="Filtrar por cartão"
           className="col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 outline-none"
         >
           <option value="">Todos os cartões</option>

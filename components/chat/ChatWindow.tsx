@@ -10,17 +10,44 @@ import { PageHero, PageShell } from "@/components/ui/page-chrome";
 import { extractChatCard } from "@/lib/finance/chat-card";
 import { ChatSuggestionChips } from "./ChatSuggestionChips";
 
+/** Intervalo da "digitação" da resposta: passos maiores e menos renders (leve em celular fraco). */
+const REVEAL_TICK_MS = 40;
+const REVEAL_STEPS = 30;
+/** Distância do fim (px) em que ainda consideramos que o usuário está "colado" no fim da conversa. */
+const STICK_THRESHOLD_PX = 80;
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
 export default function ChatWindow() {
   const [messages, setMessages] = useState<ChatUiMessage[]>([]);
   const [quota, setQuota] = useState<ChatQuotaView | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sending, setSending] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [expiredLock, setExpiredLock] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+  const revealTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Rola para o fim (sem animação) só quando o usuário já está no fim da conversa.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const el = scrollRef.current;
+    if (!el || !stickToBottom.current) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > 1) el.scrollTop = el.scrollHeight;
   }, [messages]);
+
+  // Para a animação de digitação ao sair da tela.
+  useEffect(() => {
+    return () => {
+      if (revealTimer.current) clearInterval(revealTimer.current);
+      revealTimer.current = null;
+    };
+  }, []);
+
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD_PX;
+  }
 
   useEffect(() => {
     let active = true;
@@ -36,6 +63,7 @@ export default function ChatWindow() {
         setMessages(loaded);
         if (data.quota) setQuota(data.quota);
       })
+      .catch(() => undefined)
       .finally(() => {
         if (active) setLoadingHistory(false);
       });
@@ -44,10 +72,17 @@ export default function ChatWindow() {
     };
   }, []);
 
-  const limitedNow =
-    Boolean(quota?.limited) ||
-    (quota != null && quota.remaining <= 0) ||
-    Boolean(quota?.lockedUntil && new Date(quota.lockedUntil).getTime() > Date.now());
+  // Bloqueio temporário: em vez de comparar com Date.now() no render, um timer marca quando ele expira.
+  const lockedUntil = quota?.lockedUntil ?? null;
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const remainingMs = new Date(lockedUntil).getTime() - Date.now();
+    const id = window.setTimeout(() => setExpiredLock(lockedUntil), Math.min(MAX_TIMEOUT_MS, Math.max(0, remainingMs)));
+    return () => window.clearTimeout(id);
+  }, [lockedUntil]);
+  const lockActive = lockedUntil != null && expiredLock !== lockedUntil;
+
+  const limitedNow = Boolean(quota?.limited) || (quota != null && quota.remaining <= 0) || lockActive;
 
   useEffect(() => {
     if (!limitedNow) return;
@@ -75,21 +110,31 @@ export default function ChatWindow() {
     // revela só o texto visível animando, e mostra o cartão só ao final —
     // senão o JSON cru apareceria piscando durante a digitação.
     const { text } = extractChatCard(fullReply);
+    if (revealTimer.current) clearInterval(revealTimer.current);
     let i = 0;
-    const step = Math.max(1, Math.floor(text.length / 60));
+    const step = Math.max(12, Math.ceil(text.length / REVEAL_STEPS));
     const interval = setInterval(() => {
-      i += step;
+      // Avança vários caracteres por vez e termina no fim de uma palavra.
+      let next = Math.min(text.length, i + step);
+      const space = text.indexOf(" ", next);
+      if (space !== -1 && space - next < 24) next = space;
+      i = next;
       const done = i >= text.length;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === id ? { ...m, content: done ? fullReply : text.slice(0, i) } : m,
         ),
       );
-      if (done) clearInterval(interval);
-    }, 18);
+      if (done) {
+        clearInterval(interval);
+        if (revealTimer.current === interval) revealTimer.current = null;
+      }
+    }, REVEAL_TICK_MS);
+    revealTimer.current = interval;
   }
 
   async function handleSend(message: string) {
+    stickToBottom.current = true;
     const userMsg: ChatUiMessage = {
       id: `local-${Date.now()}`,
       role: "user",
@@ -213,7 +258,7 @@ export default function ChatWindow() {
         subtitle="Pergunte sobre gastos, saldo e investimentos"
       />
       <div className="flex h-[calc(100vh-15rem)] flex-col px-4 lg:h-[calc(100vh-12rem)] lg:px-6 xl:px-10 2xl:px-14">
-        <div className="flex-1 space-y-3 overflow-y-auto pb-3">
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 space-y-3 overflow-y-auto pb-3">
           {loadingHistory ? (
             <p className="text-center text-sm text-zinc-500">Carregando conversa...</p>
           ) : messages.length === 0 ? (
@@ -223,7 +268,6 @@ export default function ChatWindow() {
           ) : (
             messages.map((m) => <ChatBubble key={m.id} message={m} />)
           )}
-          <div ref={bottomRef} />
         </div>
         {quota ? (
           <p className={`mb-2 px-1 text-xs ${limited ? "text-amber-300" : "text-zinc-500"}`}>

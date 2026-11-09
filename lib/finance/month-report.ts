@@ -5,6 +5,7 @@ import { isGasto, isRenda, saoPauloMonthKey, saoPauloTodayKey, shiftMonthKey } f
 import { isInvestmentMovement } from "./investment-movements";
 import { resolvedCategory } from "./categories";
 import { formatCurrency } from "./format";
+import { MIN_DAYS_FOR_PROJECTION } from "./budget";
 
 export interface CategoryDiff {
   category: string;
@@ -83,8 +84,14 @@ export function computeMonthReport({
   const pastTotals = Array.from(pastMonthsTotals.values());
   const mediaHistorica = pastTotals.length > 0 ? pastTotals.reduce((s, v) => s + v, 0) / pastTotals.length : 0;
 
-  const previsaoFimMes = daysElapsed > 0 ? (saidas / daysElapsed) * daysInMonth : saidas;
-  const ritmoPct = mediaHistorica > 0 ? ((previsaoFimMes - mediaHistorica) / mediaHistorica) * 100 : 0;
+  // Nos primeiros dias a projeção linear exagera (um aluguel no dia 2 virava
+  // "fechar o mês em 15x"). Até o dia 5, usa a média histórica (ou o que já
+  // foi gasto, se for maior) e não acusa ritmo acima/abaixo.
+  const canProject = daysElapsed >= MIN_DAYS_FOR_PROJECTION;
+  const previsaoFimMes = canProject
+    ? (saidas / daysElapsed) * daysInMonth
+    : Math.max(saidas, mediaHistorica || saidas);
+  const ritmoPct = canProject && mediaHistorica > 0 ? ((previsaoFimMes - mediaHistorica) / mediaHistorica) * 100 : 0;
   const ritmoStatus: MonthReport["ritmoStatus"] =
     ritmoPct > 8 ? "acima" : ritmoPct < -8 ? "abaixo" : "normal";
 
@@ -135,7 +142,12 @@ export function computeMonthReport({
   const activeGoal = goals.find((g) => Number(g.current_amount) < Number(g.target_amount));
   if (activeGoal) {
     const restante = Number(activeGoal.target_amount) - Number(activeGoal.current_amount);
-    if (activeGoal.deadline) {
+    if (activeGoal.deadline && activeGoal.deadline < todayKey) {
+      // Prazo já passou: não faz sentido pedir o valor todo "por mês".
+      recomendacoes.push(
+        `O prazo da meta "${activeGoal.name}" já passou e faltam ${formatCurrency(restante)}. Que tal definir um novo prazo?`,
+      );
+    } else if (activeGoal.deadline) {
       const monthsLeft = Math.max(
         1,
         Math.round(

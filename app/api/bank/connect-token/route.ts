@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { pluggyApi } from "@/lib/pluggy/client";
 import { publicOrigin } from "@/lib/pluggy/origin";
+import { webhookUrlFor } from "@/lib/pluggy/webhook";
+import { serverError } from "@/lib/api/errors";
 
 /**
  * Gera um connect token de curta duração (30 min) para abrir o widget da
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
     addAnother?: boolean;
   };
   const origin = publicOrigin(request);
-  const webhookUrl = origin ? `${origin}/api/bank/webhook` : undefined;
+  const webhookUrl = webhookUrlFor(origin);
   const oauthRedirectUri = origin ? `${origin}/bancos` : undefined;
 
   try {
@@ -36,9 +38,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ accessToken, mode: body.itemId && !body.addAnother ? "update" : "create" });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Não foi possível iniciar a conexão bancária.";
-    console.error("Erro ao criar connect token da Pluggy:", error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError("Não foi possível iniciar a conexão bancária.", error);
   }
 }

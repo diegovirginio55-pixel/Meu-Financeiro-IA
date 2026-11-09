@@ -1,28 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
+import { isPhoneUserAgent } from "@/lib/ui/phone-ua";
+
+/** Valor calculado no servidor a partir do user-agent (app/(app)/layout.tsx → AppChrome). */
+export const PhoneLayoutContext = createContext(false);
+
+const NARROW_TOUCH = "(pointer: coarse) and (max-width: 767.98px)";
 
 function computeIsPhone() {
-  const ua = navigator.userAgent;
-  const mobileUA = /iPhone|iPod|Android.+Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-  if (mobileUA) return true;
-  const narrowTouch =
-    window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 768;
-  return narrowTouch;
+  if (isPhoneUserAgent(navigator.userAgent)) return true;
+  return window.matchMedia(NARROW_TOUCH).matches;
 }
 
-/** No computador (mouse/Chrome desktop) fica false, mesmo com a janela estreita. */
+function subscribe(callback: () => void) {
+  const mq = window.matchMedia(NARROW_TOUCH);
+  mq.addEventListener("change", callback);
+  window.addEventListener("resize", callback);
+  return () => {
+    mq.removeEventListener("change", callback);
+    window.removeEventListener("resize", callback);
+  };
+}
+
+/**
+ * No computador (mouse/Chrome desktop) fica false, mesmo com a janela estreita.
+ * O servidor já renderiza o layout certo (pelo user-agent); no cliente refina com matchMedia/resize.
+ */
 export function usePhoneLayout() {
-  const [phone, setPhone] = useState(() =>
-    typeof window === "undefined" ? false : computeIsPhone(),
-  );
-
-  useEffect(() => {
-    const update = () => setPhone(computeIsPhone());
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  return phone;
+  const initialPhone = useContext(PhoneLayoutContext);
+  const getServerSnapshot = useCallback(() => initialPhone, [initialPhone]);
+  return useSyncExternalStore(subscribe, computeIsPhone, getServerSnapshot);
 }

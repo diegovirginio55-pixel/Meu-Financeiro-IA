@@ -7,7 +7,8 @@ services:
     branch: main
     buildCommand: npm ci --include=dev && NODE_OPTIONS=--max-old-space-size=460 npm run build
     startCommand: npm start
-    autoDeployTrigger: commit
+    # Só publica depois que o workflow de verificações (.github/workflows/ci.yml) passar.
+    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_ENV
         value: production

@@ -20,10 +20,11 @@ import {
   saoPauloMonthStartKey,
   saoPauloTodayKey,
   saoPauloWeekStartKey,
-  shiftMonthKey,
+  nextMonthlyOccurrenceKey,
   sumGastosInRange,
   dailyBudgetFromBalance,
 } from "./fluxo";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { resolvedCategory } from "./categories";
 import { uniqueInvestments } from "./bank-connections";
 import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
@@ -104,12 +105,27 @@ export async function getFinancialSnapshot(
     supabase.from("debts").select("*").order("due_date", { ascending: true }),
     supabase.from("goals").select("*").order("created_at"),
     supabase.from("recurring_items").select("*").eq("active", true),
-    supabase
-      .from("transactions")
-      .select("*")
-      .gte("date", monthStart)
-      .lte("date", monthEnd),
-    supabase.from("transactions").select("*").gte("date", thirteenMonthsAgo),
+    fetchAllRows<Transaction>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("*")
+        .gte("date", monthStart)
+        .lte("date", monthEnd)
+        .order("date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    // Paginado: com mais de 1000 lançamentos em 13 meses a consulta era
+    // cortada (e, sem ordenação, num pedaço aleatório do histórico).
+    fetchAllRows<Transaction>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("*")
+        .gte("date", thirteenMonthsAgo)
+        .order("date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", sixMonthsAgo),
     supabase.from("investment_transactions").select("*").gte("date", sixMonthsAgo),
     supabase.from("monthly_budgets").select("*").eq("month_key", saoPauloMonthKey(now)).maybeSingle(),
@@ -180,14 +196,11 @@ export async function getFinancialSnapshot(
   const todayStr = saoPauloTodayKey(now);
   const limitStr = daysAheadKey(30, now);
   const proximos30Dias: UpcomingItem[] = [];
-  const thisMonth = saoPauloMonthKey(now);
 
   recurringItems.forEach((item) => {
-    const day = Math.min(Math.max(1, item.day_of_month), 28);
-    let occurrence = `${thisMonth}-${String(day).padStart(2, "0")}`;
-    if (occurrence < todayStr) {
-      occurrence = `${shiftMonthKey(thisMonth, 1)}-${String(day).padStart(2, "0")}`;
-    }
+    // Dia real do mês (31 vira 30/28 quando o mês é mais curto) — antes
+    // tudo acima de 28 era tratado como dia 28.
+    const occurrence = nextMonthlyOccurrenceKey(Math.max(1, item.day_of_month), todayStr);
     if (occurrence <= limitStr) {
       proximos30Dias.push({
         description: item.description,
@@ -216,8 +229,16 @@ export async function getFinancialSnapshot(
 
   proximos30Dias.sort((a, b) => a.date.localeCompare(b.date));
 
+  // Faturas de cartão que vencem nos próximos 30 dias também saem do saldo.
+  const faturasAVencer = cards.reduce((sum, card) => {
+    const invoice = Number(card.current_invoice) || 0;
+    if (invoice <= 0 || !card.due_day) return sum;
+    return nextMonthlyOccurrenceKey(card.due_day, todayStr) <= limitStr ? sum + invoice : sum;
+  }, 0);
+
   const saldoPrevisto30Dias =
-    totalBalance +
+    totalBalance -
+    faturasAVencer +
     proximos30Dias.reduce(
       (s, i) => s + (i.type === "entrada" ? i.amount : -i.amount),
       0,

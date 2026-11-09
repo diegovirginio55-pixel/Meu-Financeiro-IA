@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/finance/format";
@@ -61,7 +61,8 @@ export default function FluxoClient({
 }) {
   const connectionIds = useMemo(() => connections.map((connection) => connection.id), [connections]);
   const [connectionId, setConnectionId] = useConnectionFilter(connectionIds);
-  const [monthKey, setMonthKey] = usePersistedState("mf-fluxo-month", saoPauloMonthKey());
+  // Sempre abre no mês atual (não persiste: quem volta num mês novo não deve ver o mês anterior).
+  const [monthKey, setMonthKey] = useState(saoPauloMonthKey);
   const [accountId, setAccountId] = usePersistedState("mf-fluxo-account", "all");
   const [type, setType] = usePersistedState<"todos" | "entrada" | "saida">("mf-fluxo-type", "todos");
   const [search, setSearch] = usePersistedState("mf-fluxo-search", "");
@@ -190,6 +191,7 @@ export default function FluxoClient({
         trailing={
           <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
             <select
+              aria-label="Filtrar por banco"
               value={connectionId}
               onChange={(event) => {
                 setConnectionId(event.target.value);
@@ -281,7 +283,7 @@ export default function FluxoClient({
         <SoftPanel className="flex min-h-[260px] flex-col p-5">
           {futuras.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center text-center">
-              <span className="text-zinc-600">
+              <span className="text-zinc-500">
                 <ClockIcon />
               </span>
               <p className="mt-3 text-sm font-medium text-zinc-200">Despesas futuras</p>
@@ -312,16 +314,18 @@ export default function FluxoClient({
               <button
                 type="button"
                 onClick={() => setMonthKey(format(addMonths(month, -1), "yyyy-MM"))}
+                aria-label="Mês anterior"
                 className="rounded-full border border-zinc-800 px-2 py-1 text-zinc-400 hover:text-white"
               >
                 ‹
               </button>
-              <p className="min-w-[180px] text-center text-sm font-medium text-zinc-100">
+              <p className="min-w-[180px] text-center text-sm font-medium text-zinc-100" aria-live="polite">
                 {monthTitle(month)}
               </p>
               <button
                 type="button"
                 onClick={() => setMonthKey(format(addMonths(month, 1), "yyyy-MM"))}
+                aria-label="Próximo mês"
                 className="rounded-full border border-zinc-800 px-2 py-1 text-zinc-400 hover:text-white"
               >
                 ›
@@ -340,10 +344,12 @@ export default function FluxoClient({
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar transação..."
-                className="w-full bg-transparent text-zinc-100 outline-none placeholder:text-zinc-600"
+                aria-label="Buscar transação"
+                className="w-full bg-transparent text-zinc-100 outline-none placeholder:text-zinc-500"
               />
             </label>
             <select
+              aria-label="Filtrar por conta ou cartão"
               value={accountId}
               onChange={(event) => setAccountId(event.target.value)}
               className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none"

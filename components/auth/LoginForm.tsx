@@ -15,22 +15,29 @@ export default function LoginForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setLoading(false);
-
-    if (signInError) {
-      setError("E-mail ou senha inválidos.");
+      if (signInError) {
+        setError("E-mail ou senha inválidos.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Não foi possível entrar agora. Verifique sua conexão e tente de novo.");
+      setLoading(false);
       return;
     }
 
+    // Continua "Entrando…" até a navegação acontecer (evita um segundo envio).
     router.push(readLastPath());
     router.refresh();
   }
@@ -81,7 +88,11 @@ export default function LoginForm() {
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
+        </p>
+      )}
 
       <button
         type="submit"

@@ -6,6 +6,8 @@ import { CATEGORIES, CATEGORY_ICONS } from "@/lib/finance/categories";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
 import { accountBankLabel, cardBankLabel } from "@/lib/finance/account-name";
 import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
+import { MoneyInput } from "@/components/ui/MoneyInput";
+import { formatBRLInput, parseBRL } from "@/lib/ui/money";
 
 interface EditableFields {
   description: string;
@@ -18,7 +20,7 @@ interface EditableFields {
 function toEditable(t: Transaction): EditableFields {
   return {
     description: t.description,
-    amount: String(t.amount),
+    amount: formatBRLInput(Number(t.amount)),
     type: t.type,
     category: t.category,
     date: t.date,
@@ -38,6 +40,7 @@ export default function TransactionsTable({
   transactions: Transaction[];
   accounts: Account[];
   cards: Card[];
+  /** Deve lançar um Error com a mensagem da API quando não salvar. */
   onUpdate: (id: string, patch: Record<string, unknown>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   selectedIds?: Set<string>;
@@ -47,6 +50,7 @@ export default function TransactionsTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditableFields | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const phone = usePhoneLayout();
   const selectable = Boolean(onToggleSelect);
 
@@ -65,30 +69,52 @@ export default function TransactionsTable({
   function startEdit(t: Transaction) {
     setEditingId(t.id);
     setDraft(toEditable(t));
+    setEditError(null);
   }
 
   function cancelEdit() {
     setEditingId(null);
     setDraft(null);
+    setEditError(null);
   }
 
   async function saveEdit(id: string) {
-    if (!draft) return;
+    if (!draft || saving) return;
+    const amount = parseBRL(draft.amount);
+    if (amount == null || amount <= 0) {
+      setEditError("Informe um valor válido, por exemplo 1.500,00.");
+      return;
+    }
+    if (!draft.description.trim()) {
+      setEditError("Informe uma descrição.");
+      return;
+    }
+    setEditError(null);
     setSaving(true);
     try {
       await onUpdate(id, {
-        description: draft.description,
-        amount: Number(draft.amount),
+        description: draft.description.trim(),
+        amount,
         type: draft.type,
         category: draft.category,
         date: draft.date,
       });
+      // Só fecha a edição quando o servidor confirmou.
       setEditingId(null);
       setDraft(null);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Não foi possível salvar o lançamento.");
     } finally {
       setSaving(false);
     }
   }
+
+  const amountInvalid = editError != null && draft != null && parseBRL(draft.amount) == null;
+  const errorMessage = editError ? (
+    <p role="alert" className="text-xs text-rose-400">
+      {editError}
+    </p>
+  ) : null;
 
   if (transactions.length === 0) {
     return <p className="px-4 py-8 text-center text-sm text-zinc-500">Nenhum lançamento neste filtro.</p>;
@@ -106,6 +132,7 @@ export default function TransactionsTable({
                   <input
                     value={draft.description}
                     onChange={(e) => setDraft((d) => d && { ...d, description: e.target.value })}
+                    aria-label="Descrição"
                     className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   />
                   <div className="grid grid-cols-2 gap-2">
@@ -113,26 +140,27 @@ export default function TransactionsTable({
                       type="date"
                       value={draft.date}
                       onChange={(e) => setDraft((d) => d && { ...d, date: e.target.value })}
+                      aria-label="Data"
                       className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                     />
-                    <input
-                      type="number"
-                      step="0.01"
+                    <MoneyInput
                       value={draft.amount}
-                      onChange={(e) => setDraft((d) => d && { ...d, amount: e.target.value })}
-                      className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+                      onValueChange={(value) => setDraft((d) => d && { ...d, amount: value })}
+                      aria-label="Valor"
+                      invalid={amountInvalid}
                     />
                   </div>
+                  {errorMessage}
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => saveEdit(t.id)}
+                      onClick={() => void saveEdit(t.id)}
                       disabled={saving}
-                      className="rounded-full bg-white px-4 py-1.5 text-xs font-medium text-zinc-950"
+                      className="rounded-full bg-white px-4 py-1.5 text-xs font-medium text-zinc-950 disabled:opacity-50"
                     >
-                      Salvar
+                      {saving ? "Salvando…" : "Salvar"}
                     </button>
-                    <button type="button" onClick={cancelEdit} className="text-xs text-zinc-400">
+                    <button type="button" onClick={cancelEdit} disabled={saving} className="text-xs text-zinc-400">
                       Cancelar
                     </button>
                   </div>
@@ -145,6 +173,7 @@ export default function TransactionsTable({
                         type="checkbox"
                         checked={selectedIds?.has(t.id) ?? false}
                         onChange={() => onToggleSelect?.(t.id)}
+                        aria-label={`Selecionar ${t.description}`}
                         className="mt-1 h-4 w-4 shrink-0 rounded border-zinc-700 bg-zinc-900 accent-emerald-500"
                       />
                     )}
@@ -160,7 +189,12 @@ export default function TransactionsTable({
                       {t.type === "entrada" ? "+" : "−"}
                       {formatCurrency(Number(t.amount))}
                     </p>
-                    <button type="button" onClick={() => onDelete(t.id)} className="text-[11px] text-zinc-500">
+                    <button
+                      type="button"
+                      onClick={() => void onDelete(t.id)}
+                      aria-label={`Excluir ${t.description}`}
+                      className="text-[11px] text-zinc-400"
+                    >
                       excluir
                     </button>
                   </div>
@@ -184,6 +218,7 @@ export default function TransactionsTable({
                   type="checkbox"
                   checked={transactions.length > 0 && transactions.every((t) => selectedIds?.has(t.id))}
                   onChange={(e) => onSelectAll?.(transactions.map((t) => t.id), e.target.checked)}
+                  aria-label="Selecionar todos os lançamentos visíveis"
                   className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-emerald-500"
                 />
               </th>
@@ -207,6 +242,7 @@ export default function TransactionsTable({
                       type="checkbox"
                       checked={selectedIds?.has(t.id) ?? false}
                       onChange={() => onToggleSelect?.(t.id)}
+                      aria-label={`Selecionar ${t.description}`}
                       className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-emerald-500"
                     />
                   </td>
@@ -217,6 +253,7 @@ export default function TransactionsTable({
                       type="date"
                       value={draft?.date}
                       onChange={(e) => setDraft((d) => d && { ...d, date: e.target.value })}
+                      aria-label="Data"
                       className="w-32 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-zinc-200"
                     />
                   ) : (
@@ -228,6 +265,7 @@ export default function TransactionsTable({
                     <input
                       value={draft?.description}
                       onChange={(e) => setDraft((d) => d && { ...d, description: e.target.value })}
+                      aria-label="Descrição"
                       className="w-40 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-zinc-200"
                     />
                   ) : (
@@ -239,6 +277,7 @@ export default function TransactionsTable({
                     <select
                       value={draft?.category}
                       onChange={(e) => setDraft((d) => d && { ...d, category: e.target.value })}
+                      aria-label="Categoria"
                       className="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-zinc-200"
                     >
                       {CATEGORIES.map((c) => (
@@ -249,31 +288,34 @@ export default function TransactionsTable({
                     </select>
                   ) : (
                     <span className="inline-flex items-center gap-1.5">
-                      <span>{CATEGORY_ICONS[t.category] ?? "🔖"}</span>
+                      <span aria-hidden>{CATEGORY_ICONS[t.category] ?? "🔖"}</span>
                       {t.category}
                     </span>
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-zinc-400">{accountOrCardLabel(t)}</td>
                 <td className="px-4 py-2.5 text-right">
-                  {isEditing ? (
+                  {isEditing && draft ? (
                     <div className="flex items-center justify-end gap-1.5">
                       <select
-                        value={draft?.type}
+                        value={draft.type}
                         onChange={(e) =>
                           setDraft((d) => d && { ...d, type: e.target.value as "entrada" | "saida" })
                         }
+                        aria-label="Tipo"
                         className="rounded border border-zinc-700 bg-zinc-950 px-1 py-1 text-zinc-200"
                       >
                         <option value="entrada">Entrada</option>
                         <option value="saida">Saída</option>
                       </select>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={draft?.amount}
-                        onChange={(e) => setDraft((d) => d && { ...d, amount: e.target.value })}
-                        className="w-24 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-right text-zinc-200"
+                      <MoneyInput
+                        value={draft.amount}
+                        onValueChange={(value) => setDraft((d) => d && { ...d, amount: value })}
+                        aria-label="Valor"
+                        invalid={amountInvalid}
+                        className="w-36"
+                        compact
+                        inputClassName="text-right"
                       />
                     </div>
                   ) : (
@@ -287,31 +329,41 @@ export default function TransactionsTable({
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   {isEditing ? (
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => saveEdit(t.id)}
-                        disabled={saving}
-                        className="rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                      >
-                        Salvar
-                      </button>
-                      <button
-                        onClick={cancelEdit}
-                        className="rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
-                      >
-                        Cancelar
-                      </button>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void saveEdit(t.id)}
+                          disabled={saving}
+                          className="rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                        >
+                          {saving ? "Salvando…" : "Salvar"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          disabled={saving}
+                          className="rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      {errorMessage}
                     </div>
                   ) : (
                     <div className="flex justify-end gap-3 text-xs">
                       <button
+                        type="button"
                         onClick={() => startEdit(t)}
+                        aria-label={`Editar ${t.description}`}
                         className="text-zinc-400 hover:text-emerald-400"
                       >
                         Editar
                       </button>
                       <button
-                        onClick={() => onDelete(t.id)}
+                        type="button"
+                        onClick={() => void onDelete(t.id)}
+                        aria-label={`Excluir ${t.description}`}
                         className="text-zinc-400 hover:text-red-400"
                       >
                         Excluir

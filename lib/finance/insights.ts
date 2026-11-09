@@ -33,7 +33,10 @@ function detectDuplicateCharges(transactions: Transaction[], thisMonth: string):
     .filter((t) => t.date.slice(0, 7) === thisMonth || t.date.slice(0, 7) === shiftMonthKey(thisMonth, -1))
     .filter(isGasto)
     .forEach((t) => {
-      const key = `${t.date}:${Number(t.amount).toFixed(2)}`;
+      // Inclui a descrição: dois cafés de R$ 5 em lugares diferentes no
+      // mesmo dia não são cobrança duplicada.
+      const description = t.description.toLowerCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim();
+      const key = `${t.date}:${Number(t.amount).toFixed(2)}:${description}`;
       const list = byDateAmount.get(key) ?? [];
       list.push(t);
       byDateAmount.set(key, list);

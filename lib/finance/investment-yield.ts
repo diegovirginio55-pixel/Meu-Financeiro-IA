@@ -45,6 +45,28 @@ export function holdingDaysFrom(
   );
 }
 
+/**
+ * Prazo médio ponderado pelo valor de cada aplicação. Antes o rendimento
+ * usava o prazo da aplicação MAIS ANTIGA sobre o valor total: R$ 1 mil há
+ * 300 dias + R$ 99 mil ontem "rendiam" como se os R$ 100 mil estivessem lá
+ * há 300 dias (lucro inexistente no patrimônio).
+ */
+export function weightedHoldingDays(
+  snapshots: InvestmentSnapshot[],
+  transactions: InvestmentTxn[],
+): number {
+  const buys = transactions.filter((item) => item.type === "BUY" && Math.abs(Number(item.amount ?? 0)) > 0);
+  const buyTotal = buys.reduce((sum, item) => sum + Math.abs(Number(item.amount ?? 0)), 0);
+  if (buys.length === 0 || buyTotal <= 0) return holdingDaysFrom(snapshots, transactions);
+  const today = parseISO(`${saoPauloTodayKey()}T12:00:00`);
+  const weighted =
+    buys.reduce((sum, item) => {
+      const days = Math.max(0, differenceInCalendarDays(today, parseISO(`${toDateKey(item.date)}T12:00:00`)));
+      return sum + Math.abs(Number(item.amount ?? 0)) * days;
+    }, 0) / buyTotal;
+  return Math.max(1, weighted);
+}
+
 function productKey(name: string): string {
   const text = name
     .normalize("NFD")
@@ -136,7 +158,7 @@ export function withAccruedYield(
 
     const principal = original || amount;
     if (principal === 0) return investment;
-    const days = holdingDaysFrom(snaps, txs);
+    const days = weightedHoldingDays(snaps, txs);
     const monthly = monthlyYieldPercent(investment);
     const profit = Number((principal * (monthly / 100) * (days / 30)).toFixed(2));
     return {

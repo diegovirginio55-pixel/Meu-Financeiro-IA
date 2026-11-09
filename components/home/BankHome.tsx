@@ -17,7 +17,8 @@ import { BalanceViewToggle, useBalanceView } from "@/components/ui/page-chrome";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { accumulatedProfit } from "@/lib/finance/investment-pnl";
-import { useConnectionFilter, usePersistedState } from "@/lib/ui/use-persisted-state";
+import { useConnectionFilter } from "@/lib/ui/use-persisted-state";
+import { useHideValues } from "@/lib/ui/hide-values";
 import { CronHealthBanner } from "@/components/ui/CronHealthBanner";
 import { StickyBalanceBar } from "@/components/ui/StickyBalanceBar";
 
@@ -87,7 +88,7 @@ export default function BankHome({
 }) {
   const connectionIds = useMemo(() => connections.map((connection) => connection.id), [connections]);
   const [connectionId, setConnectionId] = useConnectionFilter(connectionIds);
-  const [hidden, setHidden] = usePersistedState("mf-hide-values", false);
+  const [hidden, setHidden] = useHideValues();
   const [balanceView, setBalanceView] = useBalanceView();
 
   const selected = useMemo(

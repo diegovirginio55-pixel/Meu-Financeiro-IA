@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useStoredString, writeStored } from "@/lib/ui/browser-store";
 
 export function PageShell({ children }: { children: React.ReactNode }) {
   return <div className="-mx-4 pb-6 text-zinc-100 lg:-mx-6 xl:-mx-10 2xl:-mx-14 lg:pb-8">{children}</div>;
@@ -97,35 +98,15 @@ export function chipClass(active: boolean) {
 export type BalanceView = "total" | "conta";
 
 const BALANCE_VIEW_KEY = "mf-balance-view-v2";
-const BALANCE_VIEW_EVENT = "mf-balance-view";
 
-function readBalanceView(): BalanceView {
-  if (typeof window === "undefined") return "conta";
-  const stored = window.localStorage.getItem(BALANCE_VIEW_KEY);
-  return stored === "conta" || stored === "total" ? stored : "conta";
-}
-
+/** Visão do saldo (total x em conta), salva no localStorage e sincronizada entre telas e abas. */
 export function useBalanceView() {
-  const [value, setValue] = useState<BalanceView>("conta");
+  const stored = useStoredString(BALANCE_VIEW_KEY);
+  const value: BalanceView = stored === "total" ? "total" : "conta";
 
-  useEffect(() => {
-    setValue(readBalanceView());
-    function sync() {
-      setValue(readBalanceView());
-    }
-    window.addEventListener("storage", sync);
-    window.addEventListener(BALANCE_VIEW_EVENT, sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(BALANCE_VIEW_EVENT, sync);
-    };
+  const onChange = useCallback((next: BalanceView) => {
+    writeStored(BALANCE_VIEW_KEY, next);
   }, []);
-
-  function onChange(next: BalanceView) {
-    setValue(next);
-    window.localStorage.setItem(BALANCE_VIEW_KEY, next);
-    window.dispatchEvent(new Event(BALANCE_VIEW_EVENT));
-  }
 
   return [value, onChange] as const;
 }

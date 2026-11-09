@@ -1,0 +1,35 @@
+name: Verificações (tipos, lint e testes)
+
+# Roda em todo push e pull request. Com o render.yaml em
+# autoDeployTrigger: checksPass, o Render só publica se isto passar — um
+# erro de tipo ou teste quebrado não chega mais ao app no ar.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Checar tipos (TypeScript)
+        run: npx tsc --noEmit -p .
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Testes
+        run: npx vitest run

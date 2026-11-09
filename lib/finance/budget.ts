@@ -28,6 +28,9 @@ export interface BudgetProgress {
   tips: string[];
 }
 
+/** Antes disso, projetar "gasto até agora / dias" para o mês inteiro exagera demais. */
+export const MIN_DAYS_FOR_PROJECTION = 5;
+
 function daysInMonthOf(monthKey: string): number {
   const [year, month] = monthKey.split("-").map(Number);
   return new Date(year, month, 0).getDate();
@@ -79,7 +82,9 @@ export function computeBudgetProgress({
       tips.push(
         `Você já gastou ${formatCurrency(spentThisMonth)}, passando o orçamento de ${formatCurrency(spendingLimit)} em ${formatCurrency(spentThisMonth - spendingLimit)}.`,
       );
-    } else if (projectedSpend > spendingLimit * 1.05) {
+    } else if (daysElapsed >= MIN_DAYS_FOR_PROJECTION && projectedSpend > spendingLimit * 1.05) {
+      // Só projeta depois de alguns dias: no dia 2, um aluguel pago
+      // "projetava" o mês em 15x o valor e acendia um alerta falso.
       spendStatus = "atencao";
       tips.push(
         `No ritmo atual, você deve fechar o mês em ${formatCurrency(projectedSpend)} — acima do orçamento. Para não passar, gaste no máximo ${formatCurrency(dailyAllowance)}/dia nos próximos ${daysLeft} dia(s).`,

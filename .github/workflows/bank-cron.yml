@@ -1,9 +1,11 @@
 name: Sincronizar bancos e notificações
 
+# RESERVA. Na prática o GitHub roda este agendamento a cada 3–8 HORAS (não
+# a cada 10 min) — por isso o cron principal agora é o pg_cron do Supabase
+# (supabase/migrations/0011_cron_keepalive.sql), a cada 5 min. Este fica
+# como rede de segurança caso o do Supabase pare.
 on:
   schedule:
-    # A cada 10 minutos. O GitHub pode atrasar alguns minutos em horários de
-    # pico, mas nunca deixa de rodar por muito tempo.
     - cron: "*/10 * * * *"
   workflow_dispatch: {}
 

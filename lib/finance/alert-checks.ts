@@ -5,13 +5,14 @@ import {
   isGasto,
   isRenda,
   lastNMonthKeys,
+  nextMonthlyOccurrenceKey,
   saoPauloMonthKey,
-  saoPauloMonthStartKey,
   saoPauloTodayKey,
   saoPauloWeekStartKey,
   shiftMonthKey,
   sumGastosInRange,
 } from "./fluxo";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { resolvedCategory } from "./categories";
 import { formatCurrency } from "./format";
 import { groupSubscriptions, subscriptionKey } from "./subscriptions";
@@ -76,9 +77,8 @@ export function computeSmartAlertsFromData({
   // 1) Fatura de cartão vencendo em até 3 dias
   for (const card of cards) {
     if (!card.due_day || Number(card.current_invoice) <= 0) continue;
-    const day = Math.min(Math.max(1, card.due_day), 28);
-    let due = `${thisMonth}-${String(day).padStart(2, "0")}`;
-    if (due < todayStr) due = `${shiftMonthKey(thisMonth, 1)}-${String(day).padStart(2, "0")}`;
+    // Dia real do vencimento (30/31 não viram mais 28).
+    const due = nextMonthlyOccurrenceKey(Math.max(1, card.due_day), todayStr);
     const daysUntil = Math.round(
       (new Date(`${due}T12:00:00`).getTime() - new Date(`${todayStr}T12:00:00`).getTime()) / 86_400_000,
     );
@@ -97,14 +97,19 @@ export function computeSmartAlertsFromData({
   const upcoming: { date: string; delta: number }[] = [];
   for (const item of recurring) {
     if (!item.active) continue;
-    const day = Math.min(Math.max(1, item.day_of_month), 28);
-    let occurrence = `${thisMonth}-${String(day).padStart(2, "0")}`;
-    if (occurrence < todayStr) occurrence = `${shiftMonthKey(thisMonth, 1)}-${String(day).padStart(2, "0")}`;
+    const occurrence = nextMonthlyOccurrenceKey(Math.max(1, item.day_of_month), todayStr);
     upcoming.push({ date: occurrence, delta: item.type === "entrada" ? Number(item.amount) : -Number(item.amount) });
   }
   for (const debt of debts) {
-    if (!debt.due_date) continue;
+    // Dívida já paga não sai mais do saldo (antes gerava alerta falso).
+    if (!debt.due_date || debt.paid) continue;
     upcoming.push({ date: debt.due_date, delta: -Number(debt.amount) });
+  }
+  // Fatura do cartão a vencer também sai da conta.
+  for (const card of cards) {
+    const invoice = Number(card.current_invoice) || 0;
+    if (!card.due_day || invoice <= 0) continue;
+    upcoming.push({ date: nextMonthlyOccurrenceKey(Math.max(1, card.due_day), todayStr), delta: -invoice });
   }
   upcoming.sort((a, b) => a.date.localeCompare(b.date));
 
@@ -120,6 +125,8 @@ export function computeSmartAlertsFromData({
     if (running < lowestPoint) lowestPoint = running;
   }
 
+  // Em centavos: somas de float davam "-0,00" e alerta falso.
+  lowestPoint = Math.round(lowestPoint * 100) / 100;
   if (lowestPoint < 0) {
     alerts.push({
       kind: "low_balance",
@@ -131,13 +138,13 @@ export function computeSmartAlertsFromData({
   }
 
   // 3) Gasto de alguma categoria muito acima da média dos últimos meses
-  const monthStart = saoPauloMonthStartKey(now);
   const dayOfMonth = Number(todayStr.slice(8, 10));
   const daysInMonth = new Date(Number(thisMonth.slice(0, 4)), Number(thisMonth.slice(5, 7)), 0).getDate();
 
   const currentByCategory = new Map<string, number>();
+  // Mesmo critério do card de orçamento (só o mês atual, sem datas futuras de outro mês).
   tx
-    .filter((t) => t.date >= monthStart && isGasto(t))
+    .filter((t) => t.date.startsWith(thisMonth) && isGasto(t))
     .forEach((t) => {
       const category = resolvedCategory(t);
       currentByCategory.set(category, (currentByCategory.get(category) ?? 0) + Number(t.amount));
@@ -233,7 +240,10 @@ export function computeSmartAlertsFromData({
   let perDaySourceNote: string;
   if (spendingLimit != null) {
     const daysLeftInMonth = Math.max(1, daysInMonth - dayOfMonth + 1);
-    perDayBudget = Math.max(0, spendingLimit - totalCurrentGasto) / daysLeftInMonth;
+    // O limite de hoje vem do que sobrou ATÉ ONTEM. Antes o gasto de hoje
+    // era descontado duas vezes (do limite e depois comparado de novo).
+    const gastoAteOntem = Math.max(0, totalCurrentGasto - gastosHojeTotal);
+    perDayBudget = Math.max(0, spendingLimit - gastoAteOntem) / daysLeftInMonth;
     perDaySourceNote = "sem passar do orçamento deste mês";
   } else {
     perDayBudget = dailyBudgetFromBalance(totalBalance, todayStr).perDay;
@@ -276,7 +286,7 @@ export function computeSmartAlertsFromData({
   // bateu a meta ou se o ritmo atual está longe de alcançá-la.
   const savingsTarget = budget?.savingsTarget && budget.savingsTarget > 0 ? budget.savingsTarget : null;
   if (savingsTarget != null) {
-    const entradasMes = tx.filter((t) => t.date >= monthStart && isRenda(t)).reduce((s, t) => s + Number(t.amount), 0);
+    const entradasMes = tx.filter((t) => t.date.startsWith(thisMonth) && isRenda(t)).reduce((s, t) => s + Number(t.amount), 0);
     const economiaAtual = entradasMes - totalCurrentGasto;
     if (economiaAtual >= savingsTarget) {
       alerts.push({
@@ -352,7 +362,16 @@ export async function computeSmartAlerts(
     supabase.from("cards").select("*").eq("user_id", userId),
     supabase.from("recurring_items").select("*").eq("user_id", userId).eq("active", true),
     supabase.from("debts").select("*").eq("user_id", userId).eq("paid", false),
-    supabase.from("transactions").select("*").eq("user_id", userId).gte("date", historyStart),
+    fetchAllRows<Transaction>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", userId)
+        .gte("date", historyStart)
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     supabase.from("monthly_budgets").select("*").eq("user_id", userId).eq("month_key", thisMonth).maybeSingle(),
   ]);
 
@@ -428,12 +447,17 @@ export async function computeWeeklySummary(
   to.setDate(to.getDate() - 1);
   const toStr = to.toISOString().slice(0, 10);
 
-  const { data } = await supabase
-    .from("transactions")
-    .select("*")
-    .eq("user_id", userId)
-    .gte("date", from)
-    .lte("date", toStr);
+  const { data } = await fetchAllRows<Transaction>((start, end) =>
+    supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", userId)
+      .gte("date", from)
+      .lte("date", toStr)
+      .order("date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(start, end),
+  );
 
-  return computeWeeklySummaryFromData({ tx: (data ?? []) as Transaction[], now });
+  return computeWeeklySummaryFromData({ tx: data, now });
 }

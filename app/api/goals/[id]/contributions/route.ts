@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { serverError } from "@/lib/api/errors";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,7 +18,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .limit(20);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("Não foi possível concluir a operação.", error);
   }
   return NextResponse.json({ contributions: data ?? [] });
 }

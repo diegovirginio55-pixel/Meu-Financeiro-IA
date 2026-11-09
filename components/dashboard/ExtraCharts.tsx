@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId } from "react";
 import {
   Area,
   AreaChart,
@@ -20,15 +20,22 @@ import {
 import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/finance/format";
 import { barMoneyLabel, chartTooltipStyle, compactAxis, compactShort } from "@/components/dashboard/chart-theme";
 import type { AssetPnlRow, YieldPoint } from "@/lib/finance/investment-pnl";
+import { useHydrated } from "@/lib/ui/browser-store";
 
 // O ResponsiveContainer do Recharts só sabe o tamanho real depois de montar no
 // navegador; renderizá-lo no servidor produz um SVG diferente do que aparece
 // no cliente e pode gerar erro de hidratação. Esses três gráficos (usados no
 // painel de lucro dos investimentos) esperam montar antes de desenhar.
+// (false no servidor e na hidratação, true depois — sem setState em efeito.)
 function useMounted(): boolean {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return mounted;
+  return useHydrated();
+}
+
+/** "2026-11" → "nov/2026" (rótulo do tooltip mensal). */
+function monthYearLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-");
+  if (!year || !month) return monthKey;
+  return `${formatMonthLabel(monthKey)}/${year}`;
 }
 
 export function EconomiaMensalChart({
@@ -61,7 +68,7 @@ export function EconomiaMensalChart({
             formatter={(value) => formatCurrency(Number(value))}
             labelFormatter={(_, payload) => {
               const mes = (payload?.[0]?.payload as { mes?: string } | undefined)?.mes;
-              return mes ? mes.replace("-", "/") : "";
+              return mes ? monthYearLabel(mes) : "";
             }}
           />
           <Area
@@ -308,7 +315,7 @@ function LucroAtivoTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: Array<{ payload: { nome: string; lucro: number } }>;
+  payload?: Array<{ payload: { nome: string; lucro: number; acumulado: boolean } }>;
 }) {
   if (!active || !payload?.[0]) return null;
   const row = payload[0].payload;
@@ -318,7 +325,7 @@ function LucroAtivoTooltip({
       <p className={`mt-1 text-sm font-semibold ${row.lucro >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
         {formatCurrency(row.lucro)}
       </p>
-      <p className="text-[11px] text-zinc-500">lucro em 30 dias</p>
+      <p className="text-[11px] text-zinc-500">{row.acumulado ? "lucro acumulado" : "lucro em 30 dias"}</p>
     </div>
   );
 }
@@ -329,6 +336,8 @@ export function LucroAtivosBarChart({ rows }: { rows: AssetPnlRow[] }) {
   const chartData = rows.slice(0, 10).map((row) => ({
     nome: row.label,
     label: shortenAssetLabel(row.label),
+    // Sem variação nos últimos 30 dias, mostra o acumulado (e o tooltip diz isso).
+    acumulado: Math.abs(row.d30) < 0.005,
     lucro: Math.abs(row.d30) >= 0.005 ? row.d30 : row.accumulated,
   }));
   const peak = Math.max(...chartData.map((item) => item.lucro), 0);
@@ -387,7 +396,7 @@ export function LucroAtivosBarChart({ rows }: { rows: AssetPnlRow[] }) {
             interval={0}
           />
           <Tooltip cursor={{ fill: "rgba(52, 211, 153, 0.06)" }} content={<LucroAtivoTooltip />} />
-          <Bar dataKey="lucro" name="Lucro 30 dias" radius={[0, 10, 10, 0]} maxBarSize={26}>
+          <Bar dataKey="lucro" name="Lucro" radius={[0, 10, 10, 0]} maxBarSize={26}>
             <LabelList
               dataKey="lucro"
               position="right"

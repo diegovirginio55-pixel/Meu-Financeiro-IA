@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { serverError } from "@/lib/api/errors";
 
-/** Atualiza a categoria de vários lançamentos de uma vez (categorização em lote). */
+const MAX_IDS = 2000;
+const CHUNK = 150;
+
+/**
+ * Atualiza a categoria de vários lançamentos de uma vez (categorização em
+ * lote). Não precisa marcar "editado pelo usuário": o sync do banco já
+ * preserva a categoria atual e continua atualizando valor/data.
+ */
 export async function PATCH(request: Request) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -10,22 +18,30 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const ids = Array.isArray(body?.ids) ? (body.ids as unknown[]).filter((v) => typeof v === "string") : [];
-  const category = typeof body?.category === "string" ? body.category : "";
+  const ids = Array.isArray(body?.ids)
+    ? Array.from(new Set((body.ids as unknown[]).filter((v): v is string => typeof v === "string")))
+    : [];
+  const category = typeof body?.category === "string" ? body.category.trim().slice(0, 60) : "";
 
   if (ids.length === 0 || !category) {
     return NextResponse.json({ error: "Informe os lançamentos e a categoria." }, { status: 400 });
   }
-
-  const { error } = await supabase
-    .from("transactions")
-    .update({ category })
-    .in("id", ids)
-    .eq("user_id", userData.user.id);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (ids.length > MAX_IDS) {
+    return NextResponse.json({ error: `Selecione no máximo ${MAX_IDS} lançamentos por vez.` }, { status: 400 });
   }
 
-  return NextResponse.json({ success: true, count: ids.length });
+  // Em blocos: uma lista enorme de ids não cabe na URL da requisição.
+  let count = 0;
+  for (let index = 0; index < ids.length; index += CHUNK) {
+    const { data, error } = await supabase
+      .from("transactions")
+      .update({ category })
+      .in("id", ids.slice(index, index + CHUNK))
+      .eq("user_id", userData.user.id)
+      .select("id");
+    if (error) return serverError("Não foi possível aplicar a categoria.", error);
+    count += data?.length ?? 0;
+  }
+
+  return NextResponse.json({ success: true, count });
 }

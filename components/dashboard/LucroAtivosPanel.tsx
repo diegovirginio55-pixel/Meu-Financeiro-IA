@@ -16,7 +16,7 @@ import {
   LucroAtivosBarChart,
   RendimentoDiarioChart,
   RendimentoMensalChart,
-} from "@/components/dashboard/ExtraCharts";
+} from "@/components/dashboard/LazyCharts";
 
 export function LucroAtivosPanel({
   investments,
@@ -127,9 +127,12 @@ export function LucroAtivosPanel({
       </div>
 
       <div className="mt-5">
-        <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
+        <h3 className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
           Lucro de cada investimento
         </h3>
+        <p className="mb-2 mt-1 text-[11px] text-zinc-500">
+          Últimos 30 dias; quando não houve variação no período, mostra o lucro acumulado.
+        </p>
         <LucroAtivosBarChart rows={rows} />
       </div>
 
@@ -158,7 +161,7 @@ export function LucroAtivosPanel({
                     <p className="text-zinc-100">{row.label}</p>
                     <p className="text-[11px] text-zinc-500">
                       {formatCurrency(row.amount)}
-                      {row.rate != null && Number(row.rate) !== 0 ? ` · ${row.rate.toFixed(2)}% no mês` : ""}
+                      {row.rate != null && Number(row.rate) !== 0 ? ` · ${formatPercent(Number(row.rate), 2)} no mês` : ""}
                       {row.estimated ? " · estimado" : ""}
                     </p>
                   </td>

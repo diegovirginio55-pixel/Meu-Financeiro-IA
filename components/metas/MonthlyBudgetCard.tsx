@@ -5,6 +5,8 @@ import { computeBudgetProgress, type MonthlyBudget } from "@/lib/finance/budget"
 import { formatCurrency } from "@/lib/finance/format";
 import type { Transaction } from "@/lib/finance/types";
 import { SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
+import { MoneyInput } from "@/components/ui/MoneyInput";
+import { formatBRLInput, parseBRL } from "@/lib/ui/money";
 
 const STATUS_BAR: Record<string, string> = {
   dentro: "bg-emerald-500",
@@ -14,7 +16,7 @@ const STATUS_BAR: Record<string, string> = {
 };
 
 function toInputValue(value: number | null): string {
-  return value == null ? "" : String(value);
+  return formatBRLInput(value);
 }
 
 export function MonthlyBudgetCard({
@@ -45,13 +47,14 @@ export function MonthlyBudgetCard({
 
   async function handleSave() {
     setError(null);
-    const limitNum = spendingLimit.trim() ? Number(spendingLimit.replace(",", ".")) : null;
-    const targetNum = savingsTarget.trim() ? Number(savingsTarget.replace(",", ".")) : null;
-    if (limitNum != null && (!Number.isFinite(limitNum) || limitNum < 0)) {
+    // Vazio = sem meta para esse item; preenchido precisa ser um valor válido (ex.: 3.000,00).
+    const limitNum = spendingLimit.trim() ? parseBRL(spendingLimit) : null;
+    const targetNum = savingsTarget.trim() ? parseBRL(savingsTarget) : null;
+    if (spendingLimit.trim() && (limitNum == null || limitNum < 0)) {
       setError("Informe um valor de gasto válido.");
       return;
     }
-    if (targetNum != null && (!Number.isFinite(targetNum) || targetNum < 0)) {
+    if (savingsTarget.trim() && (targetNum == null || targetNum < 0)) {
       setError("Informe um valor de economia válido.");
       return;
     }
@@ -100,27 +103,29 @@ export function MonthlyBudgetCard({
           </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-zinc-500">Quanto pretende gastar</span>
-              <input
+              <span className="text-xs text-zinc-400">Quanto pretende gastar</span>
+              <MoneyInput
                 value={spendingLimit}
-                onChange={(e) => setSpendingLimit(e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 3000"
-                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+                onValueChange={setSpendingLimit}
+                placeholder="Ex: 3.000,00"
+                invalid={error != null && spendingLimit.trim() !== "" && parseBRL(spendingLimit) == null}
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-zinc-500">Quanto pretende economizar</span>
-              <input
+              <span className="text-xs text-zinc-400">Quanto pretende economizar</span>
+              <MoneyInput
                 value={savingsTarget}
-                onChange={(e) => setSavingsTarget(e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 500"
-                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+                onValueChange={setSavingsTarget}
+                placeholder="Ex: 500,00"
+                invalid={error != null && savingsTarget.trim() !== "" && parseBRL(savingsTarget) == null}
               />
             </label>
           </div>
-          {error && <p className="text-xs text-rose-400">{error}</p>}
+          {error && (
+            <p role="alert" className="text-xs text-rose-400">
+              {error}
+            </p>
+          )}
           <div className="flex gap-2">
             <button
               type="button"

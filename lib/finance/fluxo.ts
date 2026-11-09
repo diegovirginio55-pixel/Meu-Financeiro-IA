@@ -1,23 +1,24 @@
 import type { Account, Card, Debt, RecurringItem, Transaction } from "./types";
 import { assetMatchesBank, connectionBank, realConnectionId } from "./connection-filter";
 import { isInvestmentMovement } from "./investment-movements";
-import { isTransferDescription } from "./categories";
+import { isCardBillPayment, isInternalTransfer } from "./categories";
 import { differenceInCalendarDays, format, parseISO, subDays } from "date-fns";
 
+/**
+ * Movimentação que só troca dinheiro de lugar (não é gasto nem renda):
+ * aplicação/resgate de investimento, transferência entre contas e
+ * pagamento de fatura de cartão.
+ */
+export function isInternalMovement(transaction: Transaction): boolean {
+  return isInvestmentMovement(transaction) || isInternalTransfer(transaction) || isCardBillPayment(transaction);
+}
+
 export function isGasto(transaction: Transaction): boolean {
-  return (
-    transaction.type === "saida" &&
-    !isInvestmentMovement(transaction) &&
-    !isTransferDescription(transaction.description)
-  );
+  return transaction.type === "saida" && !isInternalMovement(transaction);
 }
 
 export function isRenda(transaction: Transaction): boolean {
-  return (
-    transaction.type === "entrada" &&
-    !isInvestmentMovement(transaction) &&
-    !isTransferDescription(transaction.description)
-  );
+  return transaction.type === "entrada" && !isInternalMovement(transaction);
 }
 
 export function saoPauloTodayKey(date = new Date()): string {
@@ -28,6 +29,10 @@ export function toSaoPauloDateOnly(value: Date | string): string {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    // Bancos que só informam o dia chegam da Pluggy como meia-noite UTC
+    // exata. Convertida para Brasília, viraria 21h do dia ANTERIOR (e uma
+    // compra do dia 1º caía no mês passado). Nesse caso, vale a data escrita.
+    if (/^\d{4}-\d{2}-\d{2}T00:00(:00(\.0+)?)?(Z|[+-]00:?00)$/.test(trimmed)) return trimmed.slice(0, 10);
     const date = new Date(trimmed);
     if (Number.isNaN(date.getTime())) return trimmed.slice(0, 10);
     return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -108,10 +113,38 @@ export function sumGastosInRange(transactions: Transaction[], from: string, to: 
     .reduce((sum, item) => sum + Number(item.amount), 0);
 }
 
+/** Próximo dia 5 (dia de pagamento): ainda neste mês se hoje for dia 1 a 4. */
 export function nextMonthDay5Key(todayKey = saoPauloTodayKey()): string {
-  const [year, month] = todayKey.split("-").map(Number);
+  const [year, month, day] = todayKey.split("-").map(Number);
+  if (day < 5) return `${year}-${String(month).padStart(2, "0")}-05`;
   const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
   return `${next.year}-${String(next.month).padStart(2, "0")}-05`;
+}
+
+/** Último dia do mês (monthIndex começa em 0). */
+export function lastDayOfMonth(year: number, monthIndex: number): number {
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+}
+
+/**
+ * Dia D no mês, respeitando o tamanho real do mês: vencimento "dia 31" vira
+ * 30 em abril e 28/29 em fevereiro (antes tudo acima de 28 virava 28).
+ */
+export function clampDayToMonth(year: number, monthIndex: number, day: number): number {
+  return Math.max(1, Math.min(day, lastDayOfMonth(year, monthIndex)));
+}
+
+/** Próxima ocorrência (hoje inclusive) de um vencimento mensal no dia D, como "YYYY-MM-DD". */
+export function nextMonthlyOccurrenceKey(dayOfMonth: number, todayKey = saoPauloTodayKey()): string {
+  const [year, month, day] = todayKey.split("-").map(Number);
+  const thisMonthDay = clampDayToMonth(year, month - 1, dayOfMonth);
+  if (thisMonthDay >= day) {
+    return `${year}-${String(month).padStart(2, "0")}-${String(thisMonthDay).padStart(2, "0")}`;
+  }
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonthIndex = month === 12 ? 0 : month;
+  const nextDay = clampDayToMonth(nextYear, nextMonthIndex, dayOfMonth);
+  return `${nextYear}-${String(nextMonthIndex + 1).padStart(2, "0")}-${String(nextDay).padStart(2, "0")}`;
 }
 
 export function daysUntilInclusive(fromKey: string, toKey: string): number {
@@ -169,7 +202,7 @@ export function futureExpensesInMonth(
 
   for (const item of recurring) {
     if (!item.active || item.type !== "saida") continue;
-    const day = Math.min(item.day_of_month, 28);
+    const day = clampDayToMonth(year, monthIndex, item.day_of_month);
     const date = new Date(year, monthIndex, day);
     if (isCurrentMonth && date < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
       continue;

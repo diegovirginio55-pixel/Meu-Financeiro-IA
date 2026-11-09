@@ -1,21 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { differenceInCalendarDays, isToday, isYesterday } from "date-fns";
 import { formatCurrency } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 import { PageHero, PageShell, SectionLabel } from "@/components/ui/page-chrome";
 import { BankLogo } from "@/components/bancos/BankLogo";
-import { BalanceHistoryChart } from "@/components/bancos/BalanceHistoryChart";
 import { realConnectionId } from "@/lib/finance/connection-filter";
+import { calendarDaysAgoSP, formatDateSP, formatTimeSP } from "@/lib/ui/datetime";
+import { useDialog } from "@/lib/ui/use-dialog";
 
 const PluggyConnect = dynamic(
   () => import("react-pluggy-connect").then((mod) => mod.PluggyConnect),
   { ssr: false },
+);
+
+// O gráfico (Recharts) só aparece dentro do modal de detalhes: carrega sob demanda.
+const BalanceHistoryChart = dynamic(
+  () => import("@/components/bancos/BalanceHistoryChart").then((mod) => mod.BalanceHistoryChart),
+  {
+    ssr: false,
+    loading: () => <p className="mt-4 h-4 text-xs text-zinc-500">Carregando histórico de saldo…</p>,
+  },
 );
 
 const ACTIVE_STATUSES = new Set(["UPDATED", "UPDATING"]);
@@ -33,12 +42,13 @@ function formatLastSync(value: string | null): string {
   if (!value) return "Nunca atualizado";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Nunca atualizado";
-  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  if (isToday(date)) return `Hoje às ${time}`;
-  if (isYesterday(date)) return `Ontem às ${time}`;
-  const days = differenceInCalendarDays(new Date(), date);
+  // Sempre no fuso de São Paulo: o servidor roda em UTC e o texto precisa ser igual no SSR e no celular.
+  const time = formatTimeSP(date);
+  const days = calendarDaysAgoSP(date);
+  if (days <= 0) return `Hoje às ${time}`;
+  if (days === 1) return `Ontem às ${time}`;
   if (days < 7) return `Há ${days} dias`;
-  return date.toLocaleDateString("pt-BR");
+  return formatDateSP(date);
 }
 
 function ConnectionCard({
@@ -101,20 +111,41 @@ function DetailsPanel({
     connection.accounts.length > 0 ||
     connection.cards.length > 0 ||
     connection.investments.length > 0;
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-4 sm:items-center">
-      <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="Fechar" />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-zinc-800 bg-[#141414] p-5 shadow-2xl">
+      <button
+        type="button"
+        tabIndex={-1}
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        aria-label="Fechar"
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bank-details-title"
+        tabIndex={-1}
+        className="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-800 bg-[#141414] p-5 shadow-2xl outline-none"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <BankLogo name={name} imageUrl={connection.institution_image_url} />
             <div>
-              <h3 className="text-base font-semibold text-white">{name}</h3>
+              <h3 id="bank-details-title" className="text-base font-semibold text-white">
+                {name}
+              </h3>
               <p className="text-xs text-zinc-500">{formatLastSync(connection.last_synced_at)}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-sm text-zinc-500 hover:text-zinc-200">
+          <button
+            type="button"
+            onClick={onClose}
+            data-autofocus
+            className="text-sm text-zinc-400 hover:text-zinc-200"
+          >
             Fechar
           </button>
         </div>
@@ -153,7 +184,7 @@ function DetailsPanel({
           )}
         </div>
 
-        <BalanceHistoryChart connectionId={connection.id} />
+        <BalanceHistoryChart key={connection.id} connectionId={connection.id} />
 
         <p className="mt-4 text-xs leading-relaxed text-zinc-500">
           Os bancos atualizam automaticamente até 1x por dia. Se o saldo aqui parecer atrasado, o banco ainda não
@@ -192,13 +223,105 @@ function DetailsPanel({
   );
 }
 
+function AddBankDialog({
+  busy,
+  importing,
+  onClose,
+  onBringBanks,
+  onReauthorize,
+}: {
+  busy: boolean;
+  importing: boolean;
+  onClose: () => void;
+  onBringBanks: () => void;
+  onReauthorize: () => void;
+}) {
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-4 sm:items-center">
+      <button
+        type="button"
+        tabIndex={-1}
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        aria-label="Fechar"
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-bank-title"
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-lg rounded-2xl border border-zinc-800 bg-[#141414] p-5 shadow-2xl outline-none"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 id="add-bank-title" className="text-base font-semibold text-white">
+              Adicionar outro banco
+            </h3>
+            <p className="mt-1 text-sm text-zinc-400">
+              O Nubank já está salvo. Bancos novos entram pelo Meu Pluggy, não por uma conexão nova aqui.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            data-autofocus
+            className="text-sm text-zinc-400 hover:text-zinc-200"
+          >
+            Fechar
+          </button>
+        </div>
+        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-zinc-400">
+          <li>Abra o Meu Pluggy e conecte o Inter (ou outro banco).</li>
+          <li>Volte aqui e traga os bancos para o app. O Nubank continua.</li>
+        </ol>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <a
+            href="https://meu.pluggy.ai"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200"
+          >
+            Abrir Meu Pluggy
+          </a>
+          <button
+            type="button"
+            onClick={onBringBanks}
+            disabled={busy}
+            className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {importing ? "Trazendo…" : "Já conectei — trazer para o app"}
+          </button>
+          <button
+            type="button"
+            onClick={onReauthorize}
+            disabled={busy}
+            className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+          >
+            Reautorizar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BancosClient({
   initialConnections,
 }: {
   initialConnections: BankConnectionWithAssets[];
 }) {
   const router = useRouter();
-  const [connections, setConnections] = useState(initialConnections);
+  // Lista atualizada localmente (após sincronizar) vale só enquanto o servidor não manda uma nova:
+  // quando `initialConnections` muda (router.refresh), volta a usar a do servidor — derivado, sem efeito.
+  const [localConnections, setLocalConnections] = useState<{
+    base: BankConnectionWithAssets[];
+    list: BankConnectionWithAssets[];
+  } | null>(null);
+  const connections =
+    localConnections && localConnections.base === initialConnections ? localConnections.list : initialConnections;
   const [connectToken, setConnectToken] = useState<string | null>(null);
   const [loadingToken, setLoadingToken] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -207,10 +330,6 @@ export default function BancosClient({
   const [addOpen, setAddOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [connectMode, setConnectMode] = useState<"create" | "update">("create");
-
-  useEffect(() => {
-    setConnections(initialConnections);
-  }, [initialConnections]);
 
   const existingItemId = connections[0]?.pluggy_item_id ?? null;
   const hasConnection = connections.length > 0;
@@ -225,10 +344,10 @@ export default function BancosClient({
     const res = await fetch("/api/bank/connections");
     if (res.ok) {
       const data = await res.json();
-      setConnections(data.connections ?? []);
+      setLocalConnections({ base: initialConnections, list: data.connections ?? [] });
     }
     router.refresh();
-  }, [router]);
+  }, [router, initialConnections]);
 
   const handleConnect = useCallback(async (mode: "create" | "update" = "create") => {
     setError(null);
@@ -304,10 +423,18 @@ export default function BancosClient({
     }
     const realId = realConnectionId(id);
     setSyncingId(id);
+    setError(null);
     try {
-      await fetch(`/api/bank/connections/${realId}`, { method: "DELETE" });
+      const res = await fetch(`/api/bank/connections/${realId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error || "Não foi possível desconectar agora. Tente de novo.");
+        return;
+      }
       setSelectedId(null);
       await refreshConnections();
+    } catch {
+      setError("Não foi possível desconectar agora. Verifique sua conexão.");
     } finally {
       setSyncingId(null);
     }
@@ -404,57 +531,13 @@ export default function BancosClient({
       )}
 
       {addOpen && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-4 sm:items-center">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default"
-            onClick={() => setAddOpen(false)}
-            aria-label="Fechar"
-          />
-          <div className="relative z-10 w-full max-w-lg rounded-2xl border border-zinc-800 bg-[#141414] p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-white">Adicionar outro banco</h3>
-                <p className="mt-1 text-sm text-zinc-400">
-                  O Nubank já está salvo. Bancos novos entram pelo Meu Pluggy, não por uma conexão nova aqui.
-                </p>
-              </div>
-              <button type="button" onClick={() => setAddOpen(false)} className="text-sm text-zinc-500 hover:text-zinc-200">
-                Fechar
-              </button>
-            </div>
-            <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-zinc-400">
-              <li>Abra o Meu Pluggy e conecte o Inter (ou outro banco).</li>
-              <li>Volte aqui e traga os bancos para o app. O Nubank continua.</li>
-            </ol>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <a
-                href="https://meu.pluggy.ai"
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-full bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200"
-              >
-                Abrir Meu Pluggy
-              </a>
-              <button
-                type="button"
-                onClick={() => void handleBringBanks()}
-                disabled={importing || loadingToken}
-                className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-              >
-                {importing ? "Trazendo…" : "Já conectei — trazer para o app"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleConnect("update")}
-                disabled={loadingToken || importing}
-                className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-              >
-                Reautorizar
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddBankDialog
+          busy={importing || loadingToken}
+          importing={importing}
+          onClose={() => setAddOpen(false)}
+          onBringBanks={() => void handleBringBanks()}
+          onReauthorize={() => void handleConnect("update")}
+        />
       )}
 
       {connectToken && (

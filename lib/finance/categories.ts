@@ -125,3 +125,37 @@ export function isTransferDescription(description: string): boolean {
   const text = normalizeDescription(description);
   return /\b(pix|ted|doc|tef)\b/.test(text) || /transferencia/.test(text);
 }
+
+/**
+ * Categorias que não dizem nada sobre o destino do dinheiro: "Outros" é o
+ * padrão de saída e "Salário" é o padrão de qualquer crédito importado.
+ * Quando um Pix/TED tem uma categoria diferente dessas (escolhida pelo
+ * usuário, por regra ou pela Pluggy — ex.: aluguel em "Moradia"), ele é um
+ * gasto/renda de verdade, não uma transferência entre contas.
+ */
+const GENERIC_CATEGORIES = new Set(["Outros", "Salário", ""]);
+
+export function isInternalTransfer(transaction: { description: string; category?: string | null }): boolean {
+  if (!isTransferDescription(transaction.description)) return false;
+  return GENERIC_CATEGORIES.has(transaction.category ?? "");
+}
+
+const BILL_WORDS = /\b(pagamento|pagto|pgto|pag|debito|deb|liquidacao|quitacao)\b/;
+
+/**
+ * Pagamento de fatura de cartão. As compras do cartão já entram como gasto
+ * (cada uma, no próprio cartão); contar também o pagamento da fatura na
+ * conta dobrava a despesa do mês. Pelo mesmo motivo, créditos lançados no
+ * próprio cartão (pagamento recebido, estorno) não são renda.
+ */
+export function isCardBillPayment(transaction: {
+  type: string;
+  description: string;
+  card_id?: string | null;
+}): boolean {
+  if (transaction.card_id) return transaction.type === "entrada";
+  if (transaction.type !== "saida") return false;
+  const text = normalizeDescription(transaction.description);
+  if (/\bfatura\b/.test(text) && BILL_WORDS.test(text)) return true;
+  return /pagamento\s+(de\s+|do\s+)?cartao(\s+de\s+credito)?\b/.test(text);
+}

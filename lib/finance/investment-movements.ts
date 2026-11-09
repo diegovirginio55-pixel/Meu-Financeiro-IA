@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { inferInstitutionName, withInstitutionPrefix } from "@/lib/pluggy/institution";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import type { Account, Investment, Transaction } from "./types";
 
 function normalizeText(value: string): string {
@@ -21,6 +22,27 @@ function hasInvestmentProduct(text: string): boolean {
     /previdencia/.test(text)
   );
 }
+
+/**
+ * Pré-filtro no banco (sem acento, por isso "aplica", "nture", "previd")
+ * para não baixar o extrato inteiro; o filtro exato é isInvestmentDescription.
+ */
+export const INVESTMENT_PREFILTER = [
+  "aplica",
+  "resgate",
+  "renda fixa",
+  "lci",
+  "lca",
+  "lcd",
+  "cdb",
+  "cri",
+  "cra",
+  "tesouro",
+  "nture",
+  "previd",
+]
+  .map((word) => `description.ilike.*${word}*`)
+  .join(",");
 
 export function isInvestmentDescription(description: string): boolean {
   const text = normalizeText(description);
@@ -86,6 +108,7 @@ export async function promoteInvestmentsFromTransactions(
   supabase: SupabaseClient,
   accounts: Account[],
   investments: Investment[],
+  userId?: string,
 ): Promise<Investment[]> {
   const official = investments.filter((row) => isOfficialPluggyId(row.pluggy_investment_id));
 
@@ -103,20 +126,36 @@ export async function promoteInvestmentsFromTransactions(
     (row) => !leftoverSynthetics.some((item) => item.id === row.id),
   );
 
-  const { data } = await supabase
-    .from("transactions")
-    .select("id, user_id, description, amount, type, category, account_id, date")
-    .eq("type", "saida");
-  const applications = ((data ?? []) as Transaction[]).filter((item) =>
-    isInvestmentDescription(item.description),
-  );
+  // Sempre filtrado pelo dono: no sync em segundo plano o cliente é admin
+  // (ignora RLS) e sem esse filtro lia lançamentos de todos os usuários.
+  const { data } = await fetchAllRows<Transaction>((from, to) => {
+    let query = supabase
+      .from("transactions")
+      .select("id, user_id, description, amount, type, category, account_id, date")
+      .in("type", ["saida", "entrada"])
+      .or(INVESTMENT_PREFILTER);
+    if (userId) query = query.eq("user_id", userId);
+    return query.order("date", { ascending: true }).order("id", { ascending: true }).range(from, to);
+  });
+  // Aplicações (saída) somam; resgates (entrada) descontam — antes só as
+  // aplicações contavam e o investimento nunca diminuía.
+  const applications = data.filter((item) => {
+    if (!isInvestmentDescription(item.description)) return false;
+    if (item.type === "saida") return true;
+    return /resgate/.test(normalizeText(item.description));
+  });
   if (applications.length === 0) return remaining;
 
+  // Só recategoriza o que estava sem categoria definida; se o usuário
+  // escolheu outra categoria, ela é mantida.
   const recategorizeIds = applications
-    .filter((item) => item.category !== "Investimentos")
+    .filter((item) => item.category === "Outros" || item.category === "Salário" || !item.category)
     .map((item) => item.id);
-  if (recategorizeIds.length > 0) {
-    await supabase.from("transactions").update({ category: "Investimentos" }).in("id", recategorizeIds);
+  for (let index = 0; index < recategorizeIds.length; index += 150) {
+    await supabase
+      .from("transactions")
+      .update({ category: "Investimentos" })
+      .in("id", recategorizeIds.slice(index, index + 150));
   }
 
   const grouped = new Map<
@@ -136,20 +175,21 @@ export async function promoteInvestmentsFromTransactions(
     const key = normalizeText(name);
     if (!key) continue;
     const current = grouped.get(key);
+    const signed = transaction.type === "entrada" ? -Number(transaction.amount) : Number(transaction.amount);
     const movement = {
       id: transaction.id,
       date: transaction.date,
-      amount: Number(transaction.amount),
+      amount: signed,
       description: transaction.description,
     };
     if (current) {
-      current.amount += Number(transaction.amount);
+      current.amount += signed;
       current.movements.push(movement);
       continue;
     }
     grouped.set(key, {
       name,
-      amount: Number(transaction.amount),
+      amount: signed,
       userId: transaction.user_id,
       accountId: transaction.account_id,
       type: investmentTypeFromDescription(transaction.description),
@@ -170,6 +210,16 @@ export async function promoteInvestmentsFromTransactions(
       const syntheticIndex = remaining.findIndex((row) => row.pluggy_investment_id === syntheticId);
       if (syntheticIndex >= 0) remaining.splice(syntheticIndex, 1);
       await supabase.from("investments").delete().eq("pluggy_investment_id", syntheticId);
+      continue;
+    }
+
+    // Tudo resgatado: o investimento acabou.
+    if (item.amount < 0.01) {
+      const syntheticIndex = remaining.findIndex((row) => row.pluggy_investment_id === syntheticId);
+      if (syntheticIndex >= 0) {
+        remaining.splice(syntheticIndex, 1);
+        await supabase.from("investments").delete().eq("pluggy_investment_id", syntheticId);
+      }
       continue;
     }
 
@@ -279,7 +329,7 @@ async function syncSyntheticInvestmentHistory(
     investment_id: investment.id,
     bank_connection_id: bankConnectionId,
     pluggy_transaction_id: `bank-tx:${movement.id}`,
-    type: "BUY",
+    type: movement.amount >= 0 ? "BUY" : "SELL",
     amount: movement.amount,
     date: movement.date,
     description: movement.description,

@@ -7,6 +7,8 @@ import { readChatQuota, writeChatQuota } from "@/lib/ai/quota-cookie";
 export const maxDuration = 60;
 
 const MAX_BYTES = 8 * 1024 * 1024;
+/** Margem para os cabeçalhos do multipart além do arquivo em si. */
+const MAX_REQUEST_BYTES = MAX_BYTES + 64 * 1024;
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -15,7 +17,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const quotaState = await readChatQuota();
+  // Recusa pelo tamanho declarado ANTES de ler o corpo: `formData()` lê
+  // tudo para a memória, e um upload enorme derrubava o servidor (512 MB).
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (declared > MAX_REQUEST_BYTES) {
+    return NextResponse.json({ error: "Áudio muito longo." }, { status: 413 });
+  }
+
+  const quotaState = await readChatQuota(supabase, userData.user.id);
   const quota = getQuotaView(quotaState);
   if (quota.limited) {
     return NextResponse.json({ error: quota.label, quota }, { status: 429 });
@@ -30,8 +39,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Áudio muito longo." }, { status: 413 });
   }
 
+  const mimeType = (file.type || "audio/webm").split(";")[0].trim().toLowerCase();
+  if (!mimeType.startsWith("audio/")) {
+    return NextResponse.json({ error: "Formato de áudio não suportado." }, { status: 415 });
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type || "audio/webm";
 
   try {
     const response = await genAI.models.generateContent({
@@ -64,9 +77,10 @@ export async function POST(request: Request) {
     if (isGeminiQuotaError(error)) {
       const locked = lockQuota(quotaState, geminiRetryAt(error));
       const nextQuota = getQuotaView(locked);
-      await writeChatQuota(locked);
+      await writeChatQuota(supabase, userData.user.id, locked);
       return NextResponse.json({ error: nextQuota.label, quota: nextQuota }, { status: 429 });
     }
+    console.error("Erro ao transcrever áudio:", error);
     return NextResponse.json({ error: "Não deu para entender o áudio. Tente de novo." }, { status: 500 });
   }
 }

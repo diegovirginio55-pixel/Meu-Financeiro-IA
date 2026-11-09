@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { logout } from "@/lib/ui/logout";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandLogo } from "@/components/brand/BrandLogo";
@@ -24,12 +25,17 @@ const TABS = [
 export default function TabNav() {
   const router = useRouter();
   const { path, onNavigate } = useOptimisticPath();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      router.push("/login");
+      router.refresh();
+    }
   }
 
   return (
@@ -47,6 +53,7 @@ export default function TabNav() {
                   href={tab.href}
                   prefetch
                   onClick={() => onNavigate(tab.href)}
+                  aria-current={active ? "page" : undefined}
                   className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active ? "bg-white font-medium text-zinc-950" : "text-zinc-400 hover:text-zinc-100"
                   }`}
@@ -80,9 +87,10 @@ export default function TabNav() {
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="text-sm text-zinc-500 hover:text-zinc-200"
+            disabled={loggingOut}
+            className="text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-60"
           >
-            Sair
+            {loggingOut ? "Saindo…" : "Sair"}
           </button>
         </div>
       </div>

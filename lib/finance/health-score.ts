@@ -147,8 +147,12 @@ export function computeHealthScore({
   });
 
   // 3) Comprometimento da renda — quanto da entrada do mês já foi consumido.
-  const rendaBase = Math.max(1, entradasMes || mediaEntradaMensal);
-  const committedRatio = (saidasMes + totalInvoices) / rendaBase;
+  // As compras do cartão já estão em saidasMes; somar a fatura de novo
+  // contava o mesmo gasto duas vezes. E uma entrada pequena antes do
+  // salário (ex.: R$ 20) virava "5000% comprometido" — por isso a base é o
+  // maior entre a entrada do mês e a média.
+  const rendaBase = Math.max(1, entradasMes, mediaEntradaMensal);
+  const committedRatio = saidasMes / rendaBase;
   const comprometimentoScore = clamp(100 - ((committedRatio - 0.5) / 0.7) * 100);
   factors.push({
     key: "comprometimento",
@@ -156,7 +160,7 @@ export function computeHealthScore({
     score: comprometimentoScore,
     weight: WEIGHTS.comprometimento,
     status: statusFor(comprometimentoScore, 55, 25),
-    detail: `${Math.round(committedRatio * 100)}% da sua renda do mês já está comprometida com gastos e faturas.`,
+    detail: `${Math.round(committedRatio * 100)}% da sua renda do mês já foi para gastos (incluindo as compras no cartão).`,
   });
 
   // 4) Dívidas — peso das dívidas em aberto sobre o patrimônio bruto.

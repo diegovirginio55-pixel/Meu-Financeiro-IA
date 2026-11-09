@@ -16,6 +16,23 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
+/**
+ * App pessoal: se ALLOWED_EMAILS estiver definida (lista separada por
+ * vírgula), só esses e-mails entram. Protege mesmo que o cadastro público
+ * do Supabase esteja ligado — a chave anon fica no navegador e qualquer um
+ * poderia criar conta pela API e usar a cota do Gemini/Pluggy.
+ */
+function isAllowedEmail(email: string | undefined): boolean {
+  const raw = process.env.ALLOWED_EMAILS;
+  if (!raw) return true;
+  const allowed = raw
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  if (allowed.length === 0) return true;
+  return Boolean(email && allowed.includes(email.toLowerCase()));
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -41,8 +58,24 @@ export async function updateSession(request: NextRequest) {
   );
 
   const { data } = await supabase.auth.getUser();
-  const user = data.user;
   const { pathname } = request.nextUrl;
+  let user = data.user;
+
+  if (user && !isAllowedEmail(user.email)) {
+    await supabase.auth.signOut();
+    user = null;
+    if (pathname.startsWith("/api/") && !isPublicPath(pathname)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (!isPublicPath(pathname)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("erro", "nao-autorizado");
+      const redirect = NextResponse.redirect(url);
+      supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+      return redirect;
+    }
+  }
 
   if (!user && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();

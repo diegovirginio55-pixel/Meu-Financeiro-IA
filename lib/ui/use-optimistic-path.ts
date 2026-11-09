@@ -1,21 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 
 export function useOptimisticPath() {
   const pathname = usePathname() ?? "";
-  const [pending, setPending] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPending(null);
-  }, [pathname]);
+  // Guarda de qual rota saiu o clique: quando a rota muda, o "pendente" deixa de valer sozinho
+  // (derivado no render, sem efeito para limpar).
+  const [pending, setPending] = useState<{ href: string; from: string } | null>(null);
 
   function onNavigate(href: string) {
-    if (href !== pathname) setPending(href);
+    if (href !== pathname) setPending({ href, from: pathname });
   }
 
-  return { path: pending ?? pathname, onNavigate };
+  const path = pending && pending.from === pathname ? pending.href : pathname;
+  return { path, onNavigate };
 }
 
 export function isActivePath(path: string, href: string) {

@@ -16,8 +16,6 @@ export function BalanceHistoryChart({ connectionId }: { connectionId: string }) 
 
   useEffect(() => {
     let active = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reseta ao trocar de conexão antes de buscar de novo
-    setHistory(null);
     fetch(`/api/bank/connections/${connectionId}/history`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { history: [] }))
       .then((data: { history?: HistoryPoint[] }) => {

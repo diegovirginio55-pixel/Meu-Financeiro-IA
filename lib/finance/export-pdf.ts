@@ -1,6 +1,7 @@
 import type { Account, Card, Transaction } from "./types";
 import { formatCurrency, formatDate } from "./format";
 import { accountBankLabel, cardBankLabel } from "./account-name";
+import { saoPauloTodayKey } from "./fluxo";
 
 export interface ExportPdfOptions {
   title: string;
@@ -82,5 +83,5 @@ export async function exportTransactionsPdf({
     columnStyles: { 4: { halign: "right" } },
   });
 
-  doc.save(fileName ?? `extrato-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(fileName ?? `extrato-${saoPauloTodayKey()}.pdf`);
 }

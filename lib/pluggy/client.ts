@@ -2,11 +2,30 @@ const PLUGGY_API = "https://api.pluggy.ai";
 
 type JsonMap = Record<string, unknown>;
 
-let cachedApiKey: string | null = null;
+/**
+ * A apiKey da Pluggy expira em 2 horas. Antes ela ficava guardada para
+ * sempre: como o cron mantém o servidor acordado, depois de ~2h todas as
+ * chamadas falhavam (sync e notificações paravam) até o servidor reiniciar.
+ * Agora ela é renovada antes de vencer e, se a Pluggy recusar (401/403),
+ * é descartada e a chamada é repetida uma vez com uma chave nova.
+ */
+const API_KEY_TTL_MS = 100 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 25_000;
 
-async function getApiKey(): Promise<string> {
-  if (cachedApiKey) return cachedApiKey;
+let cachedApiKey: { value: string; expiresAt: number } | null = null;
+let pendingApiKey: Promise<string> | null = null;
 
+export class PluggyError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "PluggyError";
+  }
+}
+
+async function requestApiKey(): Promise<string> {
   const clientId = process.env.PLUGGY_CLIENT_ID;
   const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
 
@@ -18,22 +37,33 @@ async function getApiKey(): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ clientId, clientSecret }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   const body = (await response.json().catch(() => ({}))) as JsonMap;
   if (!response.ok || typeof body.apiKey !== "string") {
-    throw new Error(
+    throw new PluggyError(
       typeof body.message === "string"
         ? body.message
         : `Falha ao autenticar na Pluggy (HTTP ${response.status}).`,
+      response.status,
     );
   }
 
-  cachedApiKey = body.apiKey;
-  return cachedApiKey;
+  cachedApiKey = { value: body.apiKey, expiresAt: Date.now() + API_KEY_TTL_MS };
+  return body.apiKey;
 }
 
-async function pluggyFetch(path: string, init: RequestInit = {}): Promise<JsonMap> {
+async function getApiKey(): Promise<string> {
+  if (cachedApiKey && cachedApiKey.expiresAt > Date.now()) return cachedApiKey.value;
+  // Várias chamadas simultâneas compartilham a mesma autenticação.
+  pendingApiKey ??= requestApiKey().finally(() => {
+    pendingApiKey = null;
+  });
+  return pendingApiKey;
+}
+
+async function pluggyFetch(path: string, init: RequestInit = {}, retried = false): Promise<JsonMap> {
   const apiKey = await getApiKey();
   const response = await fetch(`${PLUGGY_API}${path}`, {
     ...init,
@@ -42,16 +72,23 @@ async function pluggyFetch(path: string, init: RequestInit = {}): Promise<JsonMa
       "X-API-KEY": apiKey,
       ...(init.headers ?? {}),
     },
+    signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
+
+  if ((response.status === 401 || response.status === 403) && !retried) {
+    cachedApiKey = null;
+    return pluggyFetch(path, init, true);
+  }
 
   if (response.status === 204) return {};
 
   const body = (await response.json().catch(() => ({}))) as JsonMap;
   if (!response.ok) {
-    throw new Error(
+    throw new PluggyError(
       typeof body.message === "string"
         ? body.message
         : `Erro na Pluggy (HTTP ${response.status}).`,
+      response.status,
     );
   }
   return body;
@@ -84,6 +121,7 @@ export type PluggyItem = {
     accounts?: { isUpdated?: boolean; lastUpdatedAt?: string | null } | null;
   } | null;
   connector: { name: string; imageUrl?: string | null };
+  clientUserId?: string | null;
 };
 
 export type PluggyTransaction = {
@@ -277,9 +315,13 @@ export const pluggyApi = {
       }
     }
 
+    // `complete` = todas as consultas responderam. Com lista parcial o sync
+    // não pode apagar investimentos "ausentes" (eles só não vieram desta vez).
+    let complete = true;
     try {
       await collect();
     } catch (error) {
+      complete = false;
       console.error("Erro ao listar investimentos da Pluggy:", error);
     }
 
@@ -287,11 +329,12 @@ export const pluggyApi = {
       try {
         await collect(type);
       } catch (error) {
+        complete = false;
         console.error(`Erro ao listar investimentos ${type} da Pluggy:`, error);
       }
     }
 
-    return { results: [...byId.values()] };
+    return { results: [...byId.values()], complete };
   },
 
   async fetchInvestment(id: string) {
@@ -323,7 +366,7 @@ export const pluggyApi = {
     const transactions: PluggyTransaction[] = [];
     let after: string | null = null;
 
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 60; i++) {
       const params = new URLSearchParams({
         accountId,
         dateFrom,
@@ -350,4 +393,36 @@ export const pluggyApi = {
   async deleteItem(itemId: string) {
     await pluggyFetch(`/items/${itemId}`, { method: "DELETE" });
   },
+
+  /** Webhooks no nível da aplicação (valem para todos os itens). */
+  async listWebhooks(): Promise<PluggyWebhook[]> {
+    const body = (await pluggyFetch("/webhooks")) as unknown;
+    if (Array.isArray(body)) return body as PluggyWebhook[];
+    const results = (body as { results?: unknown }).results;
+    return Array.isArray(results) ? (results as PluggyWebhook[]) : [];
+  },
+
+  async createWebhook(payload: { event: string; url: string; headers?: Record<string, string> }) {
+    return (await pluggyFetch("/webhooks", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })) as unknown as PluggyWebhook;
+  },
+
+  async updateWebhook(
+    id: string,
+    payload: { event?: string; url?: string; headers?: Record<string, string> | null; enabled?: boolean },
+  ) {
+    return (await pluggyFetch(`/webhooks/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    })) as unknown as PluggyWebhook;
+  },
+};
+
+export type PluggyWebhook = {
+  id: string;
+  event: string;
+  url: string;
+  disabledAt?: string | null;
 };

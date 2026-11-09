@@ -7,11 +7,35 @@ import PrefetchTabs from "@/components/nav/PrefetchTabs";
 import SaveLastPath from "@/components/nav/SaveLastPath";
 import { PushEnable } from "@/components/pwa/PushEnable";
 import IntroSplash from "@/components/brand/IntroSplash";
-import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
+import { PhoneLayoutContext, usePhoneLayout } from "@/lib/ui/use-phone-layout";
+import { HideValuesContext } from "@/lib/ui/hide-values";
 import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { CommandPalette } from "@/components/search/CommandPalette";
+import { NotificationsProvider } from "@/components/notifications/NotificationBell";
 
-export default function AppChrome({ children }: { children: React.ReactNode }) {
+export default function AppChrome({
+  children,
+  initialPhone = false,
+  initialHideValues = false,
+}: {
+  children: React.ReactNode;
+  /** Calculado no servidor pelo user-agent — o SSR já sai com o layout certo. */
+  initialPhone?: boolean;
+  /** Cookie "ocultar valores" lido no servidor — o SSR já sai mascarado. */
+  initialHideValues?: boolean;
+}) {
+  return (
+    <PhoneLayoutContext value={initialPhone}>
+      <HideValuesContext value={initialHideValues}>
+        <NotificationsProvider>
+          <ChromeLayout>{children}</ChromeLayout>
+        </NotificationsProvider>
+      </HideValuesContext>
+    </PhoneLayoutContext>
+  );
+}
+
+function ChromeLayout({ children }: { children: React.ReactNode }) {
   const phone = usePhoneLayout();
 
   return (

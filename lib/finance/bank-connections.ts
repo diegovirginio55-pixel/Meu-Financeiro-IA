@@ -4,8 +4,9 @@ import { inferInstitutionName, isGenericConnectorName } from "@/lib/pluggy/insti
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { groupedConnectionId, institutionFromAssetName, realConnectionId } from "./connection-filter";
 import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
-import { promoteInvestmentsFromTransactions } from "./investment-movements";
+import { INVESTMENT_PREFILTER, promoteInvestmentsFromTransactions } from "./investment-movements";
 import { daysAgoKey } from "./fluxo";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 export type BankConnectionWithAssets = BankConnection & {
   accounts: Account[];
@@ -25,7 +26,19 @@ export async function getBankConnectionsWithAssets(
     supabase.from("investments").select("*"),
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", from),
     supabase.from("investment_transactions").select("*").gte("date", from),
-    supabase.from("transactions").select("id, description, amount, date").eq("type", "saida").gte("date", from),
+    // Só aplicações em investimento importam aqui (pré-filtro + paginação:
+    // antes eram todas as saídas de 180 dias, cortadas em 1000).
+    fetchAllRows<Transaction>((start, end) =>
+      supabase
+        .from("transactions")
+        .select("id, description, amount, date")
+        .eq("type", "saida")
+        .gte("date", from)
+        .or(INVESTMENT_PREFILTER)
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(start, end),
+    ),
   ]);
 
   const connections = (connRes.data ?? []) as BankConnection[];

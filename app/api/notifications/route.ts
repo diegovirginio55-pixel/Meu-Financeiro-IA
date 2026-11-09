@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { serverError } from "@/lib/api/errors";
 
 /** Lista as últimas notificações (alertas inteligentes, resumo semanal, movimentações) do usuário. */
 export async function GET() {
@@ -18,7 +19,7 @@ export async function GET() {
     .limit(30);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("Não foi possível concluir a operação.", error);
   }
 
   return NextResponse.json({ notifications: data ?? [] });
@@ -44,7 +45,7 @@ export async function PATCH(request: Request) {
 
   const { error } = await query;
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("Não foi possível concluir a operação.", error);
   }
 
   return NextResponse.json({ success: true });

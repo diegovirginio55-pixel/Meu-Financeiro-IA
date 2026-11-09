@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TransactionsFilters, { type FiltersState } from "./TransactionsFilters";
 import TransactionsTable from "./TransactionsTable";
@@ -31,11 +31,24 @@ const DEFAULT_FILTERS: FiltersState = {
   search: "",
 };
 
+const EMPTY_TRANSACTIONS: Transaction[] = [];
+const EMPTY_ACCOUNTS: Account[] = [];
+const EMPTY_CARDS: Card[] = [];
+const EMPTY_SELECTION: Set<string> = new Set();
+
+interface LoadedData {
+  /** Filtros (do servidor) que geraram estes dados. */
+  query: string;
+  transactions: Transaction[];
+  accounts: Account[];
+  cards: Card[];
+}
+
 function normalize(value: string): string {
   return value
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[̀-ͯ]/g, "");
 }
 
 function matchesSearch(transaction: Transaction, search: string | undefined): boolean {
@@ -48,18 +61,45 @@ function matchesSearch(transaction: Transaction, search: string | undefined): bo
   return false;
 }
 
+/** Só os filtros que vão para a API (a busca é feita no cliente e não dispara requisição). */
+function serverQuery(f: FiltersState): string {
+  const params = new URLSearchParams();
+  if (f.period !== "todos") params.set("period", f.period);
+  if (f.category) params.set("category", f.category);
+  if (f.accountId) params.set("account_id", f.accountId);
+  if (f.cardId) params.set("card_id", f.cardId);
+  if (f.type) params.set("type", f.type);
+  return params.toString();
+}
+
+async function readError(res: Response, fallback: string): Promise<string> {
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  return data.error || fallback;
+}
+
 export default function DetalhesClient() {
   const searchParams = useSearchParams();
   const [filters, setFilters, filtersReady] = usePersistedState<FiltersState>("mf-detalhes-filters", DEFAULT_FILTERS);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [cards, setCards] = useState<Card[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [data, setData] = useState<LoadedData | null>(null);
+  const [failed, setFailed] = useState<{ query: string; token: number } | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [exporting, setExporting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selection, setSelection] = useState<{ key: string; ids: Set<string> } | null>(null);
   const [bulkCategory, setBulkCategory] = useState<string>(CATEGORIES[0]);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const query = serverQuery(filters);
+  const transactions = data?.transactions ?? EMPTY_TRANSACTIONS;
+  const accounts = data?.accounts ?? EMPTY_ACCOUNTS;
+  const cards = data?.cards ?? EMPTY_CARDS;
+  // Trocou um filtro do servidor: mostra "carregando" até chegar a resposta desse filtro.
+  const loadError = failed != null && failed.query === query && failed.token === reloadToken;
+  const loading = !loadError && (data == null || data.query !== query);
+
+  // A seleção vale só para os filtros em que foi feita (inclusive a busca): mudou o filtro, ela zera.
+  const selectionKey = JSON.stringify(filters);
+  const selectedIds = selection && selection.key === selectionKey ? selection.ids : EMPTY_SELECTION;
 
   // Busca global (Ctrl+K) pode mandar pra cá com "?q=algo" pra já aplicar a busca.
   useEffect(() => {
@@ -70,34 +110,36 @@ export default function DetalhesClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, filtersReady]);
 
-  const load = useCallback(async (f: FiltersState) => {
-    const params = new URLSearchParams();
-    if (f.period !== "todos") params.set("period", f.period);
-    if (f.category) params.set("category", f.category);
-    if (f.accountId) params.set("account_id", f.accountId);
-    if (f.cardId) params.set("card_id", f.cardId);
-    if (f.type) params.set("type", f.type);
-
-    try {
-      const res = await fetch(`/api/transactions?${params.toString()}`, { cache: "no-store" });
-      if (!res.ok) throw new Error(`status ${res.status}`);
-      const data = await res.json();
-      setTransactions(data.transactions ?? []);
-      setAccounts(data.accounts ?? []);
-      setCards(data.cards ?? []);
-      setLoadError(false);
-    } catch {
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Busca os lançamentos. Depende só dos filtros do servidor (não da busca) e cancela a
+  // requisição anterior: uma resposta antiga nunca sobrescreve a mais nova.
   useEffect(() => {
     if (!filtersReady) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(filters);
-  }, [filters, filtersReady, load]);
+    const controller = new AbortController();
+    const token = reloadToken;
+    fetch(`/api/transactions?${query}`, { cache: "no-store", signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        return res.json();
+      })
+      .then((json: { transactions?: Transaction[]; accounts?: Account[]; cards?: Card[] }) => {
+        setData({
+          query,
+          transactions: json.transactions ?? [],
+          accounts: json.accounts ?? [],
+          cards: json.cards ?? [],
+        });
+        setFailed(null);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setFailed({ query, token });
+      });
+    return () => controller.abort();
+  }, [query, filtersReady, reloadToken]);
+
+  function reload() {
+    setReloadToken((value) => value + 1);
+  }
 
   // Filtros de conta/cartão salvos localmente podem apontar para uma conta/cartão
   // "fantasma" (placeholder) que foi removido da lista de opções — isso zerava o
@@ -120,49 +162,91 @@ export default function DetalhesClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts, cards]);
 
+  const filteredTransactions = useMemo(
+    () => transactions.filter((t) => matchesSearch(t, filters.search)),
+    [transactions, filters.search],
+  );
+
+  /** Lança erro com a mensagem da API — a tabela mantém a edição aberta e mostra o erro. */
   async function handleUpdate(id: string, patch: Record<string, unknown>) {
-    await fetch(`/api/transactions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    await load(filters);
+    let res: Response;
+    try {
+      res = await fetch(`/api/transactions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+    } catch {
+      throw new Error("Sem conexão. Tente salvar de novo.");
+    }
+    if (!res.ok) throw new Error(await readError(res, "Não foi possível salvar o lançamento."));
+    // Mostra a alteração na hora e confirma com o servidor em segundo plano.
+    setData((current) =>
+      current && {
+        ...current,
+        transactions: current.transactions.map((t) => (t.id === id ? ({ ...t, ...patch } as Transaction) : t)),
+      },
+    );
+    reload();
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Excluir este lançamento?")) return;
-    await fetch(`/api/transactions/${id}`, { method: "DELETE" });
-    await load(filters);
+    if (!window.confirm("Excluir este lançamento? Isso também ajusta o saldo da conta ou a fatura do cartão.")) return;
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        setActionError(await readError(res, "Não foi possível excluir o lançamento."));
+        return;
+      }
+    } catch {
+      setActionError("Sem conexão. Não foi possível excluir o lançamento.");
+      return;
+    }
+    setData((current) => current && { ...current, transactions: current.transactions.filter((t) => t.id !== id) });
+    reload();
+  }
+
+  function updateSelection(update: (ids: Set<string>) => void) {
+    const next = new Set(selectedIds);
+    update(next);
+    setSelection({ key: selectionKey, ids: next });
   }
 
   function toggleSelect(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
+    updateSelection((next) => {
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      return next;
     });
   }
 
   function selectAll(ids: string[], select: boolean) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
+    updateSelection((next) => {
       ids.forEach((id) => (select ? next.add(id) : next.delete(id)));
-      return next;
     });
   }
 
   async function handleBulkCategorize() {
-    if (selectedIds.size === 0) return;
+    // Só os selecionados que estão visíveis neste filtro.
+    const visibleIds = new Set(filteredTransactions.map((t) => t.id));
+    const ids = Array.from(selectedIds).filter((id) => visibleIds.has(id));
+    if (ids.length === 0) return;
     setBulkSaving(true);
+    setActionError(null);
     try {
-      await fetch("/api/transactions/bulk", {
+      const res = await fetch("/api/transactions/bulk", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: Array.from(selectedIds), category: bulkCategory }),
+        body: JSON.stringify({ ids, category: bulkCategory }),
       });
-      setSelectedIds(new Set());
-      await load(filters);
+      if (!res.ok) {
+        setActionError(await readError(res, "Não foi possível aplicar a categoria."));
+        return;
+      }
+      setSelection(null);
+      reload();
+    } catch {
+      setActionError("Sem conexão. Não foi possível aplicar a categoria.");
     } finally {
       setBulkSaving(false);
     }
@@ -187,11 +271,6 @@ export default function DetalhesClient() {
     }
   }
 
-  const filteredTransactions = useMemo(
-    () => transactions.filter((t) => matchesSearch(t, filters.search)),
-    [transactions, filters.search],
-  );
-
   const totalEntradas = filteredTransactions
     .filter((t) => t.type === "entrada")
     .reduce((s, t) => s + Number(t.amount), 0);
@@ -208,13 +287,13 @@ export default function DetalhesClient() {
       <PageHero
         kicker="Extrato"
         title={<HeroAmount>{formatCurrency(saldo)}</HeroAmount>}
-        subtitle={`${filteredTransactions.length} lançamentos neste filtro`}
+        subtitle={loading ? "Carregando lançamentos…" : `${filteredTransactions.length} lançamentos neste filtro`}
         trailing={
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleExportCsv}
-              disabled={filteredTransactions.length === 0}
+              disabled={loading || filteredTransactions.length === 0}
               className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
             >
               Exportar CSV
@@ -222,7 +301,7 @@ export default function DetalhesClient() {
             <button
               type="button"
               onClick={() => void handleExportPdf()}
-              disabled={exporting || filteredTransactions.length === 0}
+              disabled={loading || exporting || filteredTransactions.length === 0}
               className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
             >
               {exporting ? "Gerando…" : "Exportar PDF"}
@@ -252,7 +331,13 @@ export default function DetalhesClient() {
           cards={cards}
         />
 
-        <CategoryRulesPanel onApplied={() => load(filters)} />
+        <CategoryRulesPanel onApplied={reload} />
+
+        {actionError && (
+          <p role="alert" className="mt-3 rounded-2xl border border-rose-900/60 bg-rose-950/30 p-3 text-sm text-rose-300">
+            {actionError}
+          </p>
+        )}
 
         {selectedIds.size > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-emerald-800/50 bg-emerald-950/20 p-3">
@@ -260,6 +345,7 @@ export default function DetalhesClient() {
             <select
               value={bulkCategory}
               onChange={(e) => setBulkCategory(e.target.value)}
+              aria-label="Categoria para os selecionados"
               className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100 outline-none"
             >
               {CATEGORIES.map((c) => (
@@ -278,7 +364,7 @@ export default function DetalhesClient() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedIds(new Set())}
+              onClick={() => setSelection(null)}
               className="text-xs text-zinc-400 hover:text-zinc-200"
             >
               Limpar seleção
@@ -287,24 +373,23 @@ export default function DetalhesClient() {
         )}
 
         <div className="mt-5">
-          {loading ? (
-            <p className="text-sm text-zinc-500">Carregando lançamentos...</p>
-          ) : loadError ? (
+          {loadError ? (
             <SoftPanel>
-              <p className="text-sm text-rose-400">
+              <p role="alert" className="p-4 text-sm text-rose-400">
                 Não foi possível carregar os lançamentos agora.{" "}
                 <button
                   type="button"
-                  onClick={() => {
-                    setLoading(true);
-                    load(filters);
-                  }}
+                  onClick={reload}
                   className="font-medium underline underline-offset-2"
                 >
                   Tentar de novo
                 </button>
               </p>
             </SoftPanel>
+          ) : loading ? (
+            <p className="text-sm text-zinc-500" aria-live="polite">
+              Carregando lançamentos…
+            </p>
           ) : (
             <SoftPanel>
               <TransactionsTable

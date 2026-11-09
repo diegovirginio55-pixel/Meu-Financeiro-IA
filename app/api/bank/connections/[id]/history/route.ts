@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { serverError } from "@/lib/api/errors";
 import { realConnectionId } from "@/lib/finance/connection-filter";
 import { daysAgoKey } from "@/lib/finance/fluxo";
 
@@ -21,7 +22,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .order("snapshot_date", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("Não foi possível concluir a operação.", error);
   }
 
   const byDate = new Map<string, number>();

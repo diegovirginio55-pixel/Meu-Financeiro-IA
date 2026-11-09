@@ -121,17 +121,21 @@ export function FinancialCalendarPanel({
         <button
           type="button"
           onClick={() => shiftMonth(-1)}
+          aria-label="Mês anterior"
           disabled={monthKey <= minMonth}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-800 text-zinc-400 transition hover:border-zinc-700 hover:text-white disabled:opacity-30"
         >
           ‹
         </button>
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-zinc-100">{monthTitle(month)}</p>
+          <p className="text-sm font-semibold text-zinc-100" aria-live="polite">
+            {monthTitle(month)}
+          </p>
           {monthKey !== todayMonth && (
             <button
               type="button"
               onClick={() => setMonthKey(todayMonth)}
+              aria-label="Voltar para o mês atual"
               className="rounded-full border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 hover:border-emerald-700 hover:text-emerald-300"
             >
               Hoje
@@ -141,6 +145,7 @@ export function FinancialCalendarPanel({
         <button
           type="button"
           onClick={() => shiftMonth(1)}
+          aria-label="Próximo mês"
           disabled={monthKey >= maxMonth}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-800 text-zinc-400 transition hover:border-zinc-700 hover:text-white disabled:opacity-30"
         >
@@ -148,9 +153,9 @@ export function FinancialCalendarPanel({
         </button>
       </div>
 
-      <p className="relative mt-3 text-[11px] text-zinc-600">Toque em um dia para ver o que aconteceu nele.</p>
+      <p className="relative mt-3 text-[11px] text-zinc-500">Toque em um dia para ver o que aconteceu nele.</p>
 
-      <div className="relative mt-2 grid grid-cols-7 gap-1.5 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+      <div className="relative mt-2 grid grid-cols-7 gap-1.5 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-500">
         {WEEKDAY_LABELS.map((label, index) => (
           <span key={index}>{label}</span>
         ))}

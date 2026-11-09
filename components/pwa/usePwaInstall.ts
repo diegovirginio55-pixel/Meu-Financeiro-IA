@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -8,6 +8,7 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 const DISMISS_SESSION_KEY = "financeiro-pwa-install-dismissed-session";
+const CHANGE_EVENT = "mf-pwa-install-change";
 
 declare global {
   interface Window {
@@ -15,110 +16,131 @@ declare global {
   }
 }
 
+// Tudo que depende do navegador (user-agent, display-mode, sessionStorage, evento de instalação)
+// é lido via useSyncExternalStore: no servidor e na hidratação vale "nada disponível", e o cliente
+// atualiza logo depois — sem diferença de HTML entre servidor e celular.
+
+let installedByEvent = false;
+let dismissedInMemory = false;
+
+function notifyChange() {
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
 function isStandalone() {
-  if (typeof window === "undefined") return false;
   const standalone = window.matchMedia("(display-mode: standalone)").matches;
   const ios = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
   return standalone || ios;
 }
 
+function userAgent() {
+  return navigator.userAgent || "";
+}
+
 function isIos() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
+  const ua = userAgent();
   const device = /iphone|ipad|ipod/i.test(ua);
   const iPadOs = /Macintosh/.test(ua) && "ontouchend" in document;
   return device || iPadOs;
 }
 
 function isSafari() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
+  const ua = userAgent();
   return /safari/i.test(ua) && !/chrome|crios|fxios|edgios/i.test(ua);
 }
 
 function isAndroidChrome() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
+  const ua = userAgent();
   return /android/i.test(ua) && /chrome/i.test(ua) && !/edga|opr|samsungbrowser|firefox/i.test(ua);
 }
 
 function isDesktopChrome() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
+  const ua = userAgent();
   return !/android|iphone|ipad|ipod/i.test(ua) && /chrome/i.test(ua) && !/edg|opr|firefox/i.test(ua);
 }
 
-export function usePwaInstall() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(() => isStandalone());
-  const [dismissed, setDismissed] = useState(() => {
+function readDismissed() {
+  try {
+    return dismissedInMemory || sessionStorage.getItem(DISMISS_SESSION_KEY) === "1";
+  } catch {
+    return dismissedInMemory;
+  }
+}
+
+function subscribe(callback: () => void) {
+  const onBeforeInstall = (event: Event) => {
+    event.preventDefault();
+    window.__pwaDeferred = event as BeforeInstallPromptEvent;
+    dismissedInMemory = false;
     try {
-      return sessionStorage.getItem(DISMISS_SESSION_KEY) === "1";
+      sessionStorage.removeItem(DISMISS_SESSION_KEY);
     } catch {
-      return false;
+      /* ignore */
     }
-  });
+    callback();
+  };
+  const onInstalled = () => {
+    installedByEvent = true;
+    window.__pwaDeferred = null;
+    callback();
+  };
+  const mq = window.matchMedia("(display-mode: standalone)");
+  window.addEventListener("beforeinstallprompt", onBeforeInstall);
+  window.addEventListener("appinstalled", onInstalled);
+  window.addEventListener(CHANGE_EVENT, callback);
+  window.addEventListener("focus", callback);
+  mq.addEventListener("change", callback);
+  return () => {
+    window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+    window.removeEventListener("appinstalled", onInstalled);
+    window.removeEventListener(CHANGE_EVENT, callback);
+    window.removeEventListener("focus", callback);
+    mq.removeEventListener("change", callback);
+  };
+}
 
-  useEffect(() => {
-    if (window.__pwaDeferred) setDeferred(window.__pwaDeferred);
+const noopSubscribe = () => () => undefined;
+const serverFalse = () => false;
+const serverNull = () => null;
 
-    const onBeforeInstall = (event: Event) => {
-      event.preventDefault();
-      const promptEvent = event as BeforeInstallPromptEvent;
-      window.__pwaDeferred = promptEvent;
-      setDeferred(promptEvent);
-      setDismissed(false);
-      try {
-        sessionStorage.removeItem(DISMISS_SESSION_KEY);
-      } catch {
-        /* ignore */
-      }
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setDeferred(null);
-      window.__pwaDeferred = null;
-    };
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    window.addEventListener("appinstalled", onInstalled);
+const getDeferred = () => window.__pwaDeferred ?? null;
+const getInstalled = () => installedByEvent || isStandalone();
 
-    const mq = window.matchMedia("(display-mode: standalone)");
-    const onDisplayChange = () => setInstalled(isStandalone());
-    mq.addEventListener("change", onDisplayChange);
-    window.addEventListener("focus", onDisplayChange);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
-      window.removeEventListener("appinstalled", onInstalled);
-      mq.removeEventListener("change", onDisplayChange);
-      window.removeEventListener("focus", onDisplayChange);
-    };
-  }, []);
+export function usePwaInstall() {
+  const deferred = useSyncExternalStore(subscribe, getDeferred, serverNull);
+  const installed = useSyncExternalStore(subscribe, getInstalled, serverFalse);
+  const dismissed = useSyncExternalStore(subscribe, readDismissed, serverFalse);
+  const ios = useSyncExternalStore(noopSubscribe, isIos, serverFalse);
+  const safari = useSyncExternalStore(noopSubscribe, isSafari, serverFalse);
+  const androidChrome = useSyncExternalStore(noopSubscribe, isAndroidChrome, serverFalse);
+  const desktopChrome = useSyncExternalStore(noopSubscribe, isDesktopChrome, serverFalse);
 
   const promptInstall = useCallback(async () => {
-    if (!deferred) return;
-    await deferred.prompt();
-    const choice = await deferred.userChoice;
-    if (choice.outcome === "accepted") setInstalled(true);
-    setDeferred(null);
+    const event = window.__pwaDeferred;
+    if (!event) return;
+    await event.prompt();
+    const choice = await event.userChoice;
+    if (choice.outcome === "accepted") installedByEvent = true;
     window.__pwaDeferred = null;
-  }, [deferred]);
+    notifyChange();
+  }, []);
 
   const dismiss = useCallback(() => {
-    setDismissed(true);
+    dismissedInMemory = true;
     try {
       sessionStorage.setItem(DISMISS_SESSION_KEY, "1");
     } catch {
       /* ignore */
     }
+    notifyChange();
   }, []);
 
   return {
     canInstall: deferred != null && !installed,
-    isIos: isIos() && !installed,
-    isIosSafari: isIos() && isSafari() && !installed,
-    isAndroidChrome: isAndroidChrome() && !installed,
-    isDesktopChrome: isDesktopChrome() && !installed,
+    isIos: ios && !installed,
+    isIosSafari: ios && safari && !installed,
+    isAndroidChrome: androidChrome && !installed,
+    isDesktopChrome: desktopChrome && !installed,
     installed,
     dismissed,
     promptInstall,

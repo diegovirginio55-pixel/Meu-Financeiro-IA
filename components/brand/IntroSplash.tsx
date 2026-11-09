@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 const HOLD_MS = 4300;
 const FADE_MS = 600;
-const RESUME_THRESHOLD_MS = 8000;
+const SKIP_FADE_MS = 250;
+/** Só reexibe a intro ao voltar do segundo plano se o app ficou fora por mais de 10 minutos. */
+const RESUME_THRESHOLD_MS = 10 * 60 * 1000;
 const MESSAGE_MS = 830;
 
 const MESSAGES = [
@@ -33,6 +35,7 @@ const PARTICLES = [
 
 export default function IntroSplash() {
   const [phase, setPhase] = useState<"visible" | "leaving" | "done">("visible");
+  const [skipped, setSkipped] = useState(false);
   const [runId, setRunId] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -48,11 +51,9 @@ export default function IntroSplash() {
     }
   }
 
-  function play() {
+  /** Agenda a sequência da intro (só timers; o estado inicial já é "visível"). */
+  function schedule() {
     clearTimers();
-    setPhase("visible");
-    setMessageIndex(0);
-    setRunId((id) => id + 1);
     timers.current.push(setTimeout(() => setPhase("leaving"), HOLD_MS));
     timers.current.push(setTimeout(() => setPhase("done"), HOLD_MS + FADE_MS));
     messageTimer.current = setInterval(() => {
@@ -60,35 +61,70 @@ export default function IntroSplash() {
     }, MESSAGE_MS);
   }
 
+  function replay() {
+    setPhase("visible");
+    setSkipped(false);
+    setMessageIndex(0);
+    setRunId((id) => id + 1);
+    schedule();
+  }
+
+  /** Pular com um toque/clique ou Esc: fade curto e some. */
+  function skip() {
+    clearTimers();
+    setSkipped(true);
+    setPhase((current) => (current === "visible" ? "leaving" : current));
+    timers.current.push(setTimeout(() => setPhase("done"), SKIP_FADE_MS));
+  }
+
+  const onStart = useEffectEvent(() => schedule());
+  const onStop = useEffectEvent(() => clearTimers());
+  const onLongAbsence = useEffectEvent(() => replay());
+  const onEscape = useEffectEvent(() => skip());
+
   useEffect(() => {
-    play();
+    onStart();
 
     // Apps instalados (Android/iOS) costumam "retomar" a sessão em vez de recarregar a
     // página quando o usuário reabre pelo ícone. Detectamos isso pela troca de
-    // visibilidade e voltamos a mostrar a intro quando o app ficou em segundo plano por
-    // um tempo (abertura "de verdade"), sem repetir em trocas rápidas de app.
-    function handleVisibility() {
-      if (document.visibilityState === "hidden") {
-        hiddenAt.current = Date.now();
-        return;
-      }
+    // visibilidade e voltamos a mostrar a intro só quando o app ficou em segundo plano
+    // por bastante tempo (abertura "de verdade"), sem repetir em trocas rápidas de app.
+    function maybeReplay() {
       const since = hiddenAt.current;
       hiddenAt.current = null;
-      if (since != null && Date.now() - since > RESUME_THRESHOLD_MS) {
-        play();
+      if (since != null && Date.now() - since > RESUME_THRESHOLD_MS) onLongAbsence();
+    }
+
+    function handleVisibility() {
+      if (document.visibilityState === "hidden") {
+        hiddenAt.current ??= Date.now();
+        return;
       }
+      maybeReplay();
+    }
+
+    function handlePageHide() {
+      hiddenAt.current ??= Date.now();
     }
 
     function handlePageShow(event: PageTransitionEvent) {
-      if (event.persisted) play();
+      if (event.persisted) maybeReplay();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onEscape();
     }
 
     document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      clearTimers();
+      onStop();
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
@@ -98,10 +134,11 @@ export default function IntroSplash() {
     <div
       key={runId}
       aria-hidden
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 overflow-hidden bg-zinc-950 transition-opacity ease-out ${
-        phase === "leaving" ? "opacity-0" : "opacity-100"
+      onClick={skip}
+      className={`fixed inset-0 z-[100] flex cursor-pointer select-none flex-col items-center justify-center gap-6 overflow-hidden bg-zinc-950 transition-opacity ease-out ${
+        phase === "leaving" ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
-      style={{ transitionDuration: `${FADE_MS}ms` }}
+      style={{ transitionDuration: `${skipped ? SKIP_FADE_MS : FADE_MS}ms` }}
     >
       <div
         className="intro-anim pointer-events-none absolute inset-0"
@@ -204,6 +241,10 @@ export default function IntroSplash() {
           />
         </div>
       </div>
+
+      <span className="absolute inset-x-0 bottom-[max(1.5rem,env(safe-area-inset-bottom))] text-center text-[11px] text-zinc-500">
+        Toque para pular
+      </span>
     </div>
   );
 }

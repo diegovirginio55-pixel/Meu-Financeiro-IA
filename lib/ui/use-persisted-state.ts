@@ -1,29 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { readStored, useHydrated, useStoredString, writeStored } from "@/lib/ui/browser-store";
 
+function parseStored<T>(raw: string | null, fallback: T): T {
+  if (raw == null) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Estado salvo no localStorage. No servidor e na hidratação usa `fallback` (sem erro de hidratação);
+ * logo depois assume o valor salvo. `ready` indica que o valor salvo já foi lido.
+ * Componentes que usam a mesma chave ficam sincronizados (inclusive entre abas).
+ */
 export function usePersistedState<T>(key: string, fallback: T) {
-  const [value, setValue] = useState<T>(fallback);
-  const [ready, setReady] = useState(false);
+  const raw = useStoredString(key);
+  const ready = useHydrated();
+  const value = useMemo(() => parseStored(raw, fallback), [raw, fallback]);
 
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (raw != null) setValue(JSON.parse(raw) as T);
-    } catch {
-      /* ignore */
-    }
-    setReady(true);
-  }, [key]);
-
-  useEffect(() => {
-    if (!ready) return;
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      /* ignore */
-    }
-  }, [key, value, ready]);
+  const setValue = useCallback(
+    (next: T | ((previous: T) => T)) => {
+      const previous = parseStored(readStored(key), fallback);
+      const resolved = typeof next === "function" ? (next as (previous: T) => T)(previous) : next;
+      writeStored(key, JSON.stringify(resolved));
+    },
+    [key, fallback],
+  );
 
   return [value, setValue, ready] as const;
 }

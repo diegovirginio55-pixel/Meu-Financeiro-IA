@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { pluggyApi } from "@/lib/pluggy/client";
-import { syncBankConnection } from "@/lib/pluggy/sync";
+import { syncBankConnectionSafely } from "@/lib/pluggy/sync";
 import { realConnectionId } from "@/lib/finance/connection-filter";
 
 async function loadOwnedConnection(
@@ -53,8 +53,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         console.error("Não foi possível pedir atualização à Pluggy, buscando dados em cache:", error);
       }
     }
-    await syncBankConnection(supabase, user.id, connection.id, connection.pluggy_item_id);
-    return NextResponse.json({ ok: true });
+    const outcome = await syncBankConnectionSafely(supabase, user.id, connection.id, connection.pluggy_item_id);
+    return NextResponse.json({ ok: true, queued: outcome === "queued" });
   } catch (error) {
     console.error("Erro ao sincronizar conexão bancária:", error);
     return NextResponse.json({ error: "Falha ao sincronizar com o banco." }, { status: 500 });

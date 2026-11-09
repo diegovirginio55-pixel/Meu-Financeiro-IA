@@ -27,6 +27,46 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Página mínima exibida quando a navegação falha por falta de rede. Não é cache de HTML do app
+// (nada autenticado fica guardado): é gerada aqui mesmo, só no caso de erro.
+const OFFLINE_HTML = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#09090b">
+<title>Sem conexão — Meu Financeiro IA</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #09090b; color: #f4f4f5;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 24px; text-align: center; box-sizing: border-box; }
+  img { width: 72px; height: 72px; border-radius: 18px; }
+  h1 { margin: 8px 0 0; font-size: 22px; font-weight: 600; }
+  p { margin: 0; max-width: 320px; color: #a1a1aa; font-size: 15px; line-height: 1.5; }
+  button { margin-top: 12px; border: 0; border-radius: 999px; background: #10b981; color: #09090b;
+    font-size: 16px; font-weight: 600; padding: 12px 24px; cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  <img src="/icon-192.png?v=2" alt="">
+  <h1>Sem conexão</h1>
+  <p>Não foi possível carregar esta página. Verifique sua internet e tente de novo.</p>
+  <button type="button" onclick="location.reload()">Tentar de novo</button>
+</main>
+</body>
+</html>`;
+
+function offlineResponse() {
+  return new Response(OFFLINE_HTML, {
+    status: 503,
+    statusText: "Offline",
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -36,7 +76,8 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname === "/sw.js") return;
 
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request, { cache: "no-store" }));
+    // HTML nunca é cacheado (é autenticado); sem rede, mostra a página "Sem conexão".
+    event.respondWith(fetch(request, { cache: "no-store" }).catch(() => offlineResponse()));
     return;
   }
 
@@ -61,13 +102,29 @@ self.addEventListener("push", (event) => {
     const text = event.data?.text();
     if (text) payload.body = text;
   }
+  const url = payload.url || "/detalhes";
+  // Tag única por padrão: notificações seguidas aparecem todas (não substituem a anterior).
+  // Se o servidor mandar uma tag, a nova substitui a antiga e avisa de novo (renotify).
+  const tag = payload.tag || `mf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: "/icon-192.png?v=2",
-      badge: "/icon-192.png?v=2",
-      data: { url: payload.url || "/detalhes" },
-    }),
+    Promise.all([
+      self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: "/icon-192.png?v=2",
+        badge: "/icon-192.png?v=2",
+        tag,
+        renotify: true,
+        data: { url },
+      }),
+      // Avisa as janelas abertas para recarregarem a lista de notificações na hora.
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((windowClients) => {
+          windowClients.forEach((client) => client.postMessage({ type: "mf:push-received", url }));
+        })
+        .catch(() => undefined),
+    ]),
   );
 });
 
@@ -77,9 +134,16 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
       const existing = windowClients.find((client) => "focus" in client);
-      if (existing && existing.navigate) return existing.navigate(target).then((client) => client.focus());
-      if (existing) return existing.focus();
-      return self.clients.openWindow(target);
+      if (!existing) return self.clients.openWindow(target);
+      // Primeiro traz a janela para frente, depois navega (navigate antes de focus falha em alguns navegadores).
+      return existing
+        .focus()
+        .catch(() => existing)
+        .then((focused) => {
+          const client = focused || existing;
+          if (!client.navigate) return client;
+          return client.navigate(target).catch(() => self.clients.openWindow(target));
+        });
     }),
   );
 });

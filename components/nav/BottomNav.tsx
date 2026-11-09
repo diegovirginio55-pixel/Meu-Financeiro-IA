@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useRef, useState } from "react";
+import { logout } from "@/lib/ui/logout";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
-import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { NotificationBell, UnreadBadge, useNotifications } from "@/components/notifications/NotificationBell";
 
 const TABS = [
   { href: "/dashboard", label: "Início", icon: HomeIcon },
@@ -88,72 +88,118 @@ function MenuIcon({ active }: { active?: boolean }) {
 
 const MENU_ROUTES = ["/detalhes", "/bancos", "/fluxo", "/mes", "/metas"];
 
+const MENU_ITEMS = [
+  { href: "/detalhes", label: "Extrato", icon: "🧾" },
+  { href: "/mes", label: "Meu mês", icon: "📊" },
+  { href: "/metas", label: "Metas", icon: "🎯" },
+  { href: "/bancos", label: "Bancos conectados", icon: "🏦" },
+  { href: "/fluxo", label: "Fluxo de caixa", icon: "🔄" },
+];
+
 export default function BottomNav() {
   const router = useRouter();
   const { path, onNavigate } = useOptimisticPath();
+  const { unread } = useNotifications();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const menuActive = MENU_ROUTES.some((route) => isActivePath(path, route));
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const firstItemRef = useRef<HTMLAnchorElement>(null);
+
+  function closeMenu({ restoreFocus = false }: { restoreFocus?: boolean } = {}) {
+    setMenuOpen(false);
+    if (restoreFocus) menuButtonRef.current?.focus();
+  }
+
+  // Menu aberto: foco inicial no primeiro item e Esc fecha (devolvendo o foco ao botão Menu).
+  useEffect(() => {
+    if (!menuOpen) return;
+    firstItemRef.current?.focus();
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuOpen]);
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      router.push("/login");
+      router.refresh();
+    }
   }
+
+  const menuLabel = unread > 0 ? `Menu (${unread} notificações não lidas)` : "Menu";
 
   return (
     <>
       {menuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setMenuOpen(false)}>
+        <div className="fixed inset-0 z-40 bg-black/40" onClick={() => closeMenu({ restoreFocus: true })}>
           <div
+            id="mf-mobile-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
             className="absolute inset-x-0 bottom-16 w-full rounded-t-3xl border-t border-zinc-800 bg-zinc-950 p-5 text-zinc-100 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <BrandLogo size="menu" />
             <p className="mt-4 text-sm font-semibold text-zinc-400">Menu</p>
             <div className="mt-3 flex flex-col gap-1">
-              {[
-                { href: "/detalhes", label: "Extrato", icon: "🧾" },
-                { href: "/mes", label: "Meu mês", icon: "📊" },
-                { href: "/metas", label: "Metas", icon: "🎯" },
-                { href: "/bancos", label: "Bancos conectados", icon: "🏦" },
-                { href: "/fluxo", label: "Fluxo de caixa", icon: "🔄" },
-              ].map((item) => (
+              {MENU_ITEMS.map((item, index) => (
                 <Link
                   key={item.href}
+                  ref={index === 0 ? firstItemRef : undefined}
                   href={item.href}
                   prefetch
                   onClick={() => {
                     onNavigate(item.href);
-                    setMenuOpen(false);
+                    closeMenu();
                   }}
                   className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] hover:bg-zinc-900"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-base">
+                  <span
+                    aria-hidden
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-base"
+                  >
                     {item.icon}
                   </span>
                   {item.label}
                 </Link>
               ))}
-              <NotificationBell variant="menu" />
+              <NotificationBell variant="menu" onNavigate={() => closeMenu()} />
               <ThemeToggle variant="menu" />
               <InstallAppButton variant="menu" />
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] text-red-400 hover:bg-red-950/40"
+                disabled={loggingOut}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] text-red-400 hover:bg-red-950/40 disabled:opacity-60"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-base">
+                <span
+                  aria-hidden
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-base"
+                >
                   🚪
                 </span>
-                Sair
+                {loggingOut ? "Saindo…" : "Sair"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-zinc-800 bg-zinc-950/95 pb-[max(0.4rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <nav
+        aria-label="Navegação principal"
+        className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-zinc-800 bg-zinc-950/95 pb-[max(0.4rem,env(safe-area-inset-bottom))] backdrop-blur"
+      >
         <div className="grid grid-cols-5 px-1 py-1.5">
           {TABS.map((tab) => {
             const active = isActivePath(path, tab.href);
@@ -163,25 +209,35 @@ export default function BottomNav() {
                 key={tab.href}
                 href={tab.href}
                 prefetch
-                onClick={() => onNavigate(tab.href)}
+                onClick={() => {
+                  onNavigate(tab.href);
+                  closeMenu();
+                }}
+                aria-current={active ? "page" : undefined}
                 className="flex flex-col items-center gap-0.5 text-[11px]"
               >
                 <span className="flex h-9 w-9 items-center justify-center">
                   <Icon active={active} />
                 </span>
-                <span className={active ? "font-semibold text-emerald-400" : "text-zinc-500"}>{tab.label}</span>
+                <span className={active ? "font-semibold text-emerald-400" : "text-zinc-400"}>{tab.label}</span>
               </Link>
             );
           })}
           <button
+            ref={menuButtonRef}
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
-            className="flex flex-col items-center gap-0.5 text-[11px] text-zinc-500"
+            aria-label={menuLabel}
+            aria-haspopup="dialog"
+            aria-expanded={menuOpen}
+            aria-controls={menuOpen ? "mf-mobile-menu" : undefined}
+            className="flex flex-col items-center gap-0.5 text-[11px] text-zinc-400"
           >
-            <span className="flex h-9 w-9 items-center justify-center">
+            <span className="relative flex h-9 w-9 items-center justify-center">
               <MenuIcon active={menuActive || menuOpen} />
+              <UnreadBadge className="absolute right-0 top-0.5" />
             </span>
-            <span className={menuActive || menuOpen ? "font-semibold text-emerald-400" : "text-zinc-500"}>
+            <span className={menuActive || menuOpen ? "font-semibold text-emerald-400" : "text-zinc-400"}>
               Menu
             </span>
           </button>

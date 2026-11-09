@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 const DISMISS_KEY = "mf-push-dismissed";
 
@@ -46,28 +46,38 @@ async function subscribePush() {
   if (!save.ok) throw new Error("save");
 }
 
+function pushSupported() {
+  return "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
+}
+
+/** O convite aparece só se o navegador suporta, ainda não decidiu a permissão e não foi dispensado nesta sessão. */
+function shouldOfferPush() {
+  if (!pushSupported()) return false;
+  if (isIos() && !isStandalone()) return false;
+  if (Notification.permission !== "default") return false;
+  try {
+    return sessionStorage.getItem(DISMISS_KEY) !== "1";
+  } catch {
+    return false;
+  }
+}
+
+const noopSubscribe = () => () => undefined;
+const serverFalse = () => false;
+
 export function PushEnable() {
-  const [visible, setVisible] = useState(false);
+  // Lido do navegador sem setState em efeito; no servidor/hidratação vale false (nada renderizado).
+  const offer = useSyncExternalStore(noopSubscribe, shouldOfferPush, serverFalse);
+  const [closed, setClosed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState("");
+  const visible = offer && !closed;
 
   useEffect(() => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-      return;
-    }
+    // Permissão já concedida: garante que a inscrição deste aparelho está salva no servidor.
+    if (!pushSupported()) return;
     if (isIos() && !isStandalone()) return;
-
-    if (Notification.permission === "granted") {
-      void subscribePush().catch(() => undefined);
-      return;
-    }
-    if (Notification.permission === "denied") return;
-    try {
-      if (sessionStorage.getItem(DISMISS_KEY) === "1") return;
-    } catch {
-      return;
-    }
-    setVisible(true);
+    if (Notification.permission === "granted") void subscribePush().catch(() => undefined);
   }, []);
 
   async function enable() {
@@ -81,7 +91,7 @@ export function PushEnable() {
         return;
       }
       await subscribePush();
-      setVisible(false);
+      setClosed(true);
     } catch {
       setHint("Não deu para ativar agora. Instale o app e tente de novo.");
     } finally {
@@ -121,7 +131,7 @@ export function PushEnable() {
             } catch {
               /* ignore */
             }
-            setVisible(false);
+            setClosed(true);
           }}
           aria-label="Dispensar"
           className="rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-white"

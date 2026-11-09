@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCurrency, formatMonthLabel } from "@/lib/finance/format";
+import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
 import {
   belongsToConnection,
@@ -26,18 +26,17 @@ import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Transaction } from "@/lib/finance/types";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
-import {
-  FluxoBarrasChart,
-  GastosDonutChart,
-  SaldoEvolutionChart,
-} from "@/components/dashboard/OverviewCharts";
+// Gráficos via next/dynamic (ssr: false): o Recharts sai do bundle inicial da tela.
 import {
   CategoryCompareChart,
   EconomiaMensalChart,
+  FluxoBarrasChart,
   FluxoDiarioChart,
+  GastosDonutChart,
   MixPizzaChart,
+  SaldoEvolutionChart,
   SemanaGastosChart,
-} from "@/components/dashboard/ExtraCharts";
+} from "@/components/dashboard/LazyCharts";
 import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
 import { MaioresGastos, ProximasContas } from "@/components/dashboard/ListPanels";
 import GoalsPanel from "@/components/dashboard/GoalsPanel";
@@ -96,14 +95,25 @@ export default function DashboardClient({
     return connections.filter((connection) => connection.id === connectionId);
   }, [connectionId, connections]);
 
-  const accounts = visibleConnections.flatMap((connection) => connection.accounts);
-  const cards = visibleConnections.flatMap((connection) => connection.cards);
-  const investments = visibleConnections.flatMap((connection) => connection.investments);
+  // Derivados memoizados: mantêm referências estáveis para os useMemo seguintes (e para o React Compiler).
+  const { accounts, cards, investments } = useMemo(
+    () => ({
+      accounts: visibleConnections.flatMap((connection) => connection.accounts),
+      cards: visibleConnections.flatMap((connection) => connection.cards),
+      investments: visibleConnections.flatMap((connection) => connection.investments),
+    }),
+    [visibleConnections],
+  );
 
-  const totalBalance = accounts.reduce((sum, account) => sum + Number(account.balance), 0);
-  const totalInvoices = cards.reduce((sum, card) => sum + Number(card.current_invoice), 0);
-  const totalLimit = cards.reduce((sum, card) => sum + Number(card.credit_limit ?? 0), 0);
-  const totalInvestments = investments.reduce((sum, investment) => sum + Number(investment.amount), 0);
+  const { totalBalance, totalInvoices, totalLimit, totalInvestments } = useMemo(
+    () => ({
+      totalBalance: accounts.reduce((sum, account) => sum + Number(account.balance), 0),
+      totalInvoices: cards.reduce((sum, card) => sum + Number(card.current_invoice), 0),
+      totalLimit: cards.reduce((sum, card) => sum + Number(card.credit_limit ?? 0), 0),
+      totalInvestments: investments.reduce((sum, investment) => sum + Number(investment.amount), 0),
+    }),
+    [accounts, cards, investments],
+  );
   const usedLimitPct = totalLimit > 0 ? (totalInvoices / totalLimit) * 100 : 0;
 
   const scopedTx = useMemo(
@@ -111,12 +121,18 @@ export default function DashboardClient({
     [historyTx, connectionId, snapshot.accounts, snapshot.cards],
   );
 
-  const monthKey = saoPauloMonthKey();
-  const monthTx = scopedTx.filter((transaction) => transaction.date.startsWith(monthKey));
+  // Mês corrente (São Paulo) fixado na montagem da tela.
+  const [monthKey] = useState(saoPauloMonthKey);
+  const previousMonthKey = useMemo(() => shiftMonthKey(monthKey, -1), [monthKey]);
+  const monthTx = useMemo(
+    () => scopedTx.filter((transaction) => transaction.date.startsWith(monthKey)),
+    [scopedTx, monthKey],
+  );
+  const monthGastos = useMemo(() => monthTx.filter(isGasto), [monthTx]);
   const monthEntradas = monthTx
     .filter(isRenda)
     .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
-  const monthDespesas = monthTx.filter(isGasto).reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+  const monthDespesas = monthGastos.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
   const todayKey = saoPauloTodayKey();
   const weekStart = saoPauloWeekStartKey();
   const gastosHoje = sumGastosInRange(scopedTx, todayKey, todayKey);
@@ -130,16 +146,15 @@ export default function DashboardClient({
 
   const gastosPorCategoria = useMemo(() => {
     const map = new Map<string, number>();
-    monthTx.filter(isGasto).forEach((transaction) => {
+    monthGastos.forEach((transaction) => {
       const category = resolvedCategory(transaction);
       map.set(category, (map.get(category) ?? 0) + Number(transaction.amount));
     });
     return Array.from(map.entries())
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
-  }, [monthTx]);
+  }, [monthGastos]);
 
-  const previousMonthKey = shiftMonthKey(monthKey, -1);
   const categoryCompare = useMemo(() => {
     const atualMap = new Map<string, number>();
     const anteriorMap = new Map<string, number>();
@@ -310,6 +325,7 @@ export default function DashboardClient({
         trailing={
           <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
             <select
+              aria-label="Filtrar por banco"
               value={connectionId}
               onChange={(event) => setConnectionId(event.target.value)}
               className="bg-transparent outline-none"
@@ -377,7 +393,7 @@ export default function DashboardClient({
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm text-zinc-100">{group.name}</span>
                         <span className="text-xs text-zinc-500">
-                          {group.accounts.length} {group.accounts.length === 1 ? "conta" : "contas"} · {group.share.toFixed(1)}%
+                          {group.accounts.length} {group.accounts.length === 1 ? "conta" : "contas"} · {formatPercent(group.share, 1)}
                         </span>
                       </span>
                       <span className="text-sm font-medium text-emerald-400">{formatCurrency(group.balance)}</span>
@@ -404,7 +420,7 @@ export default function DashboardClient({
           <SectionLabel>Cartões</SectionLabel>
           <p className="mt-2 text-3xl font-semibold text-red-400">{formatCurrency(totalInvoices)}</p>
           <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
-            <span>{usedLimitPct.toFixed(0)}% utilizado</span>
+            <span>{formatPercent(usedLimitPct, 0)} utilizado</span>
             <span>Limite: {formatCurrency(totalLimit)}</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
@@ -468,7 +484,7 @@ export default function DashboardClient({
                       {item.label} ({item.count})
                     </span>
                     <span className="text-zinc-400">
-                      {item.share.toFixed(1)}% · {formatCurrency(item.total)}
+                      {formatPercent(item.share, 1)} · {formatCurrency(item.total)}
                     </span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
