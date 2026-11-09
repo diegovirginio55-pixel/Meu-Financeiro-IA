@@ -10,6 +10,7 @@ import { saoPauloTodayKey } from "@/lib/finance/fluxo";
 import { bankFromLabel } from "@/lib/pluggy/institution";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { serverError } from "@/lib/api/errors";
+import { appendIngestLog } from "@/lib/ingest/log";
 
 const MAX_BODY_BYTES = 8 * 1024;
 const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
@@ -18,6 +19,11 @@ type Body = { token?: unknown; app?: unknown; title?: unknown; text?: unknown; t
 
 function str(value: unknown, max = 1000): string {
   return typeof value === "string" ? value.slice(0, max) : "";
+}
+
+/** Campo do MacroDroid que não foi substituído (ex.: "[app_name]" literal): trata como vazio. */
+function withoutMagicText(value: string): string {
+  return /^\s*[\[{][a-z_ ]+[\]}]\s*$/i.test(value) ? "" : value;
 }
 
 /** Aceita JSON ou formulário (o MacroDroid e o Atalhos mandam dos dois jeitos). */
@@ -52,9 +58,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Token inválido. Gere um novo em Bancos → Saldo em tempo real." }, { status: 401 });
   }
 
-  const input = { app: str(body.app, 120), title: str(body.title, 300), text: str(body.text, 1500) };
+  const input = {
+    app: withoutMagicText(str(body.app, 120)),
+    title: withoutMagicText(str(body.title, 300)),
+    text: withoutMagicText(str(body.text, 1500)),
+  };
+  const isTest = body.test === true || body.test === "true";
+  const preview = `${input.title ? `${input.title} — ` : ""}${input.text}`.slice(0, 120);
   const result = parseBankNotification(input);
-  if (!result.ok) return NextResponse.json({ ok: true, ignored: result.reason });
+  if (!result.ok) {
+    if (!isTest) await appendIngestLog(userId, { app: input.app, preview, result: "ignorado", detail: result.reason });
+    return NextResponse.json({ ok: true, ignored: result.reason });
+  }
   const parsed = result.parsed;
 
   const supabase = createAdminClient();
@@ -97,7 +112,7 @@ export async function POST(request: Request) {
     pluggy_transaction_id: "",
   };
 
-  if (body.test === true || body.test === "true") {
+  if (isTest) {
     return NextResponse.json({ ok: true, test: true, wouldRegister: { ...row, user_id: undefined, pluggy_transaction_id: undefined, bank: parsed.bank } });
   }
 
@@ -114,6 +129,15 @@ export async function POST(request: Request) {
     .upsert(row, { onConflict: "pluggy_transaction_id", ignoreDuplicates: true })
     .select("id");
   if (error) return serverError("Não foi possível registrar a notificação.", error);
+
+  const registered = (data ?? []).length > 0;
+  const target = card ? "cartão" : account ? "conta" : "sem conta vinculada";
+  await appendIngestLog(userId, {
+    app: input.app,
+    preview,
+    result: registered ? "registrado" : "duplicado",
+    detail: `${row.type === "entrada" ? "Entrada" : "Saída"} de R$ ${row.amount.toFixed(2).replace(".", ",")} · ${row.description} · ${category} · ${parsed.bank ?? "banco não identificado"} (${target})`,
+  });
 
   return NextResponse.json({
     ok: true,

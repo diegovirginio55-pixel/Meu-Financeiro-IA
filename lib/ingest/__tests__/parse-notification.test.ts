@@ -54,6 +54,21 @@ describe("leitura de notificações dos bancos", () => {
     });
   });
 
+  it("iPhone (Atalhos/Apple Pay): texto montado, mesmo com o R$ repetido pela variável Valor", () => {
+    expect(
+      parsed({ app: "Nubank Ultravioleta", title: "Compra aprovada", text: "Compra no cartão de R$ R$ 45,90 em IFOOD" }),
+    ).toMatchObject({ amount: 45.9, type: "saida", kind: "card", bank: "Nubank", description: "IFOOD" });
+    expect(parsed({ app: "Inter Mastercard", title: "Compra aprovada", text: "Compra no cartão de R$ 12,30 em PADARIA" })).toMatchObject({
+      amount: 12.3,
+      bank: "Inter",
+      kind: "card",
+    });
+  });
+
+  it("teste do MacroDroid sem notificação real é ignorado (sem gravar nada)", () => {
+    expect(parseBankNotification({ app: "", title: "", text: "" })).toEqual({ ok: false, reason: "notificação vazia" });
+  });
+
   it("ignora compra recusada, propaganda e aviso de limite", () => {
     expect(parseBankNotification({ text: "Compra de R$ 99,90 em LOJA X foi recusada." }).ok).toBe(false);
     expect(parseBankNotification({ text: "Você tem R$ 5.000,00 de limite disponível! Aproveite." }).ok).toBe(false);
