@@ -25,6 +25,7 @@ import {
   dailyBudgetFromBalance,
 } from "./fluxo";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { applyProvisionalToBalances, loadProvisional } from "@/lib/ingest/provisional";
 import { resolvedCategory } from "./categories";
 import { uniqueInvestments } from "./bank-connections";
 import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
@@ -95,6 +96,8 @@ export async function getFinancialSnapshot(
     snapRes,
     invTxRes,
     budgetRes,
+    connectionsRes,
+    provisional,
   ] = await Promise.all([
     supabase.from("accounts").select("*").order("created_at"),
     supabase.from("cards").select("*").order("created_at"),
@@ -129,10 +132,17 @@ export async function getFinancialSnapshot(
     supabase.from("investment_snapshots").select("*").gte("snapshot_date", sixMonthsAgo),
     supabase.from("investment_transactions").select("*").gte("date", sixMonthsAgo),
     supabase.from("monthly_budgets").select("*").eq("month_key", saoPauloMonthKey(now)).maybeSingle(),
+    supabase.from("bank_connections").select("id, status_detail, last_synced_at"),
+    loadProvisional(supabase),
   ]);
 
-  const accounts = (accountsRes.data ?? []) as Account[];
-  const cards = (cardsRes.data ?? []) as Card[];
+  // Saldo estimado: banco + notificações do celular ainda não confirmadas pela Pluggy.
+  const { accounts, cards } = applyProvisionalToBalances(
+    (accountsRes.data ?? []) as Account[],
+    (cardsRes.data ?? []) as Card[],
+    provisional,
+    (connectionsRes.data ?? []) as { id: string; status_detail: string | null; last_synced_at: string | null }[],
+  );
   const debts = (debtsRes.data ?? []) as Debt[];
   const goals = (goalsRes.data ?? []) as Goal[];
   const recurringItems = (recurringRes.data ?? []) as RecurringItem[];

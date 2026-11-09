@@ -8,6 +8,8 @@ const PUBLIC_PATHS = [
   "/api/bank/cron",
   // Botões das notificações: autorizados por token assinado, não por sessão.
   "/api/push/action",
+  // Notificações do banco vindas do celular (MacroDroid/Atalhos): token pessoal.
+  "/api/ingest/notification",
   "/manifest.webmanifest",
   "/sw.js",
   "/opengraph-image",

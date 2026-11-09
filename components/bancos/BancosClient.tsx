@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/finance/format";
 import { friendlyAccountName } from "@/lib/finance/account-name";
@@ -574,10 +575,20 @@ export default function BancosClient({
       </section>
 
       <section className="mt-10">
-        <SectionLabel>Apps parceiros</SectionLabel>
-        <div className="flex min-h-[120px] items-center justify-center rounded-2xl border border-zinc-800/80 bg-transparent">
-          <p className="text-sm text-zinc-500">Nenhum app parceiro está acessando seus dados.</p>
-        </div>
+        <SectionLabel>Saldo em tempo real</SectionLabel>
+        <Link
+          href="/bancos/tempo-real"
+          className="flex items-center justify-between gap-4 rounded-2xl border border-emerald-900/60 bg-emerald-950/20 p-4 transition-colors hover:border-emerald-700"
+        >
+          <div>
+            <p className="text-[15px] font-semibold text-white">⚡ Ver cada compra na hora — grátis</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+              O Meu Pluggy atualiza 1x por dia. Encaminhe as notificações dos apps dos bancos pelo celular e o app
+              registra na hora.
+            </p>
+          </div>
+          <span className="shrink-0 text-xs text-emerald-300">Configurar &gt;</span>
+        </Link>
       </section>
 
       {selected && (

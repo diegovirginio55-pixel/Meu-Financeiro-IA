@@ -119,6 +119,8 @@ export default function BankHome({
   }, 0);
   const investmentProfitPct = investedCapital > 0 ? (investmentProfit / investedCapital) * 100 : 0;
   const saldoConta = bankBalance;
+  // Parte do saldo que veio das notificações do celular (ainda não confirmada pelo banco).
+  const provisionalDelta = Math.round(accounts.reduce((sum, item) => sum + (item.provisional_delta ?? 0), 0) * 100) / 100;
   const saldoTotal = bankBalance + bankInvestments;
   const displayedBalance = balanceView === "total" ? saldoTotal : saldoConta;
   const monthKey = saoPauloMonthKey();
@@ -238,6 +240,14 @@ export default function BankHome({
                   className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300"
                 >
                   saldo de {formatRelativeDaySP(oldestData.at)}
+                </span>
+              )}
+              {provisionalDelta !== 0 && (
+                <span
+                  title="Inclui compras e Pix que chegaram pelas notificações do banco no celular e ainda não foram confirmados pelo banco."
+                  className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
+                >
+                  ⚡ inclui {hidden ? "notificações" : `${money(false, provisionalDelta)} das notificações`}
                 </span>
               )}
             </p>

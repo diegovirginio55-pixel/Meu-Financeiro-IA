@@ -9,6 +9,22 @@ import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatBRLInput, parseBRL } from "@/lib/ui/money";
 
+/** Lançamento que veio da notificação do banco no celular e ainda espera a confirmação da Pluggy. */
+function isProvisional(transaction: Transaction): boolean {
+  return Boolean(transaction.pluggy_transaction_id?.startsWith("notif:"));
+}
+
+function ProvisionalTag() {
+  return (
+    <span
+      title="Veio da notificação do banco no celular. Será trocado pelo lançamento oficial quando o banco atualizar."
+      className="ml-1.5 inline-block rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-300"
+    >
+      ⏳ provisório
+    </span>
+  );
+}
+
 interface EditableFields {
   description: string;
   amount: string;
@@ -181,6 +197,7 @@ export default function TransactionsTable({
                       <span className="block truncate text-sm text-zinc-100">{t.description}</span>
                       <span className="text-xs text-zinc-500">
                         {formatDate(t.date)} · {CATEGORY_ICONS[t.category] ?? "🔖"} {t.category}
+                        {isProvisional(t) && <ProvisionalTag />}
                       </span>
                     </button>
                   </div>
@@ -269,7 +286,10 @@ export default function TransactionsTable({
                       className="w-40 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-zinc-200"
                     />
                   ) : (
-                    t.description
+                    <>
+                      {t.description}
+                      {isProvisional(t) && <ProvisionalTag />}
+                    </>
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-zinc-300">

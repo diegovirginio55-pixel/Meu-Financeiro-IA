@@ -7,6 +7,7 @@ import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
 import { INVESTMENT_PREFILTER, promoteInvestmentsFromTransactions } from "./investment-movements";
 import { daysAgoKey } from "./fluxo";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { applyProvisionalToBalances, loadProvisional } from "@/lib/ingest/provisional";
 
 export type BankConnectionWithAssets = BankConnection & {
   accounts: Account[];
@@ -19,7 +20,7 @@ export async function getBankConnectionsWithAssets(
 ): Promise<BankConnectionWithAssets[]> {
   const from = daysAgoKey(180);
 
-  const [connRes, accRes, cardRes, invRes, snapRes, txRes, appRes] = await Promise.all([
+  const [connRes, accRes, cardRes, invRes, snapRes, txRes, appRes, provisional] = await Promise.all([
     supabase.from("bank_connections").select("*").order("created_at", { ascending: false }),
     supabase.from("accounts").select("*"),
     supabase.from("cards").select("*"),
@@ -39,11 +40,18 @@ export async function getBankConnectionsWithAssets(
         .order("id", { ascending: true })
         .range(start, end),
     ),
+    loadProvisional(supabase),
   ]);
 
   const connections = (connRes.data ?? []) as BankConnection[];
-  const accounts = (accRes.data ?? []) as Account[];
-  const cards = (cardRes.data ?? []) as Card[];
+  // Saldo estimado: banco + notificações do celular que chegaram depois da
+  // última atualização da Pluggy (o Meu Pluggy só atualiza 1x por dia).
+  const { accounts, cards } = applyProvisionalToBalances(
+    (accRes.data ?? []) as Account[],
+    (cardRes.data ?? []) as Card[],
+    provisional,
+    connections,
+  );
   let investments = (invRes.data ?? []) as Investment[];
   try {
     investments = await promoteInvestmentsFromTransactions(supabase, accounts, investments);

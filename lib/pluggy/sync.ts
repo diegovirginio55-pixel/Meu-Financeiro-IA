@@ -17,6 +17,7 @@ import { notifyBankMovements } from "@/lib/push/send";
 import { isRecentMovementDate, recentMovements, type MovementNotice } from "@/lib/push/payload";
 import { daysAgoKey, toSaoPauloDateOnly } from "@/lib/finance/fluxo";
 import { isMissingSchemaError } from "@/lib/supabase/schema-compat";
+import { cleanupStaleProvisional, reconcileProvisional } from "@/lib/ingest/provisional";
 
 const TRANSACTIONS_LOOKBACK_DAYS = 90;
 
@@ -215,7 +216,17 @@ async function syncTransactionsForAccount(
     if (error) console.error("Erro ao atualizar transações da Pluggy:", error);
   }
 
+  // Lançamentos que já tinham chegado pela notificação do celular: troca o
+  // provisório pelo oficial e não avisa de novo.
+  let alreadyNotified = new Set<string>();
+  try {
+    alreadyNotified = await reconcileProvisional(supabase, userId, { accountId, cardId }, inserted);
+  } catch (error) {
+    console.error("Erro ao conciliar lançamentos provisórios:", error);
+  }
+
   return inserted
+    .filter((row) => !alreadyNotified.has(row.id))
     .filter((row) => isRecentMovementDate(row.date))
     .map((row) => ({
       id: row.id,
@@ -439,6 +450,8 @@ export async function syncBankConnection(
   const shouldNotify = Boolean(connectionState?.last_synced_at);
   const newMovements: MovementNotice[] = [];
   const investmentMovements: MovementNotice[] = [];
+  const syncedAccountIds: string[] = [];
+  const syncedCardIds: string[] = [];
 
   const item = await pluggyApi.waitForItemIdle(pluggyItemId);
   const { results: accounts } = await pluggyApi.fetchAccounts(pluggyItemId);
@@ -477,6 +490,7 @@ export async function syncBankConnection(
         .select("id")
         .single();
 
+      if (accountRow?.id) syncedAccountIds.push(accountRow.id);
       const created = await syncTransactionsForAccount(supabase, userId, account.id, accountRow?.id ?? null, null);
       newMovements.push(...created);
 
@@ -515,9 +529,23 @@ export async function syncBankConnection(
         .select("id")
         .single();
 
+      if (cardRow?.id) syncedCardIds.push(cardRow.id);
       const created = await syncTransactionsForAccount(supabase, userId, account.id, null, cardRow?.id ?? null);
       newMovements.push(...created);
     }
+  }
+
+  // Provisórios (das notificações do celular) que a Pluggy já devia ter
+  // trazido e não casaram com nenhum oficial: saem, para não contar em dobro.
+  try {
+    await cleanupStaleProvisional(
+      supabase,
+      userId,
+      { accountIds: syncedAccountIds, cardIds: syncedCardIds },
+      item.lastUpdatedAt,
+    );
+  } catch (error) {
+    console.error("Erro ao limpar provisórios antigos:", error);
   }
 
   // Avisa das movimentações do banco AGORA — antes o push só saía no fim,

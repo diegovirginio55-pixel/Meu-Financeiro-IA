@@ -12,6 +12,8 @@ export interface Account {
   created_at: string;
   updated_at: string;
   institution_name?: string | null;
+  /** Quanto do saldo veio de notificações do banco ainda não confirmadas pela Pluggy. */
+  provisional_delta?: number;
 }
 
 export interface Card {
@@ -28,6 +30,8 @@ export interface Card {
   created_at: string;
   updated_at: string;
   institution_name?: string | null;
+  /** Quanto da fatura veio de notificações do banco ainda não confirmadas pela Pluggy. */
+  provisional_delta?: number;
 }
 
 export interface Transaction {
