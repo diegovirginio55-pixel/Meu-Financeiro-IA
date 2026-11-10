@@ -22,6 +22,15 @@ import { useHideValues } from "@/lib/ui/hide-values";
 import { CronHealthBanner } from "@/components/ui/CronHealthBanner";
 import { StickyBalanceBar } from "@/components/ui/StickyBalanceBar";
 import { BalanceSparkline } from "@/components/home/BalanceSparkline";
+import { TiltCard } from "@/components/home/TiltCard";
+import { AnimatedMoney } from "@/components/dashboard/v2/chart-kit";
+import { monthMood } from "@/lib/finance/month-mood";
+
+const MOOD_STYLE = {
+  ok: { glow: "bg-emerald-500/20", glow2: "bg-cyan-500/10", dot: "bg-emerald-400", text: "text-emerald-300" },
+  warn: { glow: "bg-amber-500/22", glow2: "bg-orange-500/12", dot: "bg-amber-400", text: "text-amber-300" },
+  bad: { glow: "bg-rose-500/25", glow2: "bg-red-600/12", dot: "bg-rose-400", text: "text-rose-300" },
+} as const;
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
@@ -145,6 +154,13 @@ export default function BankHome({
   const gastosSemana =
     historyTx.length > 0 ? sumGastosInRange(scopedTx, weekStart, todayKey) : snapshot.gastosSemana;
   const dailyBudget = dailyBudgetFromBalance(saldoConta, todayKey);
+  const mood = monthMood({
+    saldoConta,
+    spent: monthDespesas,
+    limit: snapshot.monthlyBudget?.spendingLimit ?? null,
+    todayKey,
+    perDay: dailyBudget.perDay,
+  });
   const dailyUntilLabel = format(parseISO(`${dailyBudget.until}T12:00:00`), "d 'de' MMMM", { locale: ptBR });
 
   if (connections.length === 0) {
@@ -180,8 +196,9 @@ export default function BankHome({
     <div className="-mx-4 pb-6 text-zinc-100 lg:-mx-6 xl:-mx-10 2xl:-mx-14">
       <StickyBalanceBar label={bankLabel} value={money(hidden, displayedBalance)} />
       <section className="relative overflow-hidden px-4 pb-7 pt-1 lg:px-6 lg:pb-10 xl:px-10 2xl:px-14">
-        <div className="pointer-events-none absolute -right-16 -top-10 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl lg:h-[22rem] lg:w-[22rem]" />
-        <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
+        {/* A cor do brilho acompanha o mês: verde tranquilo, âmbar atenção, vermelho estourado. */}
+        <div className={`pointer-events-none absolute -right-16 -top-10 h-64 w-64 rounded-full blur-3xl transition-colors duration-1000 lg:h-[22rem] lg:w-[22rem] ${MOOD_STYLE[mood.level].glow}`} />
+        <div className={`pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full blur-3xl transition-colors duration-1000 ${MOOD_STYLE[mood.level].glow2}`} />
 
         <div className="relative">
           <CronHealthBanner />
@@ -198,9 +215,13 @@ export default function BankHome({
                   height={32}
                   className="h-8 w-8 rounded-xl object-cover ring-1 ring-emerald-400/25 lg:hidden"
                 />
-                <p className="text-sm font-medium tracking-wide text-emerald-400/90">
-                  {greetingForNow()}
-                </p>
+                <div>
+                  <p className="text-sm font-medium tracking-wide text-emerald-400/90">{greetingForNow()}</p>
+                  <p title={mood.detail} className={`flex items-center gap-1.5 text-[11px] font-medium ${MOOD_STYLE[mood.level].text}`}>
+                    <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${MOOD_STYLE[mood.level].dot}`} />
+                    {mood.label}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-1 lg:hidden">
                 <ThemeToggle />
@@ -242,7 +263,7 @@ export default function BankHome({
               )}
             </p>
             <p className="mt-1 text-[44px] font-semibold leading-none tracking-tight text-white lg:text-[64px]">
-              {money(hidden, displayedBalance)}
+              {hidden ? money(true, displayedBalance) : <AnimatedMoney value={displayedBalance} />}
             </p>
             <div className="mt-4">
               <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
@@ -417,8 +438,8 @@ export default function BankHome({
             const name = officialInstitutionName(connection?.institution_name ?? account.name);
             const brand = getBankBrand(name);
             return (
+              <TiltCard key={account.id}>
               <article
-                key={account.id}
                 className={walletTileClass}
                 style={{
                   background: brand
@@ -439,9 +460,11 @@ export default function BankHome({
                   {money(hidden, Number(account.balance))}
                 </p>
               </article>
+              </TiltCard>
             );
           })}
           {bankInvestments > 0 && (
+            <TiltCard>
             <Link href="/ativos" className={`${walletTileClass} bg-gradient-to-br from-emerald-700 via-emerald-900 to-zinc-950`}>
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-emerald-200/80">Investido</p>
               <p className="mt-8 text-sm text-white/75">
@@ -469,10 +492,11 @@ export default function BankHome({
                 <span>{hidden ? "••••" : money(false, investmentProfit)}</span>
               </p>
             </Link>
+            </TiltCard>
           )}
           {walletCards.map((card) => (
+            <TiltCard key={card.id}>
             <Link
-              key={card.id}
               href="/detalhes"
               className={`${walletTileClass} bg-gradient-to-br from-zinc-700 via-zinc-900 to-zinc-950`}
             >
@@ -482,6 +506,7 @@ export default function BankHome({
                 {money(hidden, Number(card.current_invoice))}
               </p>
             </Link>
+            </TiltCard>
           ))}
           {walletAccounts.length === 0 && walletCards.length === 0 && bankInvestments === 0 && (
             <p className="text-sm text-zinc-500">Nada neste banco ainda.</p>
