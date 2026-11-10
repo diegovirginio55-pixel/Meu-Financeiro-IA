@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Atalhos ao segurar o ícone do app (os mesmos do app instalado pelo navegador + a tela de leitura). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="novo_gasto"
+        android:shortcutShortLabel="@string/shortcut_new_expense">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://meu-financeiro-ia.onrender.com/chat?novo=gasto"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:targetPackage="br.com.meufinanceiroia" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="extrato"
+        android:shortcutShortLabel="@string/shortcut_statement">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://meu-financeiro-ia.onrender.com/detalhes"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:targetPackage="br.com.meufinanceiroia" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="leitura_bancos"
+        android:shortcutShortLabel="@string/shortcut_status">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="br.com.meufinanceiroia.StatusActivity"
+            android:targetPackage="br.com.meufinanceiroia" />
+    </shortcut>
+</shortcuts>

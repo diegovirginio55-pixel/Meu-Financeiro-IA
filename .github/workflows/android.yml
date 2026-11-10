@@ -1,0 +1,89 @@
+name: App Android
+
+# Gera o instalador do app Android (pasta android/) e publica em
+# Releases → "android-latest" → meu-financeiro.apk — o link do botão
+# "Baixar o app" na tela Bancos → Saldo em tempo real. Grátis (Actions).
+#
+# Precisa de 2 segredos do repositório (a chave fica fora do código):
+#   ANDROID_KEYSTORE_BASE64   — a chave release.p12 em base64
+#   ANDROID_KEYSTORE_PASSWORD — a senha dela
+# A impressão digital dessa chave está em public/.well-known/assetlinks.json.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir a chave de assinatura
+        id: key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "Sem a chave: o APK é só compilado (para conferir o código), não publicado."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "file=$RUNNER_TEMP/release.p12" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Gerar o APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ steps.key.outputs.file }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Conferir a assinatura (deve bater com o assetlinks.json)
+        if: steps.key.outputs.present == 'true'
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs android/app/build/outputs/apk/release/app-release.apk | grep -i "SHA-256"
+          rm -f "$RUNNER_TEMP/release.p12"
+
+      - name: Avisar que falta a chave
+        if: steps.key.outputs.present != 'true'
+        run: |
+          echo "::warning::O código compilou, mas o APK não foi publicado: faltam os segredos ANDROID_KEYSTORE_BASE64 e ANDROID_KEYSTORE_PASSWORD (Settings → Secrets and variables → Actions)."
+
+      - name: Publicar em Releases
+        if: steps.key.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk meu-financeiro.apk
+          if ! gh release view android-latest >/dev/null 2>&1; then
+            gh release create android-latest --title "App Android (Meu Financeiro)" --latest=false \
+              --notes "Instalador do app Android. Baixe pelo botão em Bancos → Saldo em tempo real."
+          fi
+          gh release upload android-latest meu-financeiro.apk --clobber
+          echo "Versão 1.0.${{ github.run_number }} publicada."

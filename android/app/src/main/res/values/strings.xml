@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Meu Financeiro</string>
+    <string name="launch_url" translatable="false">https://meu-financeiro-ia.onrender.com/login</string>
+    <string name="status_title">Leitura dos bancos</string>
+    <string name="listener_label">Meu Financeiro: avisos dos bancos</string>
+    <string name="shortcut_status">Leitura dos bancos</string>
+    <string name="shortcut_new_expense">Novo gasto</string>
+    <string name="shortcut_statement">Extrato</string>
+    <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://meu-financeiro-ia.onrender.com\"}}]</string>
+</resources>
