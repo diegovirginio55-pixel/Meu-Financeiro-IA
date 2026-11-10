@@ -14,6 +14,9 @@ import { realConnectionId } from "@/lib/finance/connection-filter";
 import { formatRelativeDaySP } from "@/lib/ui/datetime";
 import { connectionFreshness } from "@/lib/finance/connection-freshness";
 import { useDialog } from "@/lib/ui/use-dialog";
+import { MoneyInput } from "@/components/ui/MoneyInput";
+import { formatBRLInput, parseBRL } from "@/lib/ui/money";
+import type { Account } from "@/lib/finance/types";
 
 const PluggyConnect = dynamic(
   () => import("react-pluggy-connect").then((mod) => mod.PluggyConnect),
@@ -75,6 +78,122 @@ function ConnectionCard({
         Ver detalhes &gt;
       </span>
     </button>
+  );
+}
+
+/**
+ * Saldo de uma conta + "Corrigir saldo": o Meu Pluggy só atualiza 1x por
+ * dia; o usuário digita o saldo que vê no app do banco e ele vale até a
+ * próxima atualização oficial.
+ */
+function AccountBalanceRow({ account }: { account: Account }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const overridden = Boolean(account.balance_override_at);
+
+  async function save(balance: number | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/accounts/${account.id}/balance`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ balance }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Não foi possível salvar.");
+      setEditing(false);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl bg-zinc-900/60 p-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-zinc-300">{friendlyAccountName(account.name, account.type)}</span>
+        <span className="font-medium text-white">{formatCurrency(Number(account.balance))}</span>
+      </div>
+      {overridden && (
+        <p className="mt-1 text-[11px] leading-snug text-sky-300">
+          Saldo informado por você — volta ao do banco na próxima atualização.
+        </p>
+      )}
+      {editing ? (
+        <form
+          className="mt-2 flex items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const parsed = parseBRL(value);
+            if (parsed === null) {
+              setError("Digite o saldo como aparece no app do banco, ex.: 1.234,56");
+              return;
+            }
+            void save(parsed);
+          }}
+        >
+          <MoneyInput
+            value={value}
+            onValueChange={setValue}
+            compact
+            autoFocus
+            className="min-w-0 flex-1"
+            aria-label="Saldo que aparece no app do banco"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="shrink-0 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+          >
+            {busy ? "Salvando…" : "Salvar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditing(false);
+              setError(null);
+            }}
+            className="shrink-0 text-xs text-zinc-400 hover:text-zinc-200"
+          >
+            Cancelar
+          </button>
+        </form>
+      ) : (
+        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+          <button
+            type="button"
+            onClick={() => {
+              setValue(formatBRLInput(Number(account.balance)));
+              setEditing(true);
+            }}
+            className="text-xs text-emerald-300 hover:underline"
+          >
+            Corrigir saldo
+          </button>
+          {overridden && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void save(null)}
+              className="text-xs text-zinc-400 hover:underline disabled:opacity-60"
+            >
+              Voltar ao saldo do banco
+            </button>
+          )}
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="mt-1 text-xs text-rose-400">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -148,10 +267,7 @@ function DetailsPanel({
           {hasAssets ? (
             <>
               {connection.accounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-300">{friendlyAccountName(account.name, account.type)}</span>
-                  <span className="font-medium text-white">{formatCurrency(Number(account.balance))}</span>
-                </div>
+                <AccountBalanceRow key={account.id} account={account} />
               ))}
               {connection.cards.map((card) => (
                 <div key={card.id} className="flex items-center justify-between text-sm">
@@ -316,8 +432,10 @@ function AddBankDialog({
 
 export default function BancosClient({
   initialConnections,
+  initialSelectedId = null,
 }: {
   initialConnections: BankConnectionWithAssets[];
+  initialSelectedId?: string | null;
 }) {
   const router = useRouter();
   // Lista atualizada localmente (após sincronizar) vale só enquanto o servidor não manda uma nova:
@@ -331,7 +449,7 @@ export default function BancosClient({
   const [connectToken, setConnectToken] = useState<string | null>(null);
   const [loadingToken, setLoadingToken] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);

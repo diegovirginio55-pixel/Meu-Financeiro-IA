@@ -26,6 +26,7 @@ import {
 } from "./fluxo";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { applyProvisionalToBalances, loadProvisional } from "@/lib/ingest/provisional";
+import { loadBalanceOverrides } from "@/lib/finance/balance-override";
 import { resolvedCategory } from "./categories";
 import { uniqueInvestments } from "./bank-connections";
 import { applicationTxAsBuys, withAccruedYield } from "./investment-yield";
@@ -136,12 +137,15 @@ export async function getFinancialSnapshot(
     loadProvisional(supabase),
   ]);
 
-  // Saldo estimado: banco + notificações do celular ainda não confirmadas pela Pluggy.
+  // Saldo estimado: banco (ou o saldo corrigido à mão) + notificações do
+  // celular ainda não confirmadas pela Pluggy.
+  const rawAccounts = (accountsRes.data ?? []) as Account[];
   const { accounts, cards } = applyProvisionalToBalances(
-    (accountsRes.data ?? []) as Account[],
+    rawAccounts,
     (cardsRes.data ?? []) as Card[],
     provisional,
     (connectionsRes.data ?? []) as { id: string; status_detail: string | null; last_synced_at: string | null }[],
+    await loadBalanceOverrides(rawAccounts.map((account) => account.id)),
   );
   const debts = (debtsRes.data ?? []) as Debt[];
   const goals = (goalsRes.data ?? []) as Goal[];

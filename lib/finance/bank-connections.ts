@@ -8,6 +8,7 @@ import { INVESTMENT_PREFILTER, promoteInvestmentsFromTransactions } from "./inve
 import { daysAgoKey } from "./fluxo";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { applyProvisionalToBalances, loadProvisional } from "@/lib/ingest/provisional";
+import { loadBalanceOverrides } from "@/lib/finance/balance-override";
 
 export type BankConnectionWithAssets = BankConnection & {
   accounts: Account[];
@@ -44,13 +45,15 @@ export async function getBankConnectionsWithAssets(
   ]);
 
   const connections = (connRes.data ?? []) as BankConnection[];
-  // Saldo estimado: banco + notificações do celular que chegaram depois da
-  // última atualização da Pluggy (o Meu Pluggy só atualiza 1x por dia).
+  const rawAccounts = (accRes.data ?? []) as Account[];
+  // Saldo estimado: banco (ou o saldo corrigido à mão) + notificações do
+  // celular que chegaram depois (o Meu Pluggy só atualiza 1x por dia).
   const { accounts, cards } = applyProvisionalToBalances(
-    (accRes.data ?? []) as Account[],
+    rawAccounts,
     (cardRes.data ?? []) as Card[],
     provisional,
     connections,
+    await loadBalanceOverrides(rawAccounts.map((account) => account.id)),
   );
   let investments = (invRes.data ?? []) as Investment[];
   try {

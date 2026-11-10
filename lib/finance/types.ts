@@ -14,6 +14,8 @@ export interface Account {
   institution_name?: string | null;
   /** Quanto do saldo veio de notificações do banco ainda não confirmadas pela Pluggy. */
   provisional_delta?: number;
+  /** Quando o usuário corrigiu o saldo à mão ("Corrigir saldo"), se ainda vale. */
+  balance_override_at?: string | null;
 }
 
 export interface Card {

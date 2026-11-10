@@ -116,6 +116,9 @@ export default function BankHome({
   const saldoConta = bankBalance;
   // Parte do saldo que veio das notificações do celular (ainda não confirmada pelo banco).
   const provisionalDelta = Math.round(accounts.reduce((sum, item) => sum + (item.provisional_delta ?? 0), 0) * 100) / 100;
+  // Saldo corrigido à mão em Bancos (vale até a próxima atualização do banco).
+  const manualBalance = accounts.some((item) => Boolean(item.balance_override_at));
+  const correctHref = connectionId === "all" ? "/bancos" : `/bancos?banco=${encodeURIComponent(connectionId)}`;
   const saldoTotal = bankBalance + bankInvestments;
   const displayedBalance = balanceView === "total" ? saldoTotal : saldoConta;
   const monthKey = saoPauloMonthKey();
@@ -228,6 +231,14 @@ export default function BankHome({
                   ⚡ inclui {hidden ? "notificações" : `${money(false, provisionalDelta)} das notificações`}
                 </span>
               )}
+              {manualBalance && (
+                <span
+                  title="Você corrigiu o saldo em Bancos. Volta ao saldo do banco na próxima atualização."
+                  className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium text-sky-300"
+                >
+                  ✎ corrigido por você
+                </span>
+              )}
             </p>
             <p className="mt-1 text-[44px] font-semibold leading-none tracking-tight text-white lg:text-[64px]">
               {money(hidden, displayedBalance)}
@@ -235,6 +246,9 @@ export default function BankHome({
             <div className="mt-4">
               <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
             </div>
+            <Link href={correctHref} className="mt-3 inline-block text-xs text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline">
+              Saldo diferente do app do banco? Corrigir
+            </Link>
 
             <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-1">
               <button

@@ -42,6 +42,51 @@ describe("saldo estimado com as notificações do celular", () => {
     expect(accounts[0].provisional_delta).toBe(-30);
   });
 
+  it("saldo corrigido à mão vira a base e só somam as notificações que chegaram depois da correção", () => {
+    const account = makeAccount({ id: "acc-1", balance: 1000, bank_connection_id: "conn-1", source: "pluggy" });
+    const { accounts } = applyProvisionalToBalances(
+      [account],
+      [],
+      [
+        // Antes da correção: já estava no saldo que o usuário viu no banco.
+        provisional({ id: "antes", account_id: "acc-1", amount: 50, created_at: "2026-11-09T15:00:00.000Z" }),
+        provisional({ id: "depois", account_id: "acc-1", amount: 25, created_at: "2026-11-09T17:00:00.000Z" }),
+      ],
+      [connection],
+      new Map([["acc-1", { balance: 800, at: "2026-11-09T16:00:00.000Z" }]]),
+    );
+    expect(accounts[0].balance).toBe(775);
+    expect(accounts[0].provisional_delta).toBe(-25);
+    expect(accounts[0].balance_override_at).toBe("2026-11-09T16:00:00.000Z");
+  });
+
+  it("saldo corrigido sem nenhuma notificação aparece igual ao digitado", () => {
+    const account = makeAccount({ id: "acc-1", balance: 1000, bank_connection_id: "conn-1", source: "pluggy" });
+    const { accounts } = applyProvisionalToBalances(
+      [account],
+      [],
+      [],
+      [connection],
+      new Map([["acc-1", { balance: 1234.56, at: "2026-11-09T16:00:00.000Z" }]]),
+    );
+    expect(accounts[0].balance).toBe(1234.56);
+    expect(accounts[0].provisional_delta).toBeUndefined();
+  });
+
+  it("quando o banco atualiza depois da correção, volta sozinho ao saldo oficial", () => {
+    const account = makeAccount({ id: "acc-1", balance: 1000, bank_connection_id: "conn-1", source: "pluggy" });
+    const { accounts } = applyProvisionalToBalances(
+      [account],
+      [],
+      [],
+      [connection],
+      // Correção feita ANTES do dado do banco (12:00): o banco já é mais novo.
+      new Map([["acc-1", { balance: 800, at: "2026-11-09T11:00:00.000Z" }]]),
+    );
+    expect(accounts[0].balance).toBe(1000);
+    expect(accounts[0].balance_override_at).toBeUndefined();
+  });
+
   it("compra no cartão aumenta a fatura estimada", () => {
     const card = makeCard({ id: "card-1", current_invoice: 200, bank_connection_id: "conn-1", source: "pluggy" });
     const { cards } = applyProvisionalToBalances([], [card], [provisional({ card_id: "card-1", amount: 45.9 })], [connection]);
