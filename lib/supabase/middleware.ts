@@ -10,6 +10,8 @@ const PUBLIC_PATHS = [
   "/api/push/action",
   // Notificações do banco vindas do celular (MacroDroid/Atalhos): token pessoal.
   "/api/ingest/notification",
+  // Widget do app Android: mesmo token pessoal.
+  "/api/ingest/widget",
   "/manifest.webmanifest",
   // Verificação do app Android (abre o site sem barra de endereço).
   "/.well-known",
