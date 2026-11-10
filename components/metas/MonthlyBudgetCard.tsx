@@ -7,6 +7,7 @@ import type { Transaction } from "@/lib/finance/types";
 import { SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatBRLInput, parseBRL } from "@/lib/ui/money";
+import { BudgetJar } from "@/components/metas/BudgetJar";
 
 const STATUS_BAR: Record<string, string> = {
   dentro: "bg-emerald-500",
@@ -144,6 +145,26 @@ export function MonthlyBudgetCard({
         </div>
       ) : (
         <div className="flex flex-col gap-4">
+          {progress.spendingLimit != null && progress.spendingLimit > 0 && (
+            <div className="flex items-center gap-4">
+              <BudgetJar remaining={Math.max(0, progress.spendingLimit - progress.spentThisMonth) / progress.spendingLimit} />
+              <div className="min-w-0">
+                <p className="text-xs text-zinc-500">Restam do orçamento</p>
+                <p className="text-2xl font-semibold tracking-tight text-white">
+                  {formatCurrency(Math.max(0, progress.spendingLimit - progress.spentThisMonth))}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  de {formatCurrency(progress.spendingLimit)} · {progress.daysInMonth - progress.daysElapsed}{" "}
+                  {progress.daysInMonth - progress.daysElapsed === 1 ? "dia" : "dias"} para acabar o mês
+                </p>
+                {progress.spentThisMonth > progress.spendingLimit && (
+                  <p className="mt-1 text-xs font-medium text-rose-300">
+                    Passou {formatCurrency(progress.spentThisMonth - progress.spendingLimit)} do limite
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           {progress.spendingLimit != null && (
             <div>
               <div className="flex items-center justify-between text-sm">

@@ -13,6 +13,7 @@ import { CATEGORIES } from "@/lib/finance/categories";
 import { formatBRLInput, parseBRL } from "@/lib/ui/money";
 import type { BillSide, MonthBill, MonthBillsSummary } from "@/lib/finance/month-bills";
 import type { FutureInstallment } from "@/lib/finance/card-installments";
+import { fireConfetti, vibrate } from "@/lib/ui/celebrate";
 
 const TONE_STYLE = {
   alerta: "border-rose-500/30 bg-rose-500/10 text-rose-200",
@@ -108,6 +109,10 @@ export default function ContasClient({
     setError(null);
     try {
       await sendJson("/api/contas/status", "POST", { kind: bill.kind, id: bill.id, dueDate: bill.dueDate, done: !bill.done });
+      vibrate(bill.done ? 8 : 18);
+      // Era a última conta a pagar do mês: comemora.
+      const pendingPagar = summary.pagar.filter((item) => !item.done);
+      if (!bill.done && bill.side === "pagar" && pendingPagar.length === 1 && pendingPagar[0].id === bill.id) fireConfetti();
       refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível marcar.");
