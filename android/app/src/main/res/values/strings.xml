@@ -7,5 +7,10 @@
     <string name="shortcut_status">Leitura dos bancos</string>
     <string name="shortcut_new_expense">Novo gasto</string>
     <string name="shortcut_statement">Extrato</string>
+    <string name="widget_label">Saldo · Meu Financeiro</string>
+    <string name="widget_description">Saldo em conta e gastos de hoje</string>
+    <string name="widget_balance_label">Saldo em conta</string>
+    <string name="widget_today_label">Gastos hoje</string>
+    <string name="widget_waiting">Abra o app e toque em Ativar neste celular</string>
     <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://meu-financeiro-ia.onrender.com\"}}]</string>
 </resources>

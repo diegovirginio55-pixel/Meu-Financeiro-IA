@@ -70,6 +70,30 @@ final class Prefs {
         return sp(context).getBoolean("listener_connected", false);
     }
 
+    static void saveWidgetData(Context context, double balance, double todaySpent) {
+        sp(context).edit()
+                .putString("widget_balance", Double.toString(balance))
+                .putString("widget_today", Double.toString(todaySpent))
+                .putLong("widget_at", System.currentTimeMillis())
+                .apply();
+    }
+
+    /** {saldo, gastos de hoje} ou null se ainda não buscou. */
+    static double[] widgetData(Context context) {
+        String balance = sp(context).getString("widget_balance", null);
+        String today = sp(context).getString("widget_today", null);
+        if (balance == null || today == null) return null;
+        try {
+            return new double[] {Double.parseDouble(balance), Double.parseDouble(today)};
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    static long widgetAt(Context context) {
+        return sp(context).getLong("widget_at", 0);
+    }
+
     /** true se este aviso ainda não foi encaminhado (o app do banco às vezes reposta o mesmo aviso). */
     static synchronized boolean markIfNew(Context context, String id) {
         String joined = sp(context).getString("recent_ids", "");

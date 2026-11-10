@@ -78,6 +78,7 @@ public class StatusActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        WidgetUpdateWorker.refreshNow(this);
         if (hasNotificationAccess()) {
             try {
                 NotificationListenerService.requestRebind(new ComponentName(this, BankNotificationListener.class));
@@ -94,6 +95,8 @@ public class StatusActivity extends Activity {
         String url = data.getQueryParameter("u");
         if (url != null && url.startsWith("https://") && url.contains("/api/ingest/notification") && url.contains("token=")) {
             Prefs.setEndpoint(this, url);
+            if (BalanceWidgetProvider.hasWidgets(this)) WidgetUpdateWorker.schedulePeriodic(this);
+            WidgetUpdateWorker.refreshNow(this);
             Toast.makeText(this, "Conectado à sua conta ✓", Toast.LENGTH_LONG).show();
         } else {
             Toast.makeText(this, "Link inválido. No site, toque em Ativar neste celular de novo.", Toast.LENGTH_LONG).show();
@@ -155,7 +158,9 @@ public class StatusActivity extends Activity {
         }
         addButton(actions, "Abrir Meu Financeiro", v -> openSite("/"));
 
-        addText("Bancos lidos: " + BankApps.NAMES + ". Avisos de outros apps nunca saem do celular.", 12, MUTED, false, 24);
+        addText("Widget: segure um espaço vazio da tela inicial → Widgets → Meu Financeiro, para ver o saldo e os "
+                + "gastos de hoje sem abrir o app.", 12, MUTED, false, 24);
+        addText("Bancos lidos: " + BankApps.NAMES + ". Avisos de outros apps nunca saem do celular.", 12, MUTED, false, 12);
     }
 
     private void sendTest() {

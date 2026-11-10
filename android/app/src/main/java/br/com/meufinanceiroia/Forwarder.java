@@ -116,6 +116,8 @@ final class Forwarder {
             String response = readAll(code >= 400 ? connection.getErrorStream() : connection.getInputStream());
             String summary = describe(code, response);
             Prefs.recordSend(context, summary);
+            // Movimentação registrada: o widget mostra o saldo novo.
+            if (code < 300) WidgetUpdateWorker.refreshNow(context);
             return new Outcome(code < 500, summary);
         } catch (IOException | RuntimeException e) {
             String summary = "Sem conexão com o servidor — o app tenta de novo sozinho.";
