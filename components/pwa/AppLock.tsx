@@ -8,6 +8,7 @@ import {
   enableLock,
   lockSupported,
   readLockConfig,
+  setLockCookie,
   unlockedThisSession,
   verifyUser,
 } from "@/lib/ui/app-lock";
@@ -44,12 +45,22 @@ function subscribe(listener: () => void) {
 }
 const serverFalse = () => false;
 
-/** Tela de bloqueio por cima do app (digital / Face ID / PIN do aparelho). */
-export function AppLock() {
+/**
+ * Porta do app: com o bloqueio ligado, NADA do app é montado (telas,
+ * gráficos, sincronização) até a pessoa desbloquear com a digital, o rosto
+ * ou o PIN/padrão do celular. O servidor já sabe pelo cookie que o bloqueio
+ * está ligado, então nem o HTML das telas sai antes do desbloqueio.
+ */
+export function LockGate({ enabled: serverEnabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const router = useRouter();
-  const isLocked = useSyncExternalStore(subscribe, readLocked, serverFalse);
+  const isLocked = useSyncExternalStore(subscribe, readLocked, () => serverEnabled);
   const [checking, setChecking] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  // Mantém o cookie igual ao que o aparelho tem (bloqueio ligado antes do cookie existir, ou dados apagados).
+  useEffect(() => {
+    setLockCookie(Boolean(readLockConfig()));
+  }, []);
 
   // Saiu do app por mais de 2 min: trava de novo ao voltar.
   useEffect(() => {
@@ -100,7 +111,7 @@ export function AppLock() {
     }
   }
 
-  if (!isLocked) return null;
+  if (!isLocked) return <>{children}</>;
 
   return (
     <div
@@ -113,7 +124,9 @@ export function AppLock() {
       <img src="/logo.png?v=2" alt="" width={72} height={72} className="h-18 w-18 rounded-3xl ring-1 ring-emerald-400/30" />
       <div>
         <p className="text-lg font-semibold text-white">Meu Financeiro bloqueado</p>
-        <p className="mt-1 text-sm text-zinc-400">Use a digital, o rosto ou o PIN do celular para ver o seu dinheiro.</p>
+        <p className="mt-1 text-sm text-zinc-400">
+          Use a digital, o rosto, o PIN ou o padrão do celular. O app só carrega depois do desbloqueio.
+        </p>
       </div>
       <button
         type="button"

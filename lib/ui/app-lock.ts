@@ -9,6 +9,18 @@
  * Fica só neste aparelho (localStorage): cada celular ativa o seu.
  */
 const CONFIG_KEY = "mf-app-lock-v1";
+/** Cookie lido pelo servidor: com o bloqueio ligado, o HTML das telas só sai depois do desbloqueio. */
+export const LOCK_COOKIE = "mf-app-lock";
+
+export function setLockCookie(on: boolean) {
+  try {
+    document.cookie = on
+      ? `${LOCK_COOKIE}=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure`
+      : `${LOCK_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+  } catch {
+    // ignore
+  }
+}
 const UNLOCKED_KEY = "mf-app-unlocked-at";
 /** Voltar ao app depois de 2 min fora pede a digital de novo. */
 export const RELOCK_AFTER_MS = 2 * 60 * 1000;
@@ -74,6 +86,7 @@ export async function enableLock(): Promise<void> {
   })) as PublicKeyCredential | null;
   if (!credential) throw new Error("cancelado");
   localStorage.setItem(CONFIG_KEY, JSON.stringify({ credentialId: toBase64Url(credential.rawId) } satisfies LockConfig));
+  setLockCookie(true);
   markUnlocked();
 }
 
@@ -83,6 +96,7 @@ export function disableLock() {
   } catch {
     // ignore
   }
+  setLockCookie(false);
 }
 
 /** Pede a digital/Face ID/PIN do aparelho. true = conferiu. */

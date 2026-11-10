@@ -6,7 +6,7 @@ import AutoBankSync from "@/components/bancos/AutoBankSync";
 import PrefetchTabs from "@/components/nav/PrefetchTabs";
 import SaveLastPath from "@/components/nav/SaveLastPath";
 import { PushEnable } from "@/components/pwa/PushEnable";
-import { AppLock } from "@/components/pwa/AppLock";
+import { LockGate } from "@/components/pwa/AppLock";
 import IntroSplash from "@/components/brand/IntroSplash";
 import { PhoneLayoutContext, usePhoneLayout } from "@/lib/ui/use-phone-layout";
 import { HideValuesContext } from "@/lib/ui/hide-values";
@@ -18,19 +18,24 @@ export default function AppChrome({
   children,
   initialPhone = false,
   initialHideValues = false,
+  lockEnabled = false,
 }: {
   children: React.ReactNode;
   /** Calculado no servidor pelo user-agent — o SSR já sai com o layout certo. */
   initialPhone?: boolean;
   /** Cookie "ocultar valores" lido no servidor — o SSR já sai mascarado. */
   initialHideValues?: boolean;
+  /** Cookie do bloqueio com digital: o app só monta depois do desbloqueio. */
+  lockEnabled?: boolean;
 }) {
   return (
     <PhoneLayoutContext value={initialPhone}>
       <HideValuesContext value={initialHideValues}>
-        <NotificationsProvider>
-          <ChromeLayout>{children}</ChromeLayout>
-        </NotificationsProvider>
+        <LockGate enabled={lockEnabled}>
+          <NotificationsProvider>
+            <ChromeLayout>{children}</ChromeLayout>
+          </NotificationsProvider>
+        </LockGate>
       </HideValuesContext>
     </PhoneLayoutContext>
   );
@@ -52,7 +57,6 @@ function ChromeLayout({ children }: { children: React.ReactNode }) {
       <PrefetchTabs />
       <AutoBankSync />
       <PushEnable />
-      <AppLock />
       <main
         className={
           phone

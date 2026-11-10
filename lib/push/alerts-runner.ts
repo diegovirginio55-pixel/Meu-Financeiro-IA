@@ -6,6 +6,7 @@ import { signPushAction } from "./actions";
 import type { PushPayload } from "./payload";
 import { billKey, computeBillRemindersForUser, type BillRef } from "@/lib/finance/bill-reminders";
 import { computeCategoryBudgetAlertsForUser } from "@/lib/finance/category-budgets-store";
+import { recapReminder } from "@/lib/finance/month-recap";
 
 const DAILY_BUDGET_PUSH_START_HOUR = 7;
 const DAILY_BUDGET_PUSH_END_HOUR = 10;
@@ -121,6 +122,7 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
         ...(summary ? [summary] : []),
         ...reminders,
         ...categoryAlerts,
+        ...(recapReminder(now) ? [recapReminder(now) as AlertCandidate] : []),
       ];
       for (const candidate of candidates) {
         if (candidate.kind === "daily_budget") {

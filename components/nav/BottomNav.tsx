@@ -87,10 +87,11 @@ function MenuIcon({ active }: { active?: boolean }) {
   );
 }
 
-const MENU_ROUTES = ["/contas", "/detalhes", "/bancos", "/fluxo", "/mes", "/metas"];
+const MENU_ROUTES = ["/contas", "/retrospectiva", "/detalhes", "/bancos", "/fluxo", "/mes", "/metas"];
 
 const MENU_ITEMS = [
   { href: "/contas", label: "Contas do mês", icon: "🗓️" },
+  { href: "/retrospectiva", label: "Retrospectiva", icon: "✨" },
   { href: "/detalhes", label: "Extrato", icon: "🧾" },
   { href: "/mes", label: "Meu mês", icon: "📊" },
   { href: "/metas", label: "Metas", icon: "🎯" },
