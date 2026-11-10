@@ -15,7 +15,28 @@ import { appendIngestLog } from "@/lib/ingest/log";
 const MAX_BODY_BYTES = 8 * 1024;
 const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
 
-type Body = { token?: unknown; app?: unknown; title?: unknown; text?: unknown; test?: unknown };
+const MAX_BACKDATE_MS = 3 * 24 * 60 * 60 * 1000;
+
+type Body = {
+  token?: unknown;
+  app?: unknown;
+  title?: unknown;
+  text?: unknown;
+  test?: unknown;
+  /** App Android: botão "Enviar teste" (só registra no log que a conexão funciona). */
+  ping?: unknown;
+  /** App Android: identificador do aviso — reenvios do mesmo aviso não duplicam. */
+  id?: unknown;
+  /** App Android: hora em que o aviso apareceu (ms) — um reenvio atrasado cai no dia certo. */
+  at?: unknown;
+};
+
+/** Hora do aviso informada pelo celular, se for plausível (até 3 dias atrás); senão, agora. */
+function noticeTime(value: unknown): Date {
+  const ms = typeof value === "number" ? value : Number(value);
+  const now = Date.now();
+  return Number.isFinite(ms) && ms > now - MAX_BACKDATE_MS && ms <= now + 5 * 60 * 1000 ? new Date(ms) : new Date(now);
+}
 
 function str(value: unknown, max = 1000): string {
   return typeof value === "string" ? value.slice(0, max) : "";
@@ -72,6 +93,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Token inválido. Gere um novo em Bancos → Saldo em tempo real." }, { status: 401 });
   }
 
+  if (body.ping === true || body.ping === "true") {
+    await appendIngestLog(userId, {
+      app: "App Android",
+      preview: "",
+      result: "teste",
+      detail: "Teste do app Android: conexão funcionando ✓",
+    });
+    return NextResponse.json({ ok: true, ping: true });
+  }
+
   const input = {
     app: withoutMagicText(str(body.app, 120)),
     title: withoutMagicText(str(body.title, 300)),
@@ -120,7 +151,7 @@ export async function POST(request: Request) {
     amount: parsed.amount,
     type: parsed.type,
     category,
-    date: saoPauloTodayKey(),
+    date: saoPauloTodayKey(noticeTime(body.at)),
     account_id: card ? null : (account?.id ?? null),
     card_id: card?.id ?? null,
     source: "manual" as const,
@@ -132,9 +163,16 @@ export async function POST(request: Request) {
   }
 
   // A mesma notificação repetida (o celular às vezes reenvia) não duplica.
+  // O app Android manda um id próprio do aviso, que vale mesmo num reenvio horas depois.
+  const clientId = str(body.id, 100).trim();
   const bucket = Math.floor(Date.now() / DEDUPE_WINDOW_MS);
   const fingerprint = createHash("sha256")
-    .update([userId, parsed.bank, parsed.type, parsed.amount, input.title, input.text, bucket].join("|"))
+    .update(
+      (clientId
+        ? [userId, "id", clientId]
+        : [userId, parsed.bank, parsed.type, parsed.amount, input.title, input.text, bucket]
+      ).join("|"),
+    )
     .digest("hex")
     .slice(0, 24);
   row.pluggy_transaction_id = `${PROVISIONAL_PREFIX}${fingerprint}`;

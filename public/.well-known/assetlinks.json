@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.meufinanceiroia",
+      "sha256_cert_fingerprints": [
+        "A1:2A:78:6B:2E:4C:4F:9C:30:B1:5E:69:C8:21:08:E5:3B:B6:B8:B8:88:26:C1:7B:F5:6D:9B:D2:16:CF:E6:26"
+      ]
+    }
+  }
+]

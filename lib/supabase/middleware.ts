@@ -11,6 +11,8 @@ const PUBLIC_PATHS = [
   // Notificações do banco vindas do celular (MacroDroid/Atalhos): token pessoal.
   "/api/ingest/notification",
   "/manifest.webmanifest",
+  // Verificação do app Android (abre o site sem barra de endereço).
+  "/.well-known",
   "/sw.js",
   "/opengraph-image",
   "/twitter-image",

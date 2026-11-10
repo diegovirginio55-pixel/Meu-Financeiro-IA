@@ -11,6 +11,23 @@ import type { IngestLogEntry } from "@/lib/ingest/log";
 /** Corpo do MacroDroid: os textos entre colchetes são trocados pelo MacroDroid ("texto mágico"). */
 const ANDROID_BODY = '{"app":"[app_name]","title":"[notification_title]","text":"[notification]"}';
 
+/** App Android (pasta android/): instalador publicado pelo GitHub Actions (.github/workflows/android.yml). */
+const ANDROID_PACKAGE = "br.com.meufinanceiroia";
+const ANDROID_APK_URL =
+  "https://github.com/diegovirginio55-pixel/Meu-Financeiro-IA/releases/download/android-latest/meu-financeiro.apk";
+
+/**
+ * Link que abre a tela "Leitura dos bancos" do app Android já com o link
+ * pessoal. Sem o app instalado, o Chrome cai no download do instalador.
+ */
+function androidActivationLink(ingestUrl: string): string {
+  return (
+    `intent://setup?u=${encodeURIComponent(ingestUrl)}` +
+    `#Intent;scheme=meufinanceiro;package=${ANDROID_PACKAGE};` +
+    `S.browser_fallback_url=${encodeURIComponent(ANDROID_APK_URL)};end`
+  );
+}
+
 type TestResult =
   | { ok: true; ignored: string }
   | { ok: true; test: true; wouldRegister: { description: string; amount: number; type: string; category: string; bank: string | null } }
@@ -97,6 +114,7 @@ export default function RealTimeSetupClient({
   }, [router]);
 
   const url = token ? `${endpoint}?token=${token}` : "";
+  const activationLink = url ? androidActivationLink(url) : "";
 
   async function rotate() {
     if (!confirm("Gerar um link novo? O link antigo para de funcionar e você precisará colar o novo no celular.")) return;
@@ -193,9 +211,62 @@ export default function RealTimeSetupClient({
         </div>
 
         {platform === "android" ? (
+          <>
           <SoftPanel className="flex flex-col gap-4 p-4">
-            <SectionLabel>2. Android — MacroDroid (grátis)</SectionLabel>
+            <SectionLabel>2. Android — app Meu Financeiro (recomendado)</SectionLabel>
+            <p className="text-sm leading-relaxed text-zinc-400">
+              A versão Android do Meu Financeiro lê sozinha os avisos dos apps dos bancos, sem MacroDroid. Ela abre este
+              mesmo site, com o mesmo login, e substitui o app instalado pelo navegador.
+            </p>
             <ol className="flex flex-col gap-4">
+              <Step n={1}>
+                Baixe e instale o app. Como ele não vem da Play Store, o Android pede para{" "}
+                <strong>permitir instalar apps desta fonte</strong> e pode mostrar um aviso do Play Protect — toque em{" "}
+                <strong>Instalar mesmo assim</strong>.
+                <div className="mt-2">
+                  <a
+                    href={ANDROID_APK_URL}
+                    className="inline-block rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+                  >
+                    Baixar o app (APK)
+                  </a>
+                </div>
+              </Step>
+              <Step n={2}>
+                Abra o <strong>Meu Financeiro</strong> pelo ícone novo, entre nesta tela (Bancos → Saldo em tempo real) e
+                toque em <strong>Ativar neste celular</strong>. Abre a tela “Leitura dos bancos” já ligada à sua conta.
+                <div className="mt-2">
+                  {activationLink ? (
+                    <a
+                      href={activationLink}
+                      className="inline-block rounded-full border border-emerald-500/60 px-4 py-2 text-sm font-medium text-emerald-200 hover:bg-emerald-500/10"
+                    >
+                      Ativar neste celular
+                    </a>
+                  ) : (
+                    <span className="text-xs text-amber-300">Recarregue a página para gerar o seu link.</span>
+                  )}
+                </div>
+              </Step>
+              <Step n={3}>
+                Em “Leitura dos bancos”, toque em <strong>Liberar acesso</strong> e ligue o Meu Financeiro em “Acesso às
+                notificações”. Se a opção estiver cinza (Android 13 ou mais novo): toque em{" "}
+                <strong>Abrir informações do app</strong> → <strong>⋮</strong> (canto de cima) →{" "}
+                <strong>Permitir configurações restritas</strong> e tente de novo.
+              </Step>
+              <Step n={4}>
+                Ainda lá, toque em <strong>Liberar</strong> na linha da bateria e depois em <strong>Enviar teste</strong>{" "}
+                — em segundos aparece “teste” na lista abaixo.
+              </Step>
+              <Step n={5}>
+                Pronto: pode desinstalar o Meu Financeiro instalado pelo navegador (e o MacroDroid, se tiver
+                configurado). Para conferir depois, segure o ícone do app → <strong>Leitura dos bancos</strong>.
+              </Step>
+            </ol>
+          </SoftPanel>
+          <details className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+            <summary className="cursor-pointer text-sm font-medium text-zinc-300">Outra opção: MacroDroid</summary>
+            <ol className="mt-4 flex flex-col gap-4">
               <Step n={1}>
                 Instale o <strong>MacroDroid</strong> pela Play Store e abra. A versão grátis permite 5 automações; esta
                 usa só 1.
@@ -236,7 +307,8 @@ export default function RealTimeSetupClient({
                 compra ou Pix real aparece como <strong>registrado</strong>.
               </Step>
             </ol>
-          </SoftPanel>
+          </details>
+          </>
         ) : (
           <SoftPanel className="flex flex-col gap-4 p-4">
             <SectionLabel>2. iPhone — Atalhos (já vem instalado)</SectionLabel>
