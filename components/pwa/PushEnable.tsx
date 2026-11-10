@@ -46,6 +46,25 @@ async function subscribePush() {
   if (!save.ok) throw new Error("save");
 }
 
+const STEP_TIMEOUT_MS = 30_000;
+
+/** O pedido de permissão pode nunca responder (ex.: app Android sem a tela de permissão): não deixa o botão girando. */
+function withTimeout<T>(promise: Promise<T>, ms = STEP_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function pushSupported() {
   return "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
 }
@@ -84,16 +103,20 @@ export function PushEnable() {
     setBusy(true);
     setHint("");
     try {
-      const permission = await Notification.requestPermission();
+      const permission = await withTimeout(Notification.requestPermission());
       if (permission !== "granted") {
-        setHint("Permissão negada. Você pode ativar depois nas configurações do navegador.");
+        setHint("Permissão negada. Ative em Configurações → Apps → Meu Financeiro → Notificações.");
         setBusy(false);
         return;
       }
-      await subscribePush();
+      await withTimeout(subscribePush());
       setClosed(true);
-    } catch {
-      setHint("Não deu para ativar agora. Instale o app e tente de novo.");
+    } catch (error) {
+      setHint(
+        error instanceof Error && error.message === "timeout"
+          ? "O celular não respondeu. Ative em Configurações → Apps → Meu Financeiro → Notificações e abra o app de novo."
+          : "Não deu para ativar agora. Instale o app e tente de novo.",
+      );
     } finally {
       setBusy(false);
     }
