@@ -21,6 +21,7 @@ import { useConnectionFilter } from "@/lib/ui/use-persisted-state";
 import { useHideValues } from "@/lib/ui/hide-values";
 import { CronHealthBanner } from "@/components/ui/CronHealthBanner";
 import { StickyBalanceBar } from "@/components/ui/StickyBalanceBar";
+import { BalanceSparkline } from "@/components/home/BalanceSparkline";
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
@@ -246,6 +247,7 @@ export default function BankHome({
             <div className="mt-4">
               <BalanceViewToggle value={balanceView} onChange={setBalanceView} />
             </div>
+            <BalanceSparkline connectionId={connectionId} currentBalance={saldoConta} todayKey={todayKey} hidden={hidden} />
             <Link href={correctHref} className="mt-3 inline-block text-xs text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline">
               Saldo diferente do app do banco? Corrigir
             </Link>
@@ -280,6 +282,31 @@ export default function BankHome({
                 );
               })}
             </div>
+
+            {connectionId === "all" && connections.length > 1 && (
+              <ul className="mt-4 divide-y divide-zinc-800/80 rounded-2xl bg-zinc-900/60 ring-1 ring-zinc-800" aria-label="Saldo por banco">
+                {connections.map((connection) => {
+                  const name = officialInstitutionName(connection.institution_name);
+                  const inAccounts = connection.accounts.reduce((sum, item) => sum + Number(item.balance), 0);
+                  const inInvestments = connection.investments.reduce((sum, item) => sum + Number(item.amount), 0);
+                  const value = balanceView === "total" ? inAccounts + inInvestments : inAccounts;
+                  return (
+                    <li key={connection.id}>
+                      <button
+                        type="button"
+                        onClick={() => setConnectionId(connection.id)}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
+                      >
+                        <BankLogo name={name} imageUrl={connection.institution_image_url} size="sm" />
+                        <span className="min-w-0 flex-1 truncate text-sm text-zinc-300">{shortBankName(name)}</span>
+                        <span className="text-sm font-medium text-white">{money(hidden, value)}</span>
+                        <span aria-hidden className="text-zinc-600">›</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
 
           <div className="mt-7 lg:mt-0">

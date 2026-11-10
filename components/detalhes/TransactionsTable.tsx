@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatCurrency, formatDate } from "@/lib/finance/format";
 import { CATEGORIES, CATEGORY_ICONS } from "@/lib/finance/categories";
+import { MerchantAvatar } from "@/components/ui/MerchantAvatar";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
 import { accountBankLabel, cardBankLabel } from "@/lib/finance/account-name";
 import { usePhoneLayout } from "@/lib/ui/use-phone-layout";
@@ -193,6 +194,7 @@ export default function TransactionsTable({
                         className="mt-1 h-4 w-4 shrink-0 rounded border-zinc-700 bg-zinc-900 accent-emerald-500"
                       />
                     )}
+                    <MerchantAvatar description={t.description} category={t.category} size={34} />
                     <button type="button" onClick={() => startEdit(t)} className="min-w-0 text-left">
                       <span className="block truncate text-sm text-zinc-100">{t.description}</span>
                       <span className="text-xs text-zinc-500">
@@ -286,10 +288,13 @@ export default function TransactionsTable({
                       className="w-40 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-zinc-200"
                     />
                   ) : (
-                    <>
-                      {t.description}
-                      {isProvisional(t) && <ProvisionalTag />}
-                    </>
+                    <span className="flex items-center gap-2.5">
+                      <MerchantAvatar description={t.description} category={t.category} size={28} />
+                      <span>
+                        {t.description}
+                        {isProvisional(t) && <ProvisionalTag />}
+                      </span>
+                    </span>
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-zinc-300">
