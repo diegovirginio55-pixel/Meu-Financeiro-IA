@@ -6,6 +6,7 @@ import AutoBankSync from "@/components/bancos/AutoBankSync";
 import PrefetchTabs from "@/components/nav/PrefetchTabs";
 import SaveLastPath from "@/components/nav/SaveLastPath";
 import { PushEnable } from "@/components/pwa/PushEnable";
+import { AppLock } from "@/components/pwa/AppLock";
 import IntroSplash from "@/components/brand/IntroSplash";
 import { PhoneLayoutContext, usePhoneLayout } from "@/lib/ui/use-phone-layout";
 import { HideValuesContext } from "@/lib/ui/hide-values";
@@ -51,6 +52,7 @@ function ChromeLayout({ children }: { children: React.ReactNode }) {
       <PrefetchTabs />
       <AutoBankSync />
       <PushEnable />
+      <AppLock />
       <main
         className={
           phone

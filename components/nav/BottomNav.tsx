@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/lib/ui/logout";
 import { InstallAppButton } from "@/components/pwa/PwaInstall";
+import { AppLockToggle } from "@/components/pwa/AppLock";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { isActivePath, useOptimisticPath } from "@/lib/ui/use-optimistic-path";
@@ -177,6 +178,7 @@ export default function BottomNav() {
               ))}
               <NotificationBell variant="menu" onNavigate={() => closeMenu()} />
               <ThemeToggle variant="menu" />
+              <AppLockToggle />
               <InstallAppButton variant="menu" />
               <button
                 type="button"
