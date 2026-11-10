@@ -12,6 +12,7 @@ import { formatCurrency } from "@/lib/finance/format";
 import { CATEGORIES } from "@/lib/finance/categories";
 import { formatBRLInput, parseBRL } from "@/lib/ui/money";
 import type { BillSide, MonthBill, MonthBillsSummary } from "@/lib/finance/month-bills";
+import type { FutureInstallment } from "@/lib/finance/card-installments";
 
 const TONE_STYLE = {
   alerta: "border-rose-500/30 bg-rose-500/10 text-rose-200",
@@ -81,12 +82,14 @@ export default function ContasClient({
   summary,
   accountBalance,
   todayKey,
+  installmentsAhead = [],
   prevMonth,
   nextMonth,
 }: {
   summary: MonthBillsSummary;
   accountBalance: number;
   todayKey: string;
+  installmentsAhead?: { monthKey: string; total: number; items: FutureInstallment[] }[];
   prevMonth: string | null;
   nextMonth: string | null;
 }) {
@@ -267,6 +270,38 @@ export default function ContasClient({
             </section>
           );
         })}
+
+        {installmentsAhead.length > 0 && (
+          <section aria-label="Parcelas do cartão nos próximos meses">
+            <SectionLabel>Parcelas do cartão nos próximos meses</SectionLabel>
+            <SoftPanel className="divide-y divide-zinc-800/80">
+              {installmentsAhead.map((month) => (
+                <details key={month.monthKey} className="group px-3.5 py-3">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm">
+                    <span className="text-zinc-200">{monthTitle(month.monthKey)}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-medium text-rose-200">{formatCurrency(month.total)}</span>
+                      <span aria-hidden className="text-zinc-500 transition group-open:rotate-90">›</span>
+                    </span>
+                  </summary>
+                  <ul className="mt-2 flex flex-col gap-1 text-xs text-zinc-400">
+                    {month.items.map((item) => (
+                      <li key={`${item.description}-${item.number}`} className="flex justify-between gap-3">
+                        <span className="truncate">
+                          {item.description} · {item.number}/{item.total}
+                        </span>
+                        <span>{formatCurrency(item.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ))}
+            </SoftPanel>
+            <p className="mt-2 text-[11px] text-zinc-500">
+              Já comprometido com compras parceladas — o resto da fatura depende do que você ainda vai gastar.
+            </p>
+          </section>
+        )}
 
         <p className="text-xs leading-relaxed text-zinc-500">
           🔔 Você recebe um aviso na véspera e no dia de cada vencimento (e no dia em que o dinheiro deve cair), com o

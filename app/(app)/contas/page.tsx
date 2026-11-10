@@ -5,6 +5,8 @@ import { buildMonthBills, billPaymentKey } from "@/lib/finance/month-bills";
 import { saoPauloMonthKey, saoPauloTodayKey, shiftMonthKey } from "@/lib/finance/fluxo";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import type { BillKind } from "@/lib/finance/bill-reminders";
+import { installmentsByMonth } from "@/lib/finance/card-installments";
+import { loadCardInstallments } from "@/lib/finance/card-installments-store";
 import type { Card, Debt, RecurringItem, Transaction } from "@/lib/finance/types";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,14 @@ export default async function ContasPage({ searchParams }: { searchParams: Promi
     getBankConnectionsWithAssets(supabase),
   ]);
 
+  const cards = (cardsRes.data ?? []) as Card[];
+  const cardInstallments = await loadCardInstallments(cards.map((card) => card.id));
+  const installmentsAhead = installmentsByMonth(
+    Array.from(cardInstallments.values()).flat(),
+    currentMonth,
+    6,
+  ).filter((month) => month.total > 0);
+
   const paidKeys = new Set(
     (paymentsRes.data ?? []).map((row) => billPaymentKey(row.kind as BillKind, row.ref_id as string, row.due_date as string)),
   );
@@ -62,10 +72,11 @@ export default async function ContasPage({ searchParams }: { searchParams: Promi
     todayKey,
     recurring: (recurringRes.data ?? []) as RecurringItem[],
     debts: (debtsRes.data ?? []) as Debt[],
-    cards: (cardsRes.data ?? []) as Card[],
+    cards,
     paidKeys,
     transactions: txRes.data,
     accountBalance,
+    cardInstallments,
   });
 
   return (
@@ -73,6 +84,7 @@ export default async function ContasPage({ searchParams }: { searchParams: Promi
       summary={summary}
       accountBalance={accountBalance}
       todayKey={todayKey}
+      installmentsAhead={installmentsAhead}
       prevMonth={shiftMonthKey(monthKey, -1) >= shiftMonthKey(currentMonth, -3) ? shiftMonthKey(monthKey, -1) : null}
       nextMonth={shiftMonthKey(monthKey, 1) <= shiftMonthKey(currentMonth, 3) ? shiftMonthKey(monthKey, 1) : null}
     />

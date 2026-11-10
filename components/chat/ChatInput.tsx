@@ -11,6 +11,24 @@ function pickMimeType() {
   return types.find((type) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) ?? "";
 }
 
+/** Foto do celular tem 4–8 MB: reduz para ~1600 px em JPEG antes de enviar (cai para o original se não der). */
+async function shrinkImage(file: File): Promise<Blob> {
+  if (file.size < 900_000) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    return blob ?? file;
+  } catch {
+    return file;
+  }
+}
+
 function formatTimer(seconds: number) {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -34,6 +52,7 @@ export default function ChatInput({
   const [value, setValue] = useState(initialValue ?? "");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [reading, setReading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
 
@@ -44,8 +63,9 @@ export default function ChatInput({
   const timerRef = useRef<number | null>(null);
   const elapsedRef = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const busy = disabled || transcribing;
+  const busy = disabled || transcribing || reading;
   const hasText = value.trim().length > 0;
 
   useEffect(() => {
@@ -175,6 +195,32 @@ export default function ChatInput({
     }
   }
 
+  /** Foto do comprovante → frase pronta no campo ("Gastei R$ 45,90 em IFOOD hoje…"); o usuário confere e envia. */
+  async function readReceipt(file: File) {
+    setReading(true);
+    setError("");
+    try {
+      const image = await shrinkImage(file);
+      const form = new FormData();
+      form.append("image", image, image === file ? file.name : "comprovante.jpg");
+      const res = await fetch("/api/chat/receipt", { method: "POST", body: form });
+      const data: { text?: string; error?: string; quota?: ChatQuotaView } = await res.json().catch(() => ({}));
+      if (data.quota) onQuota?.(data.quota);
+      const text = (data.text ?? "").trim();
+      if (!res.ok || !text) {
+        setError(data.error || "Não deu para ler a foto. Tente de novo.");
+        return;
+      }
+      setValue(text);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    } catch {
+      setError("Não foi possível ler a foto. Tente de novo.");
+    } finally {
+      setReading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   function handleAction() {
     if (recording) {
       finishRecording();
@@ -210,12 +256,14 @@ export default function ChatInput({
                 <CloseIcon />
               </button>
             </>
-          ) : transcribing ? (
+          ) : transcribing || reading ? (
             <>
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-zinc-950">
                 ✦
               </span>
-              <p className="flex-1 text-sm text-zinc-400">Passando o áudio para texto…</p>
+              <p className="flex-1 text-sm text-zinc-400">
+                {reading ? "Lendo o comprovante…" : "Passando o áudio para texto…"}
+              </p>
             </>
           ) : (
             <>
@@ -232,9 +280,31 @@ export default function ChatInput({
                 disabled={busy}
                 className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
               />
+              {!hasText && (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={busy || locked}
+                  aria-label="Lançar por foto do comprovante"
+                  title="Foto do comprovante"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-800 hover:text-white disabled:opacity-40"
+                >
+                  <CameraIcon />
+                </button>
+              )}
             </>
           )}
         </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void readReceipt(file);
+          }}
+        />
 
         <button
           type="button"
@@ -270,6 +340,20 @@ function MicIcon() {
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
       <rect x="9" y="3.5" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.8" />
       <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CameraIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+      <path
+        d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.4-2h6.2l1.4 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-9Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="13" r="3.4" stroke="currentColor" strokeWidth="1.7" />
     </svg>
   );
 }

@@ -135,6 +135,15 @@ export type PluggyTransaction = {
   type: string;
   category?: string | null;
   date: string;
+  status?: string;
+  /** Só em cartão: parcela N de M e mês da fatura (lib/finance/card-installments.ts). */
+  creditCardMetadata?: {
+    installmentNumber?: number | null;
+    totalInstallments?: number | null;
+    totalAmount?: number | null;
+    purchaseDate?: string | null;
+    billForecastDate?: string | null;
+  } | null;
 };
 
 export type PluggyInvestment = {

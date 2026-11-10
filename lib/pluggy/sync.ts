@@ -15,7 +15,9 @@ import {
 } from "./institution";
 import { notifyBankMovements } from "@/lib/push/send";
 import { isRecentMovementDate, recentMovements, type MovementNotice } from "@/lib/push/payload";
-import { daysAgoKey, toSaoPauloDateOnly } from "@/lib/finance/fluxo";
+import { daysAgoKey, saoPauloMonthKey, toSaoPauloDateOnly } from "@/lib/finance/fluxo";
+import { futureInstallments } from "@/lib/finance/card-installments";
+import { saveCardInstallments } from "@/lib/finance/card-installments-store";
 import { isMissingSchemaError } from "@/lib/supabase/schema-compat";
 import { cleanupStaleProvisional, reconcileProvisional } from "@/lib/ingest/provisional";
 
@@ -152,6 +154,8 @@ async function syncTransactionsForAccount(
   cardId: string | null,
 ): Promise<MovementNotice[]> {
   const transactions = await pluggyApi.fetchAllTransactions(pluggyAccountId, daysAgoKey(TRANSACTIONS_LOOKBACK_DAYS));
+  // Cartão: guarda as parcelas que vão cair nas próximas faturas (não interrompe a sincronização se falhar).
+  if (cardId) await saveCardInstallments(cardId, futureInstallments(transactions, saoPauloMonthKey()));
   if (transactions.length === 0) return [];
 
   const ids = transactions.map((item) => item.id);

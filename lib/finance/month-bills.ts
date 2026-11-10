@@ -1,5 +1,6 @@
 import type { Card, Debt, RecurringItem, Transaction } from "./types";
 import type { BillKind } from "./bill-reminders";
+import type { FutureInstallment } from "./card-installments";
 import { clampDayToMonth } from "./fluxo";
 import { isCardBillPayment } from "./categories";
 import { formatCurrency } from "./format";
@@ -96,6 +97,7 @@ export function buildMonthBills({
   paidKeys,
   transactions = [],
   accountBalance = 0,
+  cardInstallments = new Map(),
 }: {
   monthKey: string;
   todayKey: string;
@@ -106,8 +108,11 @@ export function buildMonthBills({
   /** Lançamentos perto do mês (para achar no extrato o que já foi pago/recebido). */
   transactions?: Transaction[];
   accountBalance?: number;
+  /** Parcelas futuras por cartão: nos meses seguintes, a fatura conhecida é a soma delas. */
+  cardInstallments?: ReadonlyMap<string, FutureInstallment[]>;
 }): MonthBillsSummary {
   const isCurrentMonth = todayKey.startsWith(monthKey);
+  const isFutureMonth = monthKey > todayKey.slice(0, 7);
   const monthStart = `${monthKey}-01`;
   const bills: MonthBill[] = [];
 
@@ -153,8 +158,12 @@ export function buildMonthBills({
   }
 
   for (const card of cards) {
-    const invoice = Number(card.current_invoice) || 0;
     if (!card.due_day) continue;
+    // Mês que vem em diante: só se sabe o que já está parcelado; o resto ainda vai ser gasto.
+    const installments = (cardInstallments.get(card.id) ?? []).filter((item) => item.monthKey === monthKey);
+    const invoice = isFutureMonth
+      ? round(installments.reduce((sum, item) => sum + item.amount, 0))
+      : Number(card.current_invoice) || 0;
     const dueDate = dueDateInMonth(monthKey, card.due_day);
     const done = paidKeys.has(billPaymentKey("card", card.id, dueDate));
     if (invoice <= 0 && !done) continue;
@@ -162,7 +171,7 @@ export function buildMonthBills({
       kind: "card",
       id: card.id,
       side: "pagar",
-      description: `Fatura ${card.name}`,
+      description: isFutureMonth ? `Fatura ${card.name} · parcelas já compradas` : `Fatura ${card.name}`,
       amount: invoice,
       category: "Cartão",
       dueDate,

@@ -5,6 +5,7 @@ import { sendPushToUser } from "./send";
 import { signPushAction } from "./actions";
 import type { PushPayload } from "./payload";
 import { billKey, computeBillRemindersForUser, type BillRef } from "@/lib/finance/bill-reminders";
+import { computeCategoryBudgetAlertsForUser } from "@/lib/finance/category-budgets-store";
 
 const DAILY_BUDGET_PUSH_START_HOUR = 7;
 const DAILY_BUDGET_PUSH_END_HOUR = 10;
@@ -111,10 +112,15 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
       const alerts = await computeSmartAlerts(supabase, userId);
       const summary = await computeWeeklySummary(supabase, userId);
       const { reminders, paidKeys } = await computeBillRemindersForUser(supabase, userId, now);
+      const categoryAlerts = await computeCategoryBudgetAlertsForUser(supabase, userId, now).catch((error) => {
+        console.error("Erro ao calcular limites por categoria:", error);
+        return [];
+      });
       const candidates: (AlertCandidate & { bill?: BillRef; income?: boolean })[] = [
         ...alerts.map((alert) => withCardBill(alert)),
         ...(summary ? [summary] : []),
         ...reminders,
+        ...categoryAlerts,
       ];
       for (const candidate of candidates) {
         if (candidate.kind === "daily_budget") {

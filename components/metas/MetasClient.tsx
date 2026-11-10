@@ -7,6 +7,8 @@ import type { MonthlyBudget } from "@/lib/finance/budget";
 import type { Goal, Transaction } from "@/lib/finance/types";
 import { PageHero, PageShell, SectionLabel, SoftPanel } from "@/components/ui/page-chrome";
 import { MonthlyBudgetCard } from "@/components/metas/MonthlyBudgetCard";
+import { CategoryBudgetsCard } from "@/components/metas/CategoryBudgetsCard";
+import type { CategoryLimits } from "@/lib/finance/category-budgets";
 import { GoalContributionForm } from "@/components/metas/GoalContributionForm";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatBRLInput, parseBRL } from "@/lib/ui/money";
@@ -242,10 +244,12 @@ export default function MetasClient({
   initialGoals,
   historyTx,
   initialBudget,
+  initialCategoryLimits = {},
 }: {
   initialGoals: Goal[];
   historyTx: Transaction[];
   initialBudget: MonthlyBudget | null;
+  initialCategoryLimits?: CategoryLimits;
 }) {
   const formId = useId();
   const [goals, setGoals] = useState(initialGoals);
@@ -309,6 +313,7 @@ export default function MetasClient({
 
       <div className="flex flex-col gap-6 px-4 pb-2 lg:px-6 xl:px-10 2xl:px-14">
         <MonthlyBudgetCard historyTx={historyTx} initialBudget={initialBudget} />
+        <CategoryBudgetsCard initialLimits={initialCategoryLimits} historyTx={historyTx} />
 
         {suggestion > 0 && (
           <SoftPanel className="border-emerald-800/50 bg-emerald-950/15 p-4">

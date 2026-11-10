@@ -415,14 +415,35 @@ export function computeWeeklySummaryFromData({
   if (weekTx.length === 0) return null;
 
   const entradas = weekTx.filter(isRenda).reduce((s, t) => s + Number(t.amount), 0);
-  const saidas = weekTx.filter(isGasto).reduce((s, t) => s + Number(t.amount), 0);
-  const saldo = entradas - saidas;
+  const gastos = weekTx.filter(isGasto);
+  const saidas = gastos.reduce((s, t) => s + Number(t.amount), 0);
+
+  // Comparação com a semana anterior a essa e a categoria que mais pesou.
+  const before = new Date(`${from}T12:00:00`);
+  before.setDate(before.getDate() - 7);
+  const beforeFrom = before.toISOString().slice(0, 10);
+  const beforeGastos = tx
+    .filter((t) => t.date >= beforeFrom && t.date < from && isGasto(t))
+    .reduce((s, t) => s + Number(t.amount), 0);
+  const byCategory = new Map<string, number>();
+  for (const t of gastos) byCategory.set(t.category, (byCategory.get(t.category) ?? 0) + Number(t.amount));
+  const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];
+
+  const parts = [`Você gastou ${formatCurrency(saidas)}`];
+  if (beforeGastos > 0 && saidas > 0) {
+    const change = (saidas - beforeGastos) / beforeGastos;
+    if (Math.abs(change) >= 0.05) {
+      parts[0] += ` (${Math.round(Math.abs(change) * 100)}% ${change > 0 ? "a mais" : "a menos"} que na semana anterior)`;
+    }
+  }
+  if (top && saidas > 0) parts.push(`mais em ${top[0]}: ${formatCurrency(top[1])}`);
+  if (entradas > 0) parts.push(`entrou ${formatCurrency(entradas)}`);
 
   return {
     kind: "weekly_summary",
     refKey: from,
     title: "Resumo da semana 📊",
-    body: `Entrou ${formatCurrency(entradas)}, saiu ${formatCurrency(saidas)} · saldo da semana: ${formatCurrency(saldo)}`,
+    body: parts.join(" · "),
     url: "/visao",
   };
 }
@@ -440,8 +461,9 @@ export async function computeWeeklySummary(
   if (weekday !== "Mon") return null;
 
   const currentWeekStart = saoPauloWeekStartKey(now);
+  // Duas semanas: a que terminou (o resumo) e a anterior (para comparar).
   const previousWeekStart = new Date(`${currentWeekStart}T12:00:00`);
-  previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+  previousWeekStart.setDate(previousWeekStart.getDate() - 14);
   const from = previousWeekStart.toISOString().slice(0, 10);
   const to = new Date(`${currentWeekStart}T12:00:00`);
   to.setDate(to.getDate() - 1);
