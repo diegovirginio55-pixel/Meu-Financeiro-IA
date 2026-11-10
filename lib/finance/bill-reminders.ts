@@ -9,7 +9,8 @@ export type BillKind = "recurring" | "debt" | "card";
 
 export type BillRef = { kind: BillKind; id: string; dueDate: string };
 
-export type BillReminder = AlertCandidate & { bill: BillRef };
+/** income: dinheiro a receber (salário…) — o botão vira "Já recebi". */
+export type BillReminder = AlertCandidate & { bill: BillRef; income?: boolean };
 
 export function billKey(ref: BillRef): string {
   return `${ref.kind}:${ref.id}:${ref.dueDate}`;
@@ -47,15 +48,30 @@ export function computeBillReminders({
       refKey: `${billKey(bill)}:${isToday ? "hoje" : "vespera"}`,
       title: isToday ? "Conta vence hoje 📅" : "Conta vence amanhã 📅",
       body: `${description} · ${formatCurrency(amount)}`,
-      url: "/mes",
+      url: "/contas",
       bill,
     });
   }
 
   for (const item of recurring) {
-    if (!item.active || item.type !== "saida") continue;
+    if (!item.active) continue;
     const dueDate = nextMonthlyOccurrenceKey(Math.max(1, item.day_of_month), today);
-    remind({ kind: "recurring", id: item.id, dueDate }, item.description, Number(item.amount));
+    if (item.type === "saida") {
+      remind({ kind: "recurring", id: item.id, dueDate }, item.description, Number(item.amount));
+      continue;
+    }
+    // A receber (salário…): só no dia, para conferir se caiu.
+    const bill: BillRef = { kind: "recurring", id: item.id, dueDate };
+    if (dueDate !== today || paidKeys.has(billKey(bill))) continue;
+    reminders.push({
+      kind: "bill_due",
+      refKey: `${billKey(bill)}:receber`,
+      title: "Dinheiro previsto para hoje 💰",
+      body: `${item.description} · ${formatCurrency(Number(item.amount))} — já caiu? Marque como recebido.`,
+      url: "/contas",
+      bill,
+      income: true,
+    });
   }
 
   for (const debt of debts) {

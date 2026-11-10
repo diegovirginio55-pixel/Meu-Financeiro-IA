@@ -12,6 +12,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const TABS = [
   { href: "/dashboard", label: "Início", icon: "🏠" },
+  { href: "/contas", label: "Contas", icon: "🗓️" },
   { href: "/mes", label: "Meu mês", icon: "📊" },
   { href: "/visao", label: "Dashboard", icon: "📈" },
   { href: "/detalhes", label: "Extrato", icon: "🧾" },

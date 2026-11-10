@@ -111,7 +111,7 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
       const alerts = await computeSmartAlerts(supabase, userId);
       const summary = await computeWeeklySummary(supabase, userId);
       const { reminders, paidKeys } = await computeBillRemindersForUser(supabase, userId, now);
-      const candidates: (AlertCandidate & { bill?: BillRef })[] = [
+      const candidates: (AlertCandidate & { bill?: BillRef; income?: boolean })[] = [
         ...alerts.map((alert) => withCardBill(alert)),
         ...(summary ? [summary] : []),
         ...reminders,
@@ -124,7 +124,7 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
         }
         // Fatura já marcada como paga: não avisa mais.
         if (candidate.bill && paidKeys.has(billKey(candidate.bill))) continue;
-        const extras = candidate.bill ? billActionExtras(userId, candidate.bill) : {};
+        const extras = candidate.bill ? billActionExtras(userId, candidate.bill, candidate.income) : {};
         // A central de notificações guarda o mesmo link (tela com o botão "Já paguei").
         const stored = extras.url ? { ...candidate, url: extras.url } : candidate;
         if (await dispatch(supabase, userId, stored, extras)) sent += 1;
@@ -148,11 +148,11 @@ function withCardBill(alert: AlertCandidate): AlertCandidate & { bill?: BillRef 
  * Botão "Já paguei" (Android) e, ao tocar na notificação, a tela /lembrete
  * com o mesmo botão (iPhone não mostra botões em notificações de PWA).
  */
-function billActionExtras(userId: string, bill: BillRef): Partial<PushPayload> {
+function billActionExtras(userId: string, bill: BillRef, income = false): Partial<PushPayload> {
   const token = signPushAction({ k: "bill", u: userId, b: bill.kind, r: bill.id, d: bill.dueDate });
   if (!token) return {};
   return {
-    actions: [{ action: "paid", title: "✅ Já paguei" }],
+    actions: [{ action: "paid", title: income ? "✅ Já recebi" : "✅ Já paguei" }],
     actionToken: token,
     url: `/lembrete?t=${encodeURIComponent(token)}`,
   };

@@ -389,6 +389,19 @@ export default function BankHome({
             até {dailyUntilLabel} · {dailyBudget.days} {dailyBudget.days === 1 ? "dia" : "dias"} · saldo em conta
           </p>
         </article>
+        <Link
+          href="/contas"
+          className="col-span-2 flex items-center gap-3 rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4 lg:col-span-1"
+        >
+          <span aria-hidden className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 text-xl">
+            🗓️
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-white">Contas do mês</span>
+            <span className="block text-xs text-zinc-500">O que pagar e receber, e quanto sobra</span>
+          </span>
+          <span aria-hidden className="text-zinc-500">›</span>
+        </Link>
       </section>
 
       <section className="mt-2 lg:mt-4">

@@ -94,8 +94,11 @@ describe("lembretes de contas a pagar", () => {
     expect(hoje[0]?.bill).toEqual({ kind: "recurring", id: "rec-1", dueDate: "2026-11-10" });
   });
 
-  it("não lembra conta marcada como paga, dívida paga nem recorrência de entrada", () => {
-    const paid = new Set([billKey({ kind: "recurring", id: "rec-1", dueDate: "2026-11-10" })]);
+  it("não lembra conta marcada como paga nem dívida paga", () => {
+    const paid = new Set([
+      billKey({ kind: "recurring", id: "rec-1", dueDate: "2026-11-10" }),
+      billKey({ kind: "recurring", id: "rec-2", dueDate: "2026-11-10" }),
+    ]);
     const reminders = computeBillReminders({
       recurring: [recurring({}), recurring({ id: "rec-2", type: "entrada", description: "Salário" })],
       debts: [debt({ paid: true })],
@@ -104,6 +107,16 @@ describe("lembretes de contas a pagar", () => {
       now: DUE_DAY,
     });
     expect(reminders).toHaveLength(0);
+  });
+
+  it("dinheiro a receber: avisa só no dia, com o botão Já recebi", () => {
+    const salario = recurring({ id: "rec-2", type: "entrada", description: "Salário" });
+    const vespera = computeBillReminders({ recurring: [salario], debts: [], cards: [], paidKeys: new Set(), now: DAY_BEFORE });
+    expect(vespera).toHaveLength(0);
+    const hoje = computeBillReminders({ recurring: [salario], debts: [], cards: [], paidKeys: new Set(), now: DUE_DAY });
+    expect(hoje).toHaveLength(1);
+    expect(hoje[0]).toMatchObject({ income: true, url: "/contas" });
+    expect(hoje[0].title).toContain("previsto para hoje");
   });
 
   it("dívida e fatura: dívida na véspera; fatura só no dia do vencimento", () => {
