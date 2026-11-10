@@ -1,9 +1,11 @@
 package br.com.meufinanceiroia;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -41,8 +43,11 @@ public class StatusActivity extends Activity {
     private static final int OK = Color.parseColor("#6EE7B7");
     private static final int WARN = Color.parseColor("#FCD34D");
 
+    private static final int REQUEST_NOTIFICATIONS = 7;
+
     private LinearLayout root;
     private String testMessage;
+    private int notificationAsks;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,6 +125,12 @@ public class StatusActivity extends Activity {
             addButton(notifications, "Abrir informações do app", v -> openAppDetails());
         }
 
+        boolean appNotifications = NotificationManagerCompat.from(this).areNotificationsEnabled();
+        LinearLayout alerts = addCard(appNotifications, "Avisos de movimentação", appNotifications
+                ? "O Meu Financeiro pode te avisar quando entrar ou sair dinheiro."
+                : "Libere as notificações do Meu Financeiro para receber os avisos de entrada e saída de dinheiro.");
+        if (!appNotifications) addButton(alerts, "Liberar notificações", v -> requestAppNotifications());
+
         LinearLayout power = addCard(battery, "Bateria sem restrição", battery
                 ? "O Android não vai pausar a leitura."
                 : "Sem isso o Android pode pausar a leitura depois de um tempo.");
@@ -177,6 +188,32 @@ public class StatusActivity extends Activity {
 
     private void openAppDetails() {
         tryStart(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+    }
+
+    private void requestAppNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                && shouldAskNotificationPermission()) {
+            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
+            return;
+        }
+        Intent settings = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+        settings.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+        if (!tryStart(settings)) openAppDetails();
+    }
+
+    /** Depois de 2 recusas o Android não mostra mais o pedido: aí abre as configurações direto. */
+    private boolean shouldAskNotificationPermission() {
+        return notificationAsks < 2;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_NOTIFICATIONS) {
+            notificationAsks += 1;
+            render();
+        }
     }
 
     private void requestBatteryExemption() {

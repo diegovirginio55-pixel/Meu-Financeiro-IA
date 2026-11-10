@@ -77,6 +77,13 @@
             </intent-filter>
         </service>
 
+        <!-- Pedido de permissão de notificação (Android 13+) feito pelo site ao tocar em "Ativar".
+             Sem esta declaração o pedido nunca responde e o botão fica em "Ativando…". -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name=".StatusActivity"
             android:exported="true"
