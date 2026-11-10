@@ -1,5 +1,6 @@
 import { formatCurrency, formatDate } from "@/lib/finance/format";
-import { CATEGORY_ICONS, resolvedCategory } from "@/lib/finance/categories";
+import { categoryColor, resolvedCategory } from "@/lib/finance/categories";
+import { MerchantAvatar } from "@/components/ui/MerchantAvatar";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import type { Transaction } from "@/lib/finance/types";
 
@@ -16,22 +17,24 @@ export function MaioresGastos({
       {items.length === 0 ? (
         <p className="text-sm text-zinc-500">Nenhuma despesa registrada.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-3">
           {items.map((t) => {
             const category = resolvedCategory(t);
+            const share = Number(items[0].amount) > 0 ? (Number(t.amount) / Number(items[0].amount)) * 100 : 0;
             return (
-            <li
-              key={t.id}
-              className="flex items-center justify-between text-sm"
-            >
-              <span className="flex items-center gap-2 text-zinc-300">
-                <span>{CATEGORY_ICONS[category] ?? "🔖"}</span>
-                {t.description}
-              </span>
-              <span className="font-medium text-red-400">
-                {formatCurrency(Number(t.amount))}
-              </span>
-            </li>
+              <li key={t.id} className="flex items-center gap-3 text-sm">
+                <MerchantAvatar description={t.description} category={category} size={32} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-zinc-200">{t.description}</span>
+                  <span className="text-[11px] text-zinc-500">
+                    {category} · {formatDate(t.date)}
+                  </span>
+                  <span className="mt-1 block h-1 overflow-hidden rounded bg-zinc-800">
+                    <span className="block h-full rounded" style={{ width: `${share}%`, background: categoryColor(category) }} />
+                  </span>
+                </span>
+                <span className="shrink-0 font-medium text-rose-300">{formatCurrency(Number(t.amount))}</span>
+              </li>
             );
           })}
         </ul>

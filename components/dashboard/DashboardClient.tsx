@@ -26,17 +26,18 @@ import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Transaction } from "@/lib/finance/types";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { BankLogo } from "@/components/bancos/BankLogo";
-// Gráficos via next/dynamic (ssr: false): o Recharts sai do bundle inicial da tela.
+// Gráficos do novo visual: SVG próprio, leve e legível no tema claro e escuro.
+import { AnimatedMoney, ChartCard, INK } from "@/components/dashboard/v2/chart-kit";
+import { DailyChart, FlowDivergingChart, PatrimonioChart, SavingsChart, savingsHeadline } from "@/components/dashboard/v2/TimeCharts";
 import {
-  CategoryCompareChart,
-  EconomiaMensalChart,
-  FluxoBarrasChart,
-  FluxoDiarioChart,
-  GastosDonutChart,
-  MixPizzaChart,
-  SaldoEvolutionChart,
-  SemanaGastosChart,
-} from "@/components/dashboard/LazyCharts";
+  AssetTreemap,
+  CategoryDonut,
+  CompareDumbbell,
+  MoneySankey,
+  SpendHeatmap,
+  WeekdayChart,
+  weekdayHeadline,
+} from "@/components/dashboard/v2/CategoryCharts";
 import { LucroAtivosPanel } from "@/components/dashboard/LucroAtivosPanel";
 import { MaioresGastos, ProximasContas } from "@/components/dashboard/ListPanels";
 import GoalsPanel from "@/components/dashboard/GoalsPanel";
@@ -275,12 +276,32 @@ export default function DashboardClient({
       const bucket = byDay.get(key)!;
       const [, month, day] = key.split("-");
       return {
+        key,
         dia: `${day}/${month}`,
         entradas: bucket.entradas,
         despesas: bucket.despesas,
       };
     });
   }, [scopedTx]);
+
+  // Fluxo do dinheiro do mês: de onde veio (entradas por categoria) e para onde foi.
+  const entradasPorCategoria = useMemo(() => {
+    const map = new Map<string, number>();
+    monthTx.filter(isRenda).forEach((transaction) => {
+      const category = resolvedCategory(transaction);
+      map.set(category, (map.get(category) ?? 0) + Number(transaction.amount));
+    });
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+  }, [monthTx]);
+
+  // Calendário de calor: gastos por dia do mês.
+  const gastosPorDia = useMemo(() => {
+    const map: Record<string, number> = {};
+    monthTx.filter(isGasto).forEach((transaction) => {
+      map[transaction.date] = (map[transaction.date] ?? 0) + Number(transaction.amount);
+    });
+    return map;
+  }, [monthTx]);
 
   const gastosPorSemana = useMemo(() => {
     const labels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -300,11 +321,35 @@ export default function DashboardClient({
     [monthTx],
   );
 
+  // Mix do patrimônio (mapa de blocos): dinheiro em conta + cada classe de investimento.
+  const TREEMAP_COLORS = ["#8b5cf6", "#d97706", "#3b82f6", "#ea580c", "#0891b2"];
   const mixPatrimonio = [
-    { name: "Contas", value: Math.max(0, totalBalance), color: "#34d399" },
-    { name: "Investido", value: Math.max(0, totalInvestments), color: "#60a5fa" },
-    { name: "Faturas", value: Math.max(0, totalInvoices), color: "#f87171" },
+    { name: "Em conta", value: Math.max(0, totalBalance), color: "#059669" },
+    ...investClasses.slice(0, 5).map((item, index) => ({ name: item.label, value: Math.max(0, item.total), color: TREEMAP_COLORS[index] })),
+    ...(investClasses.length > 5
+      ? [{ name: "Outros investimentos", value: investClasses.slice(5).reduce((sum, item) => sum + Math.max(0, item.total), 0), color: "#71717a" }]
+      : []),
   ];
+  // Comparação justa com o mês em andamento: até o mesmo dia do mês passado.
+  const todayDay = Number(todayKey.slice(8, 10));
+  const lastMonthSoFar = scopedTx.filter(
+    (transaction) => transaction.date.startsWith(previousMonthKey) && Number(transaction.date.slice(8, 10)) <= todayDay,
+  );
+  const samePointLastMonth = {
+    entradas: lastMonthSoFar.filter(isRenda).reduce((sum, transaction) => sum + Number(transaction.amount), 0),
+    despesas: lastMonthSoFar.filter(isGasto).reduce((sum, transaction) => sum + Number(transaction.amount), 0),
+  };
+  const deltaLabel = (now: number, before: number, lowerIsGood: boolean) => {
+    if (before <= 0) return null;
+    const change = (now - before) / before;
+    if (Math.abs(change) < 0.03) return { text: "igual ao mesmo dia do mês passado", tone: "flat" as const };
+    const good = lowerIsGood ? change < 0 : change > 0;
+    return {
+      text: `${change > 0 ? "▲" : "▼"} ${Math.round(Math.abs(change) * 100)}% vs mesmo dia do mês passado`,
+      tone: good ? ("good" as const) : ("bad" as const),
+    };
+  };
+  const DELTA_TONE = { good: "text-emerald-400", bad: "text-rose-300", flat: "text-zinc-500" } as const;
 
   const investmentIds = useMemo(() => new Set(investments.map((item) => item.id)), [investments]);
 
@@ -321,7 +366,11 @@ export default function DashboardClient({
     <PageShell>
       <PageHero
         kicker="Visão geral"
-        title={<HeroAmount>{formatCurrency(displayedBalance)}</HeroAmount>}
+        title={
+          <HeroAmount>
+            <AnimatedMoney value={displayedBalance} />
+          </HeroAmount>
+        }
         trailing={
           <label className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300">
             <select
@@ -351,15 +400,20 @@ export default function DashboardClient({
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          ["Gastos de hoje", gastosHoje, "text-rose-300"],
-          ["Gastos da semana", gastosSemana, "text-rose-300"],
-          ["Entradas", monthEntradas, "text-emerald-400"],
-          ["Despesas do mês", monthDespesas, "text-rose-300"],
-        ].map(([label, value, tone]) => (
-          <SoftPanel key={String(label)} className="px-4 py-3">
+        {(
+          [
+            ["Gastos de hoje", gastosHoje, "text-rose-300", null],
+            ["Gastos da semana", gastosSemana, "text-rose-300", null],
+            ["Entradas do mês", monthEntradas, "text-emerald-400", deltaLabel(monthEntradas, samePointLastMonth.entradas, false)],
+            ["Despesas do mês", monthDespesas, "text-rose-300", deltaLabel(monthDespesas, samePointLastMonth.despesas, true)],
+          ] as const
+        ).map(([label, value, tone, delta]) => (
+          <SoftPanel key={label} className="px-4 py-3">
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
-            <p className={`mt-1 truncate text-lg font-semibold ${tone}`}>{formatCurrency(Number(value))}</p>
+            <p className={`mt-1 truncate text-lg font-semibold ${tone}`}>
+              <AnimatedMoney value={Number(value)} />
+            </p>
+            {delta && <p className={`mt-1 text-[11px] font-medium ${DELTA_TONE[delta.tone]}`}>{delta.text}</p>}
           </SoftPanel>
         ))}
       </div>
@@ -512,37 +566,53 @@ export default function DashboardClient({
         </section>
       </div>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-        <SectionLabel>Evolução do saldo</SectionLabel>
-        <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(totalBalance)}</p>
-        <p className="mt-1 text-xs text-zinc-500">Verde: saldo em contas · azul: patrimônio</p>
-        <div className="mt-2">
-          <SaldoEvolutionChart data={evolucaoSaldo} />
-        </div>
-      </section>
+      <ChartCard
+        title="Evolução do patrimônio"
+        headline={`Patrimônio hoje: ${formatCurrency(evolucaoSaldo[evolucaoSaldo.length - 1]?.patrimonio ?? 0)} · saldo em contas ${formatCurrency(totalBalance)}. A linha tracejada é a previsão do próximo mês no ritmo dos últimos 3.`}
+        legend={[
+          { label: "Patrimônio", color: INK.good },
+          { label: "Saldo em contas", color: INK.blue },
+          { label: "Previsão", color: "#71717a", kind: "dash" },
+        ]}
+      >
+        <PatrimonioChart data={evolucaoSaldo} />
+      </ChartCard>
+
+      <ChartCard
+        title={`Para onde foi o dinheiro em ${formatMonthLabel(monthKey)}`}
+        headline="De onde o dinheiro veio, para onde foi e quanto sobrou. A largura de cada faixa é o valor."
+      >
+        <MoneySankey entradas={entradasPorCategoria} gastos={gastosPorCategoria.map((item) => ({ name: item.category, value: item.total }))} />
+      </ChartCard>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:col-span-2 lg:rounded-3xl lg:p-6">
-          <h2 className="mb-2 text-sm font-medium text-zinc-300">Entradas x despesas (12 meses)</h2>
-          <FluxoBarrasChart data={evolucaoMensal} />
-        </section>
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-          <h2 className="mb-2 text-sm font-medium text-zinc-300">Gastos por categoria</h2>
-          <GastosDonutChart data={gastosPorCategoria} />
-        </section>
+        <ChartCard
+          className="lg:col-span-2"
+          title="Entradas x despesas (12 meses)"
+          headline="Entradas para cima, despesas para baixo; o ponto é o resultado de cada mês."
+          legend={[
+            { label: "Entradas", color: INK.good },
+            { label: "Despesas", color: INK.bad },
+            { label: "Resultado", color: "#a1a1aa", kind: "dot" },
+          ]}
+        >
+          <FlowDivergingChart data={evolucaoMensal} />
+        </ChartCard>
+        <ChartCard title="Gastos por categoria" headline="Toque numa categoria para ver o valor no meio do anel.">
+          <CategoryDonut data={gastosPorCategoria} monthLabel={formatMonthLabel(monthKey)} />
+        </ChartCard>
       </div>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-        <h2 className="text-sm font-medium text-zinc-200">Este mês vs mês anterior</h2>
-        <p className="mb-2 mt-1 text-[11px] text-zinc-500">
-          {formatMonthLabel(monthKey)} comparado com {formatMonthLabel(previousMonthKey)}, por categoria.
-        </p>
-        <CategoryCompareChart
-          data={categoryCompare}
-          currentLabel={formatMonthLabel(monthKey)}
-          previousLabel={formatMonthLabel(previousMonthKey)}
-        />
-      </section>
+      <ChartCard
+        title="Este mês x mês anterior"
+        headline={`${formatMonthLabel(monthKey)} comparado com ${formatMonthLabel(previousMonthKey)}: ponto vazio é o mês anterior, cheio é o atual.`}
+        legend={[
+          { label: formatMonthLabel(previousMonthKey), color: "#71717a", kind: "ring" },
+          { label: formatMonthLabel(monthKey), color: "#a1a1aa", kind: "dot" },
+        ]}
+      >
+        <CompareDumbbell data={categoryCompare} currentLabel={formatMonthLabel(monthKey)} previousLabel={formatMonthLabel(previousMonthKey)} />
+      </ChartCard>
 
       <LucroAtivosPanel
         connections={visibleConnections}
@@ -552,24 +622,36 @@ export default function DashboardClient({
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-          <h2 className="mb-2 text-sm font-medium text-zinc-300">Economia mensal</h2>
-          <EconomiaMensalChart data={evolucaoMensal} />
-        </section>
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-          <h2 className="mb-2 text-sm font-medium text-zinc-300">Entradas e saídas por dia (30 dias)</h2>
-          <FluxoDiarioChart data={fluxoDiario} />
-        </section>
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-          <h2 className="text-sm font-medium text-zinc-200">Gastos por dia da semana</h2>
-          <p className="mb-2 mt-1 text-[11px] text-zinc-500">Quanto saiu em cada dia neste mês.</p>
-          <SemanaGastosChart data={gastosPorSemana} />
-        </section>
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:rounded-3xl lg:p-6">
-          <h2 className="text-sm font-medium text-zinc-200">Mix do patrimônio</h2>
-          <p className="mb-2 mt-1 text-[11px] text-zinc-500">Quanto está em contas e quanto está investido.</p>
-          <MixPizzaChart data={mixPatrimonio} />
-        </section>
+        <ChartCard
+          title="Economia mensal"
+          headline={savingsHeadline(evolucaoMensal, snapshot.monthlyBudget?.savingsTarget ? Number(snapshot.monthlyBudget.savingsTarget) : null)}
+        >
+          <SavingsChart data={evolucaoMensal} meta={snapshot.monthlyBudget?.savingsTarget ? Number(snapshot.monthlyBudget.savingsTarget) : null} />
+        </ChartCard>
+        <ChartCard title="Gastos por dia da semana" headline={weekdayHeadline(gastosPorSemana)}>
+          <WeekdayChart data={gastosPorSemana} />
+        </ChartCard>
+        <ChartCard
+          className="lg:col-span-2"
+          title="Entradas e saídas por dia (30 dias)"
+          headline="Fins de semana marcados, entradas sinalizadas no topo e o maior gasto escrito no gráfico."
+          legend={[
+            { label: "Saídas", color: INK.bad },
+            { label: "Entradas", color: INK.good, kind: "dot" },
+            { label: "Fim de semana", color: "#3f3f46" },
+          ]}
+        >
+          <DailyChart data={fluxoDiario} />
+        </ChartCard>
+        <ChartCard title={`Calendário de gastos · ${formatMonthLabel(monthKey)}`} headline="Quanto mais forte a cor, mais você gastou no dia.">
+          <SpendHeatmap monthKey={monthKey} todayKey={todayKey} byDay={gastosPorDia} />
+        </ChartCard>
+        <ChartCard
+          title="Mix do patrimônio"
+          headline={`O tamanho de cada bloco é o valor.${totalInvoices > 0 ? ` Faturas em aberto (não entram aqui): ${formatCurrency(totalInvoices)}.` : ""}`}
+        >
+          <AssetTreemap items={mixPatrimonio} />
+        </ChartCard>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

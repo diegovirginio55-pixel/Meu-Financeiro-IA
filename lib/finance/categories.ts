@@ -32,13 +32,14 @@ export const CATEGORY_ICONS: Record<string, string> = {
 
 export const CATEGORY_COLORS: Record<string, string> = {
   Salário: "#10b981",
-  Alimentação: "#f59e0b",
+  // Tons ajustados (validados para fundo escuro e daltonismo): âmbar, ciano e laranja um pouco mais escuros.
+  Alimentação: "#d97706",
   Transporte: "#3b82f6",
   Moradia: "#8b5cf6",
   Educação: "#ec4899",
   Saúde: "#ef4444",
-  Lazer: "#06b6d4",
-  Assinaturas: "#f97316",
+  Lazer: "#0891b2",
+  Assinaturas: "#ea580c",
   Compras: "#a855f7",
   Investimentos: "#22c55e",
   Dívidas: "#dc2626",
