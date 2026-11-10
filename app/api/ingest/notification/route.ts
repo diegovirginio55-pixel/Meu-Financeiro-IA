@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyIngestToken } from "@/lib/ingest/token";
 import { parseBankNotification } from "@/lib/ingest/parse-notification";
@@ -11,6 +11,7 @@ import { bankFromLabel } from "@/lib/pluggy/institution";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { serverError } from "@/lib/api/errors";
 import { appendIngestLog } from "@/lib/ingest/log";
+import { notifyRealtimeMovement } from "@/lib/push/realtime-movement";
 
 const MAX_BODY_BYTES = 8 * 1024;
 const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
@@ -20,6 +21,8 @@ const MAX_BACKDATE_MS = 3 * 24 * 60 * 60 * 1000;
 type Body = {
   token?: unknown;
   app?: unknown;
+  /** App Android: nome do app como aparece no celular (ex.: "Cartões CAIXA"). */
+  label?: unknown;
   title?: unknown;
   text?: unknown;
   test?: unknown;
@@ -105,6 +108,7 @@ export async function POST(request: Request) {
 
   const input = {
     app: withoutMagicText(str(body.app, 120)),
+    label: withoutMagicText(str(body.label, 120)),
     title: withoutMagicText(str(body.title, 300)),
     text: withoutMagicText(str(body.text, 1500)),
   };
@@ -113,7 +117,7 @@ export async function POST(request: Request) {
   const result = parseBankNotification(input);
   if (!result.ok) {
     const detail = result.reason === "notificação vazia" ? emptyReason(body) : result.reason;
-    if (!isTest) await appendIngestLog(userId, { app: input.app, preview, result: "ignorado", detail });
+    if (!isTest) await appendIngestLog(userId, { app: input.label || input.app, preview, result: "ignorado", detail });
     return NextResponse.json({ ok: true, ignored: result.reason });
   }
   const parsed = result.parsed;
@@ -185,8 +189,23 @@ export async function POST(request: Request) {
 
   const registered = (data ?? []).length > 0;
   const target = card ? "cartão" : account ? "conta" : "sem conta vinculada";
+  const insertedId = (data ?? [])[0]?.id as string | undefined;
+  if (registered && insertedId) {
+    // Depois de responder ao celular: aviso na hora (saldo novo + limite de hoje) e alertas de controle.
+    after(() =>
+      notifyRealtimeMovement(supabase, userId, {
+        id: insertedId,
+        description: row.description,
+        amount: row.amount,
+        type: row.type,
+        category,
+        bank: parsed.bank,
+        accountId: row.account_id,
+      }),
+    );
+  }
   await appendIngestLog(userId, {
-    app: input.app,
+    app: input.label || input.app,
     preview,
     result: registered ? "registrado" : "duplicado",
     detail: `${row.type === "entrada" ? "Entrada" : "Saída"} de R$ ${row.amount.toFixed(2).replace(".", ",")} · ${row.description} · ${category} · ${parsed.bank ?? "banco não identificado"} (${target})`,

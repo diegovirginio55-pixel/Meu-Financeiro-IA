@@ -102,21 +102,58 @@ export async function notifyBankMovements(userId: string, bankName: string, move
     const item = oneEach ? fresh[index] : null;
     if (item?.id && item.type === "saida") {
       suggestions ??= await topSpendingCategories(userId).catch(() => FALLBACK_CATEGORIES);
-      const options = suggestions.filter((category) => category !== item.category).slice(0, 2);
-      const token = signPushAction({ k: "tx", u: userId, t: item.id });
-      if (token && options.length > 0) {
-        payload = {
-          ...payload,
-          actions: options.map((category) => ({
-            action: `cat:${category}`,
-            title: `${CATEGORY_ICONS[category] ?? ""} ${category}`.trim(),
-          })),
-          actionToken: token,
-        };
-      }
+      payload = { ...payload, ...categoryActionExtras(userId, item, suggestions) };
     }
+    const refKey = item?.id ? `tx:${item.id}` : `lote:${bankName}:${Date.now()}:${index}`;
+    if (!(await logMovementNotice(userId, refKey, payload))) continue;
     await sendPushToUser(userId, payload, "high");
   }
+}
+
+/** Botões com as 2 categorias mais usadas (sem a atual) para categorizar o gasto pela notificação. */
+export function categoryActionExtras(
+  userId: string,
+  item: { id?: string; category?: string },
+  suggestions: string[],
+): Partial<PushPayload> {
+  if (!item.id) return {};
+  const options = suggestions.filter((category) => category !== item.category).slice(0, 2);
+  const token = signPushAction({ k: "tx", u: userId, t: item.id });
+  if (!token || options.length === 0) return {};
+  return {
+    actions: options.map((category) => ({
+      action: `cat:${category}`,
+      title: `${CATEGORY_ICONS[category] ?? ""} ${category}`.trim(),
+    })),
+    actionToken: token,
+  };
+}
+
+/** Sugestões de categoria para os botões (as mais usadas nos últimos 90 dias). */
+export async function categorySuggestions(userId: string): Promise<string[]> {
+  return topSpendingCategories(userId).catch(() => FALLBACK_CATEGORIES);
+}
+
+/**
+ * Guarda o aviso de movimentação na central de notificações do app (sino).
+ * Devolve false se o mesmo lançamento já tinha sido avisado — assim um
+ * reenvio não manda a notificação duas vezes.
+ */
+export async function logMovementNotice(userId: string, refKey: string, payload: PushPayload): Promise<boolean> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("notification_log")
+    .upsert(
+      { user_id: userId, kind: "movement", ref_key: refKey, title: payload.title, body: payload.body, url: payload.url },
+      { onConflict: "user_id,kind,ref_key", ignoreDuplicates: true },
+    )
+    .select("id");
+  if (error) {
+    // Sem registro não impede o aviso (melhor avisar do que perder).
+    console.error("Erro ao registrar aviso de movimentação:", error);
+    return true;
+  }
+  return Boolean(data && data.length > 0);
 }
 
 /**

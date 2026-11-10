@@ -110,39 +110,52 @@ export async function runAlertsAndSummaries(supabase: SupabaseClient): Promise<{
   let sent = 0;
   for (const userId of userIds) {
     try {
-      const alerts = await computeSmartAlerts(supabase, userId);
-      const summary = await computeWeeklySummary(supabase, userId);
-      const { reminders, paidKeys } = await computeBillRemindersForUser(supabase, userId, now);
-      const categoryAlerts = await computeCategoryBudgetAlertsForUser(supabase, userId, now).catch((error) => {
-        console.error("Erro ao calcular limites por categoria:", error);
-        return [];
-      });
-      const candidates: (AlertCandidate & { bill?: BillRef; income?: boolean })[] = [
-        ...alerts.map((alert) => withCardBill(alert)),
-        ...(summary ? [summary] : []),
-        ...reminders,
-        ...categoryAlerts,
-        ...(recapReminder(now) ? [recapReminder(now) as AlertCandidate] : []),
-      ];
-      for (const candidate of candidates) {
-        if (candidate.kind === "daily_budget") {
-          if (!isDailyBudgetPushWindow(now)) continue;
-        } else if (!isAwakeHours(now)) {
-          continue;
-        }
-        // Fatura já marcada como paga: não avisa mais.
-        if (candidate.bill && paidKeys.has(billKey(candidate.bill))) continue;
-        const extras = candidate.bill ? billActionExtras(userId, candidate.bill, candidate.income) : {};
-        // A central de notificações guarda o mesmo link (tela com o botão "Já paguei").
-        const stored = extras.url ? { ...candidate, url: extras.url } : candidate;
-        if (await dispatch(supabase, userId, stored, extras)) sent += 1;
-      }
+      sent += await runAlertsForUser(supabase, userId, now);
     } catch (error) {
       console.error("Erro ao calcular alertas para usuário:", userId, error);
     }
   }
 
   return { users: userIds.length, sent };
+}
+
+/**
+ * Alertas de um usuário (limite do dia, passou do limite, categoria,
+ * contas a vencer, resumo...). Roda no cron e também logo depois de cada
+ * gasto que chega pelo celular — assim "você passou do limite de hoje" sai
+ * na hora da compra. Cada alerta só é enviado uma vez (notification_log).
+ */
+export async function runAlertsForUser(supabase: SupabaseClient, userId: string, now = new Date()): Promise<number> {
+  if (!isAwakeHours(now) && !isDailyBudgetPushWindow(now)) return 0;
+  const alerts = await computeSmartAlerts(supabase, userId);
+  const summary = await computeWeeklySummary(supabase, userId);
+  const { reminders, paidKeys } = await computeBillRemindersForUser(supabase, userId, now);
+  const categoryAlerts = await computeCategoryBudgetAlertsForUser(supabase, userId, now).catch((error) => {
+    console.error("Erro ao calcular limites por categoria:", error);
+    return [];
+  });
+  const candidates: (AlertCandidate & { bill?: BillRef; income?: boolean })[] = [
+    ...alerts.map((alert) => withCardBill(alert)),
+    ...(summary ? [summary] : []),
+    ...reminders,
+    ...categoryAlerts,
+    ...(recapReminder(now) ? [recapReminder(now) as AlertCandidate] : []),
+  ];
+  let sent = 0;
+  for (const candidate of candidates) {
+    if (candidate.kind === "daily_budget") {
+      if (!isDailyBudgetPushWindow(now)) continue;
+    } else if (!isAwakeHours(now)) {
+      continue;
+    }
+    // Fatura já marcada como paga: não avisa mais.
+    if (candidate.bill && paidKeys.has(billKey(candidate.bill))) continue;
+    const extras = candidate.bill ? billActionExtras(userId, candidate.bill, candidate.income) : {};
+    // A central de notificações guarda o mesmo link (tela com o botão "Já paguei").
+    const stored = extras.url ? { ...candidate, url: extras.url } : candidate;
+    if (await dispatch(supabase, userId, stored, extras)) sent += 1;
+  }
+  return sent;
 }
 
 /** "Fatura chegando" (refKey = cartão:vencimento) também ganha o botão "Já paguei". */

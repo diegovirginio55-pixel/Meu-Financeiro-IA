@@ -38,6 +38,8 @@ const NAME_HINTS: Array<[RegExp, string]> = [
   [/\bbtg\b/i, "BTG Pactual"],
   [/original/i, "Original"],
   [/\bneon\b/i, "Neon"],
+  [/sicoob/i, "Sicoob"],
+  [/sicredi/i, "Sicredi"],
 ];
 
 const CNPJ_BANKS: Record<string, string> = {

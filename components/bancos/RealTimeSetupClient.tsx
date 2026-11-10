@@ -215,8 +215,15 @@ export default function RealTimeSetupClient({
           <SoftPanel className="flex flex-col gap-4 p-4">
             <SectionLabel>2. Android — app Meu Financeiro (recomendado)</SectionLabel>
             <p className="text-sm leading-relaxed text-zinc-400">
-              A versão Android do Meu Financeiro lê sozinha os avisos dos apps dos bancos, sem MacroDroid. Ela abre este
-              mesmo site, com o mesmo login, e substitui o app instalado pelo navegador.
+              A versão Android do Meu Financeiro lê sozinha os avisos dos apps dos bancos e os SMS de banco com valor em
+              R$, sem MacroDroid. A cada compra ou Pix o saldo atualiza na hora e chega um aviso com o saldo novo e
+              quanto ainda dá para gastar hoje. Ela abre este mesmo site, com o mesmo login, e substitui o app instalado
+              pelo navegador.
+            </p>
+            <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs leading-relaxed text-emerald-200">
+              Já tem o app? Baixe de novo e instale por cima para pegar a versão nova (não precisa ativar de novo). Se o
+              aviso de alguma compra vier de um app que não está na lista, ele aparece em “Leitura dos bancos” →{" "}
+              <strong>Outros apps com valores em R$</strong>: toque em <strong>Ler os avisos deste app</strong>.
             </p>
             <ol className="flex flex-col gap-4">
               <Step n={1}>

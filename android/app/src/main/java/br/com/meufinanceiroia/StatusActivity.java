@@ -24,6 +24,10 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import androidx.core.app.NotificationManagerCompat;
 
 import com.google.androidbrowserhelper.trusted.LauncherActivity;
@@ -106,8 +110,8 @@ public class StatusActivity extends Activity {
     private void render() {
         root.removeAllViews();
         addText("Leitura dos bancos", 24, TEXT, true, 0);
-        addText("Quando um app de banco mostrar um aviso de compra ou Pix, o Meu Financeiro registra na hora e o saldo "
-                + "atualiza — sem esperar a atualização diária.", 14, MUTED, false, 8);
+        addText("Quando um app de banco (ou o SMS do banco) mostrar um aviso de compra ou Pix, o Meu Financeiro "
+                + "registra na hora, atualiza o saldo e te avisa quanto ainda pode gastar hoje.", 14, MUTED, false, 8);
 
         boolean connected = Prefs.endpoint(this) != null;
         boolean access = hasNotificationAccess();
@@ -158,9 +162,44 @@ public class StatusActivity extends Activity {
         }
         addButton(actions, "Abrir Meu Financeiro", v -> openSite("/"));
 
+        renderOtherApps();
+
         addText("Widget: segure um espaço vazio da tela inicial → Widgets → Meu Financeiro, para ver o saldo e os "
                 + "gastos de hoje sem abrir o app.", 12, MUTED, false, 24);
-        addText("Bancos lidos: " + BankApps.NAMES + ". Avisos de outros apps nunca saem do celular.", 12, MUTED, false, 12);
+        addText("Bancos lidos: " + BankApps.NAMES + ". Também lê SMS de banco com valor em R$. Avisos de outros apps "
+                + "(e SMS de pessoas) nunca saem do celular.", 12, MUTED, false, 12);
+    }
+
+    /** Apps fora da lista que mostraram valores em R$: o usuário decide se o app lê os avisos deles. */
+    private void renderOtherApps() {
+        addText("Outros apps com valores em R$", 16, TEXT, true, 24);
+        addText("Se a compra aparecer num app que não está na lista de bancos, ele aparece aqui. Ligue só os apps "
+                + "do seu banco — os avisos dos outros nunca saem do celular.", 13, MUTED, false, 6);
+        Set<String> extras = Prefs.extraApps(this);
+        List<Prefs.Candidate> candidates = Prefs.candidates(this);
+        Set<String> shown = new HashSet<>();
+        for (Prefs.Candidate candidate : candidates) {
+            shown.add(candidate.packageName);
+            addOtherApp(candidate.packageName, candidate.label, extras.contains(candidate.packageName),
+                    candidate.count + (candidate.count == 1 ? " aviso" : " avisos") + " · último " + ago(candidate.at)
+                            + "\n“" + candidate.preview + "”");
+        }
+        for (String packageName : extras) {
+            if (!shown.contains(packageName)) {
+                addOtherApp(packageName, BankApps.label(this, packageName), true, "Ligado por você.");
+            }
+        }
+        if (candidates.isEmpty() && extras.isEmpty()) addText("Nenhum por enquanto.", 13, MUTED, false, 8);
+    }
+
+    private void addOtherApp(String packageName, String label, boolean on, String detail) {
+        LinearLayout card = addCardWith(on ? "✅  " : "➕  ", on ? OK : TEXT, label + (on ? " · lendo" : ""), detail);
+        addButton(card, on ? "Parar de ler este app" : "Ler os avisos deste app", v -> {
+            Prefs.setExtraApp(this, packageName, !on);
+            Toast.makeText(this, on ? "Parou de ler " + label : "Lendo os avisos de " + label + " ✓",
+                    Toast.LENGTH_SHORT).show();
+            render();
+        });
     }
 
     private void sendTest() {
@@ -249,6 +288,10 @@ public class StatusActivity extends Activity {
     // ---- layout ----
 
     private LinearLayout addCard(boolean ok, String title, String description) {
+        return addCardWith(ok ? "✅  " : "⚠️  ", ok ? OK : WARN, title, description);
+    }
+
+    private LinearLayout addCardWith(String icon, int color, String title, String description) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(16), dp(14), dp(16), dp(14));
@@ -261,7 +304,7 @@ public class StatusActivity extends Activity {
         params.topMargin = dp(12);
         root.addView(card, params);
 
-        addTextTo(card, (ok ? "✅  " : "⚠️  ") + title, 16, ok ? OK : WARN, true, 0);
+        addTextTo(card, icon + title, 16, color, true, 0);
         addTextTo(card, description, 13, MUTED, false, 4);
         return card;
     }

@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Account, Card, Debt, RecurringItem, Transaction } from "./types";
 import {
-  dailyBudgetFromBalance,
   isGasto,
   isRenda,
   lastNMonthKeys,
@@ -10,9 +9,9 @@ import {
   saoPauloTodayKey,
   saoPauloWeekStartKey,
   shiftMonthKey,
-  sumGastosInRange,
 } from "./fluxo";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { dailyLimitStatus } from "./daily-limit";
 import { resolvedCategory } from "./categories";
 import { formatCurrency } from "./format";
 import { groupSubscriptions, subscriptionKey } from "./subscriptions";
@@ -235,20 +234,13 @@ export function computeSmartAlertsFromData({
   // orçamento definido, usa (orçamento - já gasto) / dias restantes; senão
   // cai no cálculo pelo saldo em conta até o dia 5 do mês seguinte. Avisa
   // se já passou bem do limite diário.
-  const gastosHojeTotal = sumGastosInRange(tx, todayStr, todayStr);
-  let perDayBudget: number;
-  let perDaySourceNote: string;
-  if (spendingLimit != null) {
-    const daysLeftInMonth = Math.max(1, daysInMonth - dayOfMonth + 1);
-    // O limite de hoje vem do que sobrou ATÉ ONTEM. Antes o gasto de hoje
-    // era descontado duas vezes (do limite e depois comparado de novo).
-    const gastoAteOntem = Math.max(0, totalCurrentGasto - gastosHojeTotal);
-    perDayBudget = Math.max(0, spendingLimit - gastoAteOntem) / daysLeftInMonth;
-    perDaySourceNote = "sem passar do orçamento deste mês";
-  } else {
-    perDayBudget = dailyBudgetFromBalance(totalBalance, todayStr).perDay;
-    perDaySourceNote = "sem comprometer o resto do mês (baseado no saldo em conta)";
-  }
+  const daily = dailyLimitStatus({ tx, totalBalance, spendingLimit, todayKey: todayStr });
+  const gastosHojeTotal = daily.spentToday;
+  const perDayBudget = daily.perDay;
+  const perDaySourceNote =
+    daily.basis === "budget"
+      ? "sem passar do orçamento deste mês"
+      : "sem comprometer o resto do mês (baseado no saldo em conta)";
 
   if (perDayBudget > 1) {
     const restante = Math.max(0, perDayBudget - gastosHojeTotal);

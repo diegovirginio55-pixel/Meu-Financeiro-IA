@@ -3,6 +3,7 @@
 import TabNav from "@/components/nav/TabNav";
 import BottomNav from "@/components/nav/BottomNav";
 import AutoBankSync from "@/components/bancos/AutoBankSync";
+import LiveRefresh from "@/components/nav/LiveRefresh";
 import PrefetchTabs from "@/components/nav/PrefetchTabs";
 import SaveLastPath from "@/components/nav/SaveLastPath";
 import { PushEnable } from "@/components/pwa/PushEnable";
@@ -56,6 +57,7 @@ function ChromeLayout({ children }: { children: React.ReactNode }) {
       <SaveLastPath />
       <PrefetchTabs />
       <AutoBankSync />
+      <LiveRefresh />
       <PushEnable />
       <main
         className={

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseBankNotification } from "../parse-notification";
 
-function parsed(input: { app?: string; title?: string; text?: string }) {
+function parsed(input: { app?: string; label?: string; title?: string; text?: string }) {
   const result = parseBankNotification(input);
   if (!result.ok) throw new Error(`ignorada: ${result.reason}`);
   return result.parsed;
@@ -61,6 +61,30 @@ describe("leitura de notificações dos bancos", () => {
     expect(parsed({ app: "Inter Mastercard", title: "Compra aprovada", text: "Compra no cartão de R$ 12,30 em PADARIA" })).toMatchObject({
       amount: 12.3,
       bank: "Inter",
+      kind: "card",
+    });
+  });
+
+  it("SMS da Caixa: compra no cartão de débito sai da conta e o banco vem do remetente", () => {
+    expect(
+      parsed({
+        app: "com.google.android.apps.messaging",
+        title: "CAIXA",
+        text: "CAIXA: Compra aprovada no cartao de debito final 1234 em SUPERMERCADO BOM PRECO, R$ 100,00 em 10/11 as 14:22.",
+      }),
+    ).toMatchObject({ amount: 100, type: "saida", kind: "account", bank: "Caixa", description: "SUPERMERCADO BOM PRECO" });
+    // Sem estabelecimento: o remetente "CAIXA" não vira descrição.
+    expect(parsed({ app: "com.google.android.apps.messaging", title: "CAIXA", text: "Saque de R$ 50,00 realizado." })).toMatchObject({
+      description: "Saída Caixa",
+    });
+  });
+
+  it("app sem pacote conhecido: o banco vem do nome do app no celular", () => {
+    expect(
+      parsed({ app: "br.com.algum.app", label: "Sicoob", title: "Pix enviado", text: "Pix de R$ 25,00 enviado para ANA." }),
+    ).toMatchObject({ amount: 25, type: "saida", kind: "account", bank: "Sicoob" });
+    expect(parsed({ app: "br.gov.caixa.cartoes", title: "Compra aprovada", text: "Compra de R$ 59,90 no cartão de crédito em LOJA." })).toMatchObject({
+      bank: "Caixa",
       kind: "card",
     });
   });

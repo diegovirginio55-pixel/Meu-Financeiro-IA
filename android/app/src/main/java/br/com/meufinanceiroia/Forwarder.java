@@ -54,10 +54,11 @@ final class Forwarder {
         return "a" + sha256(packageName + "|" + title + "|" + text + "|" + bucket).substring(0, 31);
     }
 
-    static JSONObject notice(String packageName, String title, String text, String id, long postTime) {
+    static JSONObject notice(String packageName, String label, String title, String text, String id, long postTime) {
         JSONObject body = new JSONObject();
         try {
             body.put("app", packageName);
+            body.put("label", label);
             body.put("title", title);
             body.put("text", text);
             body.put("id", id);

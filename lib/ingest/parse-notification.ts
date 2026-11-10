@@ -12,6 +12,8 @@ import { bankFromLabel } from "@/lib/pluggy/institution";
  */
 export type BankNotificationInput = {
   app?: string | null;
+  /** Nome do app como aparece no celular (o app Android manda junto com o pacote). */
+  label?: string | null;
   title?: string | null;
   text?: string | null;
 };
@@ -32,6 +34,7 @@ const PACKAGE_BANKS: Record<string, string> = {
   "br.com.intermedium": "Inter",
   "br.com.gabba.caixa": "Caixa",
   "br.gov.caixa.tem": "Caixa",
+  "br.gov.caixa.cartoes": "Caixa",
   "com.bradesco": "Bradesco",
   "br.com.bradesco.next": "Bradesco",
   "com.santander.app": "Santander",
@@ -41,6 +44,10 @@ const PACKAGE_BANKS: Record<string, string> = {
   "com.c6bank.app": "C6 Bank",
   "com.picpay": "PicPay",
   "com.mercadopago.wallet": "Mercado Pago",
+  "br.com.sicoobnet": "Sicoob",
+  "br.com.sicoob.moob": "Sicoob",
+  "br.com.neon": "Neon",
+  "br.com.uol.ps.myaccount": "PagBank",
 };
 
 function normalize(value: string): string {
@@ -92,14 +99,33 @@ function describe(original: string, type: "entrada" | "saida", amountIndex: numb
     const name = cleanMerchant(from[1]);
     if (name) return `Recebido de ${name}`;
   }
+  // SMS de banco costuma pôr o estabelecimento ANTES do valor ("... em PADARIA, R$ 10,00").
+  if (type === "saida") {
+    const before = original.slice(0, Math.max(0, amountIndex));
+    const shop = /\b(?:em|no estabelecimento|na loja)\s+(?!R\$|seu |sua |\d)([^\n.;!,]+)/i.exec(before);
+    if (shop) {
+      const name = cleanMerchant(shop[1]);
+      if (name) return name;
+    }
+  }
   return null;
+}
+
+/** Título que é só o nome do banco (ex.: remetente "CAIXA" do SMS) não serve de descrição. */
+function isOnlyBankName(title: string): boolean {
+  return title.length <= 24 && bankFromLabel(title) != null && !/\b(compra|pix|pagamento|transfer|saque|dep[oó]sito)/i.test(title);
 }
 
 export function bankFromNotification(input: BankNotificationInput): string | null {
   const app = (input.app ?? "").trim();
   const byPackage = PACKAGE_BANKS[app.toLowerCase()];
   if (byPackage) return byPackage;
-  return bankFromLabel(app) ?? bankFromLabel(input.title ?? "") ?? bankFromLabel(input.text ?? "");
+  return (
+    bankFromLabel(input.label ?? "") ??
+    bankFromLabel(app) ??
+    bankFromLabel(input.title ?? "") ??
+    bankFromLabel(input.text ?? "")
+  );
 }
 
 export function parseBankNotification(input: BankNotificationInput): ParseResult {
@@ -122,13 +148,15 @@ export function parseBankNotification(input: BankNotificationInput): ParseResult
   if (!type) return { ok: false, reason: "não parece uma movimentação (propaganda, limite, aviso)" };
 
   const isPix = /\bpix\b/.test(plain);
+  // "Compra no cartão de DÉBITO" sai da conta, não da fatura do cartão de crédito.
+  const isDebit = /\bdebito\b/.test(plain) && !/\bcredito\b/.test(plain);
   const kind: "card" | "account" =
-    !isPix && CARD.test(plain) && !/credito em conta|creditad/.test(plain) ? "card" : "account";
+    !isPix && !isDebit && CARD.test(plain) && !/credito em conta|creditad/.test(plain) ? "card" : "account";
 
   const bank = bankFromNotification(input);
   const description =
     describe(original, type, amountMatch.index) ??
-    (title && !/R\$/.test(title) ? title.slice(0, 80) : null) ??
+    (title && !/R\$/.test(title) && !isOnlyBankName(title) ? title.slice(0, 80) : null) ??
     `${type === "entrada" ? "Entrada" : "Saída"}${bank ? ` ${bank}` : ""}`;
 
   return { ok: true, parsed: { amount, type, kind, bank, description } };
