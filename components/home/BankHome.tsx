@@ -19,13 +19,8 @@ import { BankLogo } from "@/components/bancos/BankLogo";
 import { accumulatedProfit } from "@/lib/finance/investment-pnl";
 import { useConnectionFilter } from "@/lib/ui/use-persisted-state";
 import { useHideValues } from "@/lib/ui/hide-values";
-import { oldestDataAgeHours } from "@/lib/finance/connection-freshness";
-import { formatRelativeDaySP } from "@/lib/ui/datetime";
 import { CronHealthBanner } from "@/components/ui/CronHealthBanner";
 import { StickyBalanceBar } from "@/components/ui/StickyBalanceBar";
-
-/** Acima disso, mostra de quando é o saldo (o Meu Pluggy só traz dados novos 1x por dia). */
-const STALE_SYNC_HOURS = 6;
 
 function money(hidden: boolean, value: number) {
   if (hidden) return "••••••";
@@ -148,15 +143,6 @@ export default function BankHome({
   const dailyBudget = dailyBudgetFromBalance(saldoConta, todayKey);
   const dailyUntilLabel = format(parseISO(`${dailyBudget.until}T12:00:00`), "d 'de' MMMM", { locale: ptBR });
 
-  // Idade dos DADOS do banco (quando a Pluggy buscou no banco), não da última
-  // leitura do app — essa é sempre recente e escondia saldo de ontem.
-  const oldestData = useMemo(
-    // eslint-disable-next-line react-hooks/purity -- horário atual só pra exibir "atrasado", não precisa ser puro
-    () => oldestDataAgeHours(connections, Date.now()),
-    [connections],
-  );
-  const dataStale = oldestData != null && oldestData.hours > STALE_SYNC_HOURS;
-
   if (connections.length === 0) {
     return (
       <div className="flex min-h-[70vh] flex-col justify-end pb-8 lg:justify-center lg:pb-0">
@@ -234,14 +220,6 @@ export default function BankHome({
 
             <p className="mt-8 flex items-center gap-2 text-sm text-zinc-500 lg:mt-10">
               {bankLabel}
-              {dataStale && oldestData && (
-                <span
-                  title="O Meu Pluggy busca os dados de cada banco 1 vez por dia: movimentações mais recentes ainda não aparecem."
-                  className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300"
-                >
-                  saldo de {formatRelativeDaySP(oldestData.at)}
-                </span>
-              )}
               {provisionalDelta !== 0 && (
                 <span
                   title="Inclui compras e Pix que chegaram pelas notificações do banco no celular e ainda não foram confirmados pelo banco."

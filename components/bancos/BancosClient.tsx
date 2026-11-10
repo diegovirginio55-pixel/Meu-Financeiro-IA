@@ -11,7 +11,7 @@ import { getBankBrand, officialInstitutionName } from "@/lib/pluggy/brands";
 import { PageHero, PageShell, SectionLabel } from "@/components/ui/page-chrome";
 import { BankLogo } from "@/components/bancos/BankLogo";
 import { realConnectionId } from "@/lib/finance/connection-filter";
-import { calendarDaysAgoSP, formatDateSP, formatRelativeDaySP } from "@/lib/ui/datetime";
+import { formatRelativeDaySP } from "@/lib/ui/datetime";
 import { connectionFreshness } from "@/lib/finance/connection-freshness";
 import { useDialog } from "@/lib/ui/use-dialog";
 
@@ -30,30 +30,6 @@ const BalanceHistoryChart = dynamic(
 );
 
 const ACTIVE_STATUSES = new Set(["UPDATED", "UPDATING"]);
-
-function ClockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="8.25" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 8v4.2L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/**
- * "Saldo de ontem às 17:33": hora em que a Pluggy buscou os dados no banco
- * (não a hora em que o app leu a Pluggy, que é sempre recente e enganava).
- */
-function formatDataAge(value: string | null): string {
-  if (!value) return "Ainda sem dados do banco";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Ainda sem dados do banco";
-  // Sempre no fuso de São Paulo: o servidor roda em UTC e o texto precisa ser igual no SSR e no celular.
-  const days = calendarDaysAgoSP(date);
-  if (days <= 1) return `Saldo de ${formatRelativeDaySP(date)}`;
-  if (days < 7) return `Saldo de ${days} dias atrás`;
-  return `Saldo de ${formatDateSP(date)}`;
-}
 
 /** "próxima atualização hoje às 17:33" (ou "em instantes" se a Pluggy já devia ter atualizado). */
 function formatNextUpdate(value: string | null): string | null {
@@ -95,10 +71,6 @@ function ConnectionCard({
         />
       </div>
       <p className="mt-6 text-[15px] font-semibold text-white">{name}</p>
-      <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
-        <ClockIcon />
-        {formatDataAge(connectionFreshness(connection).dataUpdatedAt)}
-      </p>
       <span className="mt-auto w-full border-t border-zinc-800 pt-3 text-xs text-zinc-500">
         Ver detalhes &gt;
       </span>
@@ -155,10 +127,11 @@ function DetailsPanel({
               <h3 id="bank-details-title" className="text-base font-semibold text-white">
                 {name}
               </h3>
-              <p className="text-xs text-zinc-500">
-                {formatDataAge(freshness.dataUpdatedAt)}
-                {nextUpdate ? ` · ${nextUpdate}` : ""}
-              </p>
+              {nextUpdate && (
+                <p className="text-xs text-zinc-500">
+                  {nextUpdate.charAt(0).toUpperCase() + nextUpdate.slice(1)}
+                </p>
+              )}
             </div>
           </div>
           <button
