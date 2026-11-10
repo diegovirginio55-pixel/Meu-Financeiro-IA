@@ -14,6 +14,7 @@ const TABS = [
   { href: "/dashboard", label: "Início", icon: "🏠" },
   { href: "/contas", label: "Contas", icon: "🗓️" },
   { href: "/retrospectiva", label: "Retrospectiva", icon: "✨" },
+  { href: "/3d", label: "Visão 3D", icon: "🪐" },
   { href: "/mes", label: "Meu mês", icon: "📊" },
   { href: "/visao", label: "Dashboard", icon: "📈" },
   { href: "/detalhes", label: "Extrato", icon: "🧾" },

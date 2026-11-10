@@ -3,29 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { serverError } from "@/lib/api/errors";
 import { realConnectionId } from "@/lib/finance/connection-filter";
 import { daysAgoKey, saoPauloTodayKey } from "@/lib/finance/fluxo";
+import { dailyBalanceHistory, type BalanceSnapshotRow } from "@/lib/finance/balance-history";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 const MAX_DAYS = 90;
 
-type SnapshotRow = { account_id: string; snapshot_date: string; balance: number | string };
-
-/** Dias entre duas datas "AAAA-MM-DD", inclusive. */
-function dayKeys(from: string, to: string): string[] {
-  const keys: string[] = [];
-  const cursor = new Date(`${from}T12:00:00Z`);
-  const end = new Date(`${to}T12:00:00Z`);
-  while (cursor <= end && keys.length <= MAX_DAYS + 1) {
-    keys.push(cursor.toISOString().slice(0, 10));
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return keys;
-}
-
 /**
  * Evolução diária do saldo em conta (todas as contas, ou de um banco com
  * ?banco=<id>), para o gráfico da tela inicial. Dia sem foto de uma conta
- * repete o último saldo conhecido dela — senão a soma "despencava" nos dias
- * em que um banco não atualizou.
+ * repete o último saldo conhecido dela (ver dailyBalanceHistory).
  */
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -35,12 +21,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const days = Math.min(MAX_DAYS, Math.max(7, Number(url.searchParams.get("dias")) || 30));
   const bank = url.searchParams.get("banco");
-  // Um dia antes do período, para já começar com o último saldo de cada conta.
+  // Uma semana antes do período, para já começar com o último saldo de cada conta.
   const from = daysAgoKey(days + 7);
   const start = daysAgoKey(days);
   const today = saoPauloTodayKey();
 
-  const { data: rows, error } = await fetchAllRows<SnapshotRow>((rangeStart, rangeEnd) => {
+  const { data: rows, error } = await fetchAllRows<BalanceSnapshotRow>((rangeStart, rangeEnd) => {
     let query = supabase
       .from("account_balance_snapshots")
       .select("account_id, snapshot_date, balance")
@@ -53,21 +39,5 @@ export async function GET(request: Request) {
   });
   if (error) return serverError("Não foi possível carregar o histórico do saldo.", error);
 
-  const byDate = new Map<string, SnapshotRow[]>();
-  for (const row of rows) {
-    const list = byDate.get(row.snapshot_date) ?? [];
-    list.push(row);
-    byDate.set(row.snapshot_date, list);
-  }
-
-  const lastByAccount = new Map<string, number>();
-  const history: { date: string; balance: number }[] = [];
-  for (const key of dayKeys(from, today)) {
-    for (const row of byDate.get(key) ?? []) lastByAccount.set(row.account_id, Number(row.balance) || 0);
-    if (key < start || lastByAccount.size === 0) continue;
-    const total = Array.from(lastByAccount.values()).reduce((sum, value) => sum + value, 0);
-    history.push({ date: key, balance: Math.round(total * 100) / 100 });
-  }
-
-  return NextResponse.json({ history });
+  return NextResponse.json({ history: dailyBalanceHistory(rows, start, today) });
 }
