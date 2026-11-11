@@ -20,6 +20,7 @@ function provisional(overrides: Record<string, unknown>) {
     category: "Outros",
     created_at: "2026-11-09T15:00:00.000Z",
     pluggy_transaction_id: "notif:abc",
+    description: "Compra",
     ...overrides,
   };
 }
@@ -94,37 +95,42 @@ describe("saldo estimado com as notificações do celular", () => {
   });
 });
 
+type Call = { table: string; op: string; payload?: unknown; filters: unknown[][] };
+
+/** Cliente falso do Supabase: o select devolve "rows" e cada update/delete fica registrado em "calls". */
+function fakeClient(rows: unknown[], calls: Call[]): SupabaseClient {
+  return {
+    from(table: string) {
+      const call: Call = { table, op: "select", payload: undefined, filters: [] };
+      calls.push(call);
+      const builder: Record<string, unknown> = new Proxy(
+        {},
+        {
+          get(_target, prop: string) {
+            if (prop === "then") {
+              const data = call.op === "select" ? rows : null;
+              return (resolve: (value: unknown) => void) => resolve({ data, error: null });
+            }
+            return (...args: unknown[]) => {
+              if (["delete", "update"].includes(prop)) {
+                call.op = prop;
+                call.payload = args[0];
+              } else call.filters.push([prop, ...args]);
+              return builder;
+            };
+          },
+        },
+      );
+      return builder;
+    },
+  } as unknown as SupabaseClient;
+}
+
 describe("troca do provisório pelo lançamento oficial", () => {
   it("apaga o provisório, mantém a categoria escolhida e não notifica de novo", async () => {
-    const calls: { table: string; op: string; payload?: unknown; filters: unknown[][] }[] = [];
+    const calls: Call[] = [];
     const rows = [provisional({ id: "prov-1", account_id: "acc-1", amount: 45.9, category: "Alimentação" })];
-    const client = {
-      from(table: string) {
-        const call = { table, op: "select", payload: undefined as unknown, filters: [] as unknown[][] };
-        calls.push(call);
-        const builder: Record<string, unknown> = new Proxy(
-          {},
-          {
-            get(_target, prop: string) {
-              if (prop === "then") {
-                const data = call.op === "select" ? rows : null;
-                return (resolve: (value: unknown) => void) => resolve({ data, error: null });
-              }
-              return (...args: unknown[]) => {
-                if (["delete", "update"].includes(prop)) {
-                  call.op = prop;
-                  call.payload = args[0];
-                } else call.filters.push([prop, ...args]);
-                return builder;
-              };
-            },
-          },
-        );
-        return builder;
-      },
-    } as unknown as SupabaseClient;
-
-    const matched = await reconcileProvisional(client, "user-1", { accountId: "acc-1", cardId: null }, [
+    const matched = await reconcileProvisional(fakeClient(rows, calls), "user-1", { accountId: "acc-1", cardId: null }, [
       { id: "oficial-1", amount: 45.9, type: "saida", date: "2026-11-10", category: "Outros" },
       { id: "oficial-2", amount: 12, type: "saida", date: "2026-11-10", category: "Outros" },
     ]);
@@ -132,5 +138,24 @@ describe("troca do provisório pelo lançamento oficial", () => {
     expect([...matched]).toEqual(["oficial-1"]);
     expect(calls.some((c) => c.op === "update" && (c.payload as { category: string }).category === "Alimentação")).toBe(true);
     expect(calls.some((c) => c.op === "delete" && JSON.stringify(c.filters).includes("prov-1"))).toBe(true);
+  });
+
+  it("o nome da loja do SMS substitui o \"COMPRA CARTAO DEBITO\" do banco", async () => {
+    const calls: Call[] = [];
+    const rows = [provisional({ id: "prov-1", account_id: "acc-1", amount: 100, description: "SUPERMERCADO BOM PRECO" })];
+    await reconcileProvisional(fakeClient(rows, calls), "user-1", { accountId: "acc-1", cardId: null }, [
+      { id: "oficial-1", amount: 100, type: "saida", date: "2026-11-10", category: "Outros", description: "COMPRA CARTAO DEBITO" },
+    ]);
+    const update = calls.find((c) => c.op === "update");
+    expect(update?.payload).toEqual({ description: "SUPERMERCADO BOM PRECO" });
+  });
+
+  it("descrição boa do banco não é trocada", async () => {
+    const calls: Call[] = [];
+    const rows = [provisional({ id: "prov-1", account_id: "acc-1", amount: 100, description: "Pix para ANA" })];
+    await reconcileProvisional(fakeClient(rows, calls), "user-1", { accountId: "acc-1", cardId: null }, [
+      { id: "oficial-1", amount: 100, type: "saida", date: "2026-11-10", category: "Outros", description: "Pix enviado - Ana Souza" },
+    ]);
+    expect(calls.some((c) => c.op === "update")).toBe(false);
   });
 });

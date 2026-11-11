@@ -69,6 +69,32 @@ final class Forwarder {
         return body;
     }
 
+    /** Texto de um comprovante compartilhado (lido no celular): o site entende e lança. */
+    static JSONObject receipt(String text) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("kind", "receipt");
+            body.put("app", "comprovante");
+            body.put("label", "Comprovante");
+            body.put("text", text);
+            body.put("at", System.currentTimeMillis());
+        } catch (JSONException ignored) {
+            // put com String/long não falha
+        }
+        return body;
+    }
+
+    /** Envia o comprovante e devolve o resultado na tela; sem rede, agenda o reenvio. */
+    static void postReceipt(Context context, JSONObject body, Callback callback) {
+        Context app = context.getApplicationContext();
+        Handler main = new Handler(Looper.getMainLooper());
+        EXECUTOR.execute(() -> {
+            Outcome outcome = post(app, body);
+            if (!outcome.delivered) SendWorker.enqueue(app, body.toString());
+            main.post(() -> callback.done(outcome));
+        });
+    }
+
     /** Envia em segundo plano; se falhar, agenda o reenvio. */
     static void send(Context context, JSONObject body) {
         Context app = context.getApplicationContext();

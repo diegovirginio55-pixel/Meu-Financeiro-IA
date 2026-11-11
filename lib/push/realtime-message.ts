@@ -1,5 +1,6 @@
 import { formatCurrency } from "@/lib/finance/format";
 import type { DailyLimitStatus } from "@/lib/finance/daily-limit";
+import { TRANSFER_CATEGORY } from "@/lib/finance/categories";
 
 /** A partir de quanto do limite da categoria o aviso do gasto mostra o quanto já foi. */
 const CATEGORY_SHOW_PCT = 0.7;
@@ -35,6 +36,13 @@ export function realtimeMovementMessage(
 ): { title: string; body: string } {
   const value = formatCurrency(movement.amount);
   const where = movement.bank ? ` · ${movement.bank}` : "";
+
+  // Entre as próprias contas: só troca de lugar — sem limite do dia nem categoria.
+  if (movement.category === TRANSFER_CATEGORY) {
+    const lines = [movement.description, "Entre as suas contas: não conta como gasto"];
+    if (context.balance != null) lines.push(`Saldo agora: ${formatCurrency(context.balance)}`);
+    return { title: `🔁 Transferência ${value}${where}`, body: lines.join("\n") };
+  }
   const title = movement.type === "entrada" ? `💰 Entrou ${value}${where}` : `💸 Saiu ${value}${where}`;
 
   const lines: string[] = [

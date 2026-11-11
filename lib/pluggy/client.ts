@@ -102,6 +102,8 @@ export type PluggyAccount = {
   marketingName?: string | null;
   number?: string | null;
   balance: number;
+  /** Nome do titular (reconhece Pix para o próprio nome). */
+  owner?: string | null;
   bankData?: {
     transferNumber?: string | null;
   } | null;
@@ -128,6 +130,11 @@ export type PluggyItem = {
   nextAutoSyncAt?: string | null;
 };
 
+export type PluggyParticipant = {
+  name?: string | null;
+  documentNumber?: { type?: string | null; value?: string | null } | null;
+};
+
 export type PluggyTransaction = {
   id: string;
   description?: string;
@@ -136,6 +143,14 @@ export type PluggyTransaction = {
   category?: string | null;
   date: string;
   status?: string;
+  /** Open Finance: PIX, TED, CARTAO, SAQUE… */
+  operationType?: string | null;
+  /** Quem pagou e quem recebeu (Pix/TED): mesmo CPF dos dois lados = transferência entre as próprias contas. */
+  paymentData?: {
+    payer?: PluggyParticipant | null;
+    receiver?: PluggyParticipant | null;
+    paymentMethod?: string | null;
+  } | null;
   /** Só em cartão: parcela N de M e mês da fatura (lib/finance/card-installments.ts). */
   creditCardMetadata?: {
     installmentNumber?: number | null;

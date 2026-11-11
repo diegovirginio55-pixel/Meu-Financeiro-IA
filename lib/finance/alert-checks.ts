@@ -232,7 +232,7 @@ export function computeSmartAlertsFromData({
 
   // 3c) Quanto ainda pode gastar hoje sem comprometer o mês. Se houver um
   // orçamento definido, usa (orçamento - já gasto) / dias restantes; senão
-  // cai no cálculo pelo saldo em conta até o dia 5 do mês seguinte. Avisa
+  // cai no cálculo pelo saldo em conta até o próximo salário (5º dia útil). Avisa
   // se já passou bem do limite diário.
   const daily = dailyLimitStatus({ tx, totalBalance, spendingLimit, todayKey: todayStr });
   const gastosHojeTotal = daily.spentToday;

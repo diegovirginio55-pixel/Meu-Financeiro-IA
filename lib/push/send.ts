@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getVapidKeys, vapidSubject } from "./vapid";
 import { movementPayloads, recentMovements, type MovementNotice, type PushPayload } from "./payload";
 import { signPushAction } from "./actions";
-import { CATEGORIES, CATEGORY_ICONS } from "@/lib/finance/categories";
+import { CATEGORIES, CATEGORY_ICONS, isTransferDescription, TRANSFER_CATEGORY } from "@/lib/finance/categories";
 
 type SubscriptionRow = {
   id: string;
@@ -58,7 +58,7 @@ async function sendOne(
 }
 
 const FALLBACK_CATEGORIES = ["Alimentação", "Transporte", "Compras", "Moradia", "Lazer", "Saúde"];
-const NOT_SUGGESTED = new Set(["Outros", "Salário", "Investimentos", "Dívidas"]);
+const NOT_SUGGESTED = new Set(["Outros", "Salário", "Investimentos", "Dívidas", TRANSFER_CATEGORY]);
 
 /** Categorias de gasto que o usuário mais usa (últimos 90 dias) — viram os botões do push. */
 async function topSpendingCategories(userId: string): Promise<string[]> {
@@ -110,14 +110,22 @@ export async function notifyBankMovements(userId: string, bankName: string, move
   }
 }
 
-/** Botões com as 2 categorias mais usadas (sem a atual) para categorizar o gasto pela notificação. */
+/**
+ * Botões com as 2 categorias mais usadas (sem a atual) para categorizar o
+ * gasto pela notificação. Num Pix/transferência, o segundo botão é
+ * "Transferências" — um toque se o dinheiro foi para outra conta sua (aí não
+ * conta como gasto).
+ */
 export function categoryActionExtras(
   userId: string,
-  item: { id?: string; category?: string },
+  item: { id?: string; category?: string; description?: string },
   suggestions: string[],
 ): Partial<PushPayload> {
   if (!item.id) return {};
-  const options = suggestions.filter((category) => category !== item.category).slice(0, 2);
+  let options = suggestions.filter((category) => category !== item.category).slice(0, 2);
+  if (item.category !== TRANSFER_CATEGORY && item.description && isTransferDescription(item.description)) {
+    options = [...options.slice(0, 1), TRANSFER_CATEGORY];
+  }
   const token = signPushAction({ k: "tx", u: userId, t: item.id });
   if (!token || options.length === 0) return {};
   return {

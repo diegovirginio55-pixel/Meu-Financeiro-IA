@@ -4,6 +4,7 @@ import { applyTransactionChange, type TransactionEffect } from "@/lib/finance/ap
 import { isMissingSchemaError } from "@/lib/supabase/schema-compat";
 import { serverError } from "@/lib/api/errors";
 import { parseTransactionUpdate } from "@/lib/finance/validation";
+import { learnCategoryChoice, learnedMessage, type LearnedCategory } from "@/lib/finance/category-learning";
 
 const EFFECT_FIELDS = "account_id, card_id, type, amount, pluggy_transaction_id, user_id";
 
@@ -94,7 +95,18 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ transaction: data });
+  // Categoria de um Pix para alguém: vira regra e corrige os antigos dessa pessoa.
+  let learned: LearnedCategory | null = null;
+  if (typeof parsed.updates.category === "string") {
+    learned = await learnCategoryChoice(
+      supabase,
+      userData.user.id,
+      { id, description: String(data.description ?? ""), type: String(data.type ?? "") },
+      parsed.updates.category,
+    );
+  }
+
+  return NextResponse.json({ transaction: data, learned: learned ? learnedMessage(learned) : "" });
 }
 
 export async function DELETE(

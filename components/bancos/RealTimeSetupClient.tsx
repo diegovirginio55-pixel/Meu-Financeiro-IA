@@ -225,6 +225,12 @@ export default function RealTimeSetupClient({
               aviso de alguma compra vier de um app que não está na lista, ele aparece em “Leitura dos bancos” →{" "}
               <strong>Outros apps com valores em R$</strong>: toque em <strong>Ler os avisos deste app</strong>.
             </p>
+            <p className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3 text-xs leading-relaxed text-zinc-300">
+              <strong className="text-zinc-100">Pix que o banco não avisou</strong> (alguns bancos não mandam aviso quando
+              você mesmo faz o Pix com o app aberto): no comprovante, toque em <strong>Compartilhar</strong> →{" "}
+              <strong>Lançar no Meu Financeiro</strong>. O app lê o comprovante no próprio celular e lança na hora — se já
+              estiver lançado, não duplica.
+            </p>
             <ol className="flex flex-col gap-4">
               <Step n={1}>
                 Baixe e instale o app. Como ele não vem da Play Store, o Android pede para{" "}

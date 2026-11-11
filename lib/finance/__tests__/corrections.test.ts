@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isGasto,
   isRenda,
-  nextMonthDay5Key,
+  nextPaydayKey,
+  nthBusinessDayKey,
   nextMonthlyOccurrenceKey,
   toSaoPauloDateOnly,
 } from "../fluxo";
@@ -36,10 +37,13 @@ describe("classificação: fatura de cartão não conta em dobro", () => {
     expect(isGasto(makeTx({ type: "saida", description: "PARCELA FINANCIAMENTO", category: "Dívidas" }))).toBe(true);
   });
 
-  it("Pix sem categoria específica segue como transferência; com categoria real, conta", () => {
-    expect(isGasto(makeTx({ type: "saida", description: "PIX ENVIADO JOAO", category: "Outros" }))).toBe(false);
+  it("Pix para outra pessoa e Pix por QR Code contam como gasto; só \"Transferências\" fica de fora", () => {
+    expect(isGasto(makeTx({ type: "saida", description: "Pix enviado - Izoleide Mangueira Da Cruz", category: "Outros" }))).toBe(true);
+    expect(isGasto(makeTx({ type: "saida", description: "DEB PIX QR COD EST", category: "Outros" }))).toBe(true);
     expect(isGasto(makeTx({ type: "saida", description: "PIX ENVIADO JOAO", category: "Moradia" }))).toBe(true);
-    expect(isRenda(makeTx({ type: "entrada", description: "PIX RECEBIDO MARIA", category: "Salário" }))).toBe(false);
+    expect(isGasto(makeTx({ type: "saida", description: "Pix enviado - Diego Silva", category: "Transferências" }))).toBe(false);
+    expect(isRenda(makeTx({ type: "entrada", description: "PIX RECEBIDO MARIA", category: "Outros" }))).toBe(true);
+    expect(isRenda(makeTx({ type: "entrada", description: "Transferência Recebida|DIEGO", category: "Transferências" }))).toBe(false);
   });
 });
 
@@ -67,10 +71,23 @@ describe("vencimentos mensais respeitam o tamanho do mês", () => {
     expect(nextMonthlyOccurrenceKey(31, "2027-01-31")).toBe("2027-01-31");
   });
 
-  it("próximo dia 5 é deste mês quando hoje é dia 1 a 4", () => {
-    expect(nextMonthDay5Key("2026-11-03")).toBe("2026-11-05");
-    expect(nextMonthDay5Key("2026-11-05")).toBe("2026-12-05");
-    expect(nextMonthDay5Key("2026-12-20")).toBe("2027-01-05");
+  it("salário no 5º dia útil, pulando fim de semana e feriado (Finados, Independência, Ano-Novo)", () => {
+    expect(nthBusinessDayKey(2026, 11, 5)).toBe("2026-11-09");
+    expect(nthBusinessDayKey(2026, 10, 5)).toBe("2026-10-07");
+    expect(nthBusinessDayKey(2026, 9, 5)).toBe("2026-09-08");
+    expect(nthBusinessDayKey(2027, 1, 5)).toBe("2027-01-08");
+  });
+
+  it("próximo dia de salário é deste mês só antes do 5º dia útil", () => {
+    expect(nextPaydayKey("2026-11-03")).toBe("2026-11-09");
+    expect(nextPaydayKey("2026-11-09")).toBe("2026-12-07");
+    expect(nextPaydayKey("2026-12-20")).toBe("2027-01-08");
+  });
+
+  it("Carnaval e Sexta-feira Santa não são dia útil", () => {
+    // 2027: Carnaval 8 e 9/fev, Sexta-feira Santa 26/mar.
+    expect(nthBusinessDayKey(2027, 2, 6)).toBe("2027-02-10");
+    expect(nthBusinessDayKey(2027, 3, 20)).toBe("2027-03-29");
   });
 });
 

@@ -10,7 +10,7 @@ export type DailyLimitStatus = {
   remaining: number;
   /** Quanto passou do limite de hoje (0 se não passou). */
   over: number;
-  /** De onde veio o limite: orçamento do mês ou saldo em conta até o dia 5. */
+  /** De onde veio o limite: orçamento do mês ou saldo em conta até o próximo salário (5º dia útil). */
   basis: "budget" | "balance";
 };
 
@@ -18,7 +18,7 @@ export type DailyLimitStatus = {
  * Limite de gasto de hoje — o mesmo número do aviso "Seu limite de hoje" e
  * do aviso que sai a cada gasto. Com orçamento do mês definido:
  * (orçamento - gasto até ontem) / dias restantes. Sem orçamento: saldo em
- * conta dividido pelos dias até o próximo dia 5.
+ * conta dividido pelos dias até o próximo salário (5º dia útil).
  */
 export function dailyLimitStatus({
   tx,

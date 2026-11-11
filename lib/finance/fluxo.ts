@@ -113,12 +113,67 @@ export function sumGastosInRange(transactions: Transaction[], from: string, to: 
     .reduce((sum, item) => sum + Number(item.amount), 0);
 }
 
-/** Próximo dia 5 (dia de pagamento): ainda neste mês se hoje for dia 1 a 4. */
-export function nextMonthDay5Key(todayKey = saoPauloTodayKey()): string {
-  const [year, month, day] = todayKey.split("-").map(Number);
-  if (day < 5) return `${year}-${String(month).padStart(2, "0")}-05`;
-  const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
-  return `${next.year}-${String(next.month).padStart(2, "0")}-05`;
+function dateKeyUTC(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher), em UTC. */
+function easterSunday(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+/** Dias sem expediente bancário no país: feriados nacionais + Carnaval, Sexta-feira Santa e Corpus Christi. */
+function bankHolidays(year: number): Set<string> {
+  const fixed = ["01-01", "04-21", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-25"].map((day) => `${year}-${day}`);
+  const easter = easterSunday(year).getTime();
+  const movable = [-48, -47, -2, 60].map((offset) => dateKeyUTC(new Date(easter + offset * 86_400_000)));
+  return new Set([...fixed, ...movable]);
+}
+
+/** N-ésimo dia útil do mês (seg–sex, fora feriados bancários), como "YYYY-MM-DD". month: 1–12. */
+export function nthBusinessDayKey(year: number, month: number, n: number): string {
+  const holidays = bankHolidays(year);
+  let count = 0;
+  for (let day = 1; day <= lastDayOfMonth(year, month - 1); day += 1) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    const weekday = date.getUTCDay();
+    const key = dateKeyUTC(date);
+    if (weekday === 0 || weekday === 6 || holidays.has(key)) continue;
+    count += 1;
+    if (count === n) return key;
+  }
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDayOfMonth(year, month - 1)).padStart(2, "0")}`;
+}
+
+/** Dia útil em que o salário costuma cair (CLT: até o 5º dia útil do mês). */
+export const PAYDAY_BUSINESS_DAY = 5;
+
+/**
+ * Próximo dia de salário: o 5º dia útil — ainda neste mês se hoje for antes
+ * dele. Antes era o dia 5 fixo, que adiantava o salário em até 4 dias (em
+ * nov/2026 o 5º dia útil é dia 9, por causa do feriado de Finados).
+ */
+export function nextPaydayKey(todayKey = saoPauloTodayKey()): string {
+  const [year, month] = todayKey.split("-").map(Number);
+  const thisMonth = nthBusinessDayKey(year, month, PAYDAY_BUSINESS_DAY);
+  if (todayKey < thisMonth) return thisMonth;
+  return month === 12
+    ? nthBusinessDayKey(year + 1, 1, PAYDAY_BUSINESS_DAY)
+    : nthBusinessDayKey(year, month + 1, PAYDAY_BUSINESS_DAY);
 }
 
 /** Último dia do mês (monthIndex começa em 0). */
@@ -157,7 +212,7 @@ export function dailyBudgetFromBalance(
   balance: number,
   todayKey = saoPauloTodayKey(),
 ): { perDay: number; days: number; until: string } {
-  const until = nextMonthDay5Key(todayKey);
+  const until = nextPaydayKey(todayKey);
   const days = daysUntilInclusive(todayKey, until);
   const available = Math.max(0, Number(balance) || 0);
   return { perDay: available / days, days, until };

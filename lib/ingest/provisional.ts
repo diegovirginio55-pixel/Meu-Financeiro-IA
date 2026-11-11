@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Account, Card, Transaction } from "@/lib/finance/types";
 import { connectionFreshness } from "@/lib/finance/connection-freshness";
 import type { BalanceOverride } from "@/lib/finance/balance-override";
+import { isBlandDescription, isGenericCategory } from "@/lib/finance/categories";
 
 /**
  * Lançamentos "provisórios": vieram da notificação do app do banco no
@@ -20,10 +21,10 @@ export function isProvisional(transaction: { pluggy_transaction_id?: string | nu
 
 type ProvisionalRow = Pick<
   Transaction,
-  "id" | "amount" | "type" | "account_id" | "card_id" | "date" | "category" | "created_at" | "pluggy_transaction_id"
+  "id" | "amount" | "type" | "account_id" | "card_id" | "date" | "category" | "created_at" | "pluggy_transaction_id" | "description"
 >;
 
-const PROVISIONAL_FIELDS = "id, amount, type, account_id, card_id, date, category, created_at, pluggy_transaction_id";
+const PROVISIONAL_FIELDS = "id, amount, type, account_id, card_id, date, category, created_at, pluggy_transaction_id, description";
 
 export async function loadProvisional(supabase: SupabaseClient, userId?: string): Promise<ProvisionalRow[]> {
   let query = supabase.from("transactions").select(PROVISIONAL_FIELDS).like("pluggy_transaction_id", `${PROVISIONAL_PREFIX}%`);
@@ -44,14 +45,15 @@ function dayDiff(a: string, b: string): number {
  * Chegaram lançamentos oficiais da Pluggy: troca os provisórios
  * correspondentes (mesma conta/cartão, mesmo tipo e valor, data próxima).
  * Se o usuário já tinha escolhido uma categoria no provisório, ela passa
- * para o oficial. Devolve os ids oficiais que tinham provisório — esses não
+ * para o oficial — e o nome da loja do aviso substitui uma descrição vazia
+ * do banco ("COMPRA CARTAO DEBITO"). Devolve os ids oficiais que tinham provisório — esses não
  * geram notificação de novo (o usuário já viu a do próprio banco).
  */
 export async function reconcileProvisional(
   supabase: SupabaseClient,
   userId: string,
   target: { accountId: string | null; cardId: string | null },
-  inserted: { id: string; amount: number; type: string; date: string; category: string }[],
+  inserted: { id: string; amount: number; type: string; date: string; category: string; description?: string }[],
 ): Promise<Set<string>> {
   const matched = new Set<string>();
   if (inserted.length === 0) return matched;
@@ -75,9 +77,20 @@ export async function reconcileProvisional(
     if (!candidate) continue;
     used.add(candidate.id);
     matched.add(official.id);
-    const chosen = candidate.category && !["Outros", "Salário"].includes(candidate.category) ? candidate.category : null;
-    if (chosen && chosen !== official.category) {
-      await supabase.from("transactions").update({ category: chosen }).eq("id", official.id);
+    const chosen = candidate.category && !isGenericCategory(candidate.category) ? candidate.category : null;
+    const updates: { category?: string; description?: string } = {};
+    if (chosen && chosen !== official.category) updates.category = chosen;
+    if (
+      official.description !== undefined &&
+      isBlandDescription(official.description) &&
+      candidate.description &&
+      !isBlandDescription(candidate.description)
+    ) {
+      updates.description = candidate.description;
+    }
+    if (Object.keys(updates).length > 0) {
+      await supabase.from("transactions").update(updates).eq("id", official.id);
+      Object.assign(official, updates);
     }
   }
   if (used.size > 0) {

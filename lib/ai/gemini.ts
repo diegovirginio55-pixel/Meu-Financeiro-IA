@@ -85,7 +85,7 @@ Entradas do mês: ${formatCurrency(snapshot.monthEntradas)}
 Despesas do mês: ${formatCurrency(snapshot.monthDespesas)}
 Gastos de hoje: ${formatCurrency(snapshot.gastosHoje)}
 Gastos da semana: ${formatCurrency(snapshot.gastosSemana)}
-Pode gastar por dia até ${snapshot.dataLimiteDia5} (dia 5 do mês seguinte, ${snapshot.diasAteDia5} dias, só saldo em conta): ${formatCurrency(snapshot.gastoDiarioAteDia5)}
+Pode gastar por dia até ${snapshot.dataLimiteDia5} (próximo salário, no 5º dia útil, ${snapshot.diasAteDia5} dias, só saldo em conta): ${formatCurrency(snapshot.gastoDiarioAteDia5)}
 Economia do mês: ${formatCurrency(snapshot.economia)}
 
 Dívidas pendentes:

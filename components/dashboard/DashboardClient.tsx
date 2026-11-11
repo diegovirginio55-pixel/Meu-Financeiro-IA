@@ -20,7 +20,7 @@ import {
   shiftMonthKey,
   sumGastosInRange,
 } from "@/lib/finance/fluxo";
-import { isTransferDescription, resolvedCategory } from "@/lib/finance/categories";
+import { isInternalTransfer, resolvedCategory } from "@/lib/finance/categories";
 import type { FinancialSnapshot } from "@/lib/finance/summary";
 import type { BankConnectionWithAssets } from "@/lib/finance/bank-connections";
 import type { Transaction } from "@/lib/finance/types";
@@ -195,7 +195,8 @@ export default function DashboardClient({
       const key = transaction.date.slice(0, 7);
       if (!cashNet.has(key)) return;
       const amount = Number(transaction.amount);
-      if (!isTransferDescription(transaction.description)) {
+      // Entre as próprias contas o dinheiro só troca de lugar; Pix para outras pessoas sai do caixa.
+      if (!isInternalTransfer(transaction)) {
         cashNet.set(key, (cashNet.get(key) ?? 0) + (transaction.type === "entrada" ? amount : -amount));
       }
       if (isRenda(transaction)) patrNet.set(key, (patrNet.get(key) ?? 0) + amount);
@@ -422,7 +423,7 @@ export default function DashboardClient({
         <p className="text-[11px] uppercase tracking-wide text-zinc-500">Pode gastar por dia</p>
         <p className="mt-1 text-2xl font-semibold text-white">{formatCurrency(dailyBudget.perDay)}</p>
         <p className="mt-1 text-xs text-zinc-500">
-          até {dailyUntilLabel} · {dailyBudget.days} {dailyBudget.days === 1 ? "dia" : "dias"} · saldo em conta
+          até o salário ({dailyUntilLabel}) · {dailyBudget.days} {dailyBudget.days === 1 ? "dia" : "dias"} · saldo em conta
         </p>
       </SoftPanel>
 

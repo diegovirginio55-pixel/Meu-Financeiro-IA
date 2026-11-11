@@ -40,7 +40,9 @@ export function CategoryBudgetsCard({ initialLimits, historyTx }: { initialLimit
 
   const monthTx = useMemo(() => historyTx.filter((tx) => tx.date.startsWith(monthKey)), [historyTx, monthKey]);
   const usage = useMemo(() => categoryUsage(limits, monthTx), [limits, monthTx]);
-  const available = CATEGORIES.filter((category) => !(category in draft) && category !== "Salário");
+  const available = CATEGORIES.filter(
+    (category) => !(category in draft) && !["Salário", "Transferências", "Investimentos"].includes(category),
+  );
 
   function startEdit() {
     setDraft(Object.fromEntries(Object.entries(limits).map(([category, limit]) => [category, formatBRLInput(limit)])));

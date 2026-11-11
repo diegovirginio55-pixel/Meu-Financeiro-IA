@@ -407,7 +407,7 @@ export default function BankHome({
             {money(hidden, dailyBudget.perDay)}
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            até {dailyUntilLabel} · {dailyBudget.days} {dailyBudget.days === 1 ? "dia" : "dias"} · saldo em conta
+            até o salário ({dailyUntilLabel}) · {dailyBudget.days} {dailyBudget.days === 1 ? "dia" : "dias"} · saldo em conta
           </p>
         </article>
         <Link

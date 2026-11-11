@@ -73,7 +73,7 @@ describe("summarizeMonthSpending", () => {
   const txs = [
     makeTx({ id: "1", date: "2026-11-02", amount: 300, type: "saida", category: "Moradia", description: "Aluguel" }),
     makeTx({ id: "2", date: "2026-11-05", amount: 40, type: "saida", category: "Lazer", description: "Cinema" }),
-    makeTx({ id: "3", date: "2026-11-06", amount: 500, type: "saida", category: "Outros", description: "Pix para Maria" }),
+    makeTx({ id: "3", date: "2026-11-06", amount: 500, type: "saida", category: "Transferências", description: "Pix para minha conta" }),
     makeTx({ id: "4", date: "2026-11-05", amount: 5000, type: "entrada", category: "Salário", description: "Salário" }),
     makeTx({ id: "5", date: "2026-10-30", amount: 999, type: "saida", category: "Moradia", description: "Mês passado" }),
     makeTx({ id: "6", date: "2026-11-08", amount: 60, type: "saida", category: "Lazer", description: "Bar" }),

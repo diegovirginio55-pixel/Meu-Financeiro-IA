@@ -162,6 +162,11 @@ public class StatusActivity extends Activity {
         }
         addButton(actions, "Abrir Meu Financeiro", v -> openSite("/"));
 
+        addText("Pix que o banco não avisou", 16, TEXT, true, 24);
+        addText("Alguns bancos não mandam aviso quando você mesmo faz o Pix com o app aberto. No comprovante, toque em "
+                + "Compartilhar → Lançar no Meu Financeiro: o app lê o comprovante aqui no celular e lança na hora "
+                + "(se já estiver lançado, não duplica).", 13, MUTED, false, 6);
+
         renderOtherApps();
 
         addText("Widget: segure um espaço vazio da tela inicial → Widgets → Meu Financeiro, para ver o saldo e os "

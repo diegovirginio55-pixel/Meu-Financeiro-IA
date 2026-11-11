@@ -7,6 +7,7 @@
     <string name="shortcut_status">Leitura dos bancos</string>
     <string name="shortcut_new_expense">Novo gasto</string>
     <string name="shortcut_statement">Extrato</string>
+    <string name="share_receipt_label">Lançar no Meu Financeiro</string>
     <string name="widget_label">Saldo · Meu Financeiro</string>
     <string name="widget_description">Saldo em conta e gastos de hoje</string>
     <string name="widget_balance_label">Saldo em conta</string>

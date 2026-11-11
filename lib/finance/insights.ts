@@ -1,6 +1,6 @@
 import type { Transaction } from "./types";
 import { isGasto, isRenda, saoPauloMonthKey, saoPauloTodayKey, shiftMonthKey } from "./fluxo";
-import { inferCategoryFromDescription, isTransferDescription, resolvedCategory } from "./categories";
+import { inferCategoryFromDescription, isInternalTransfer, isTransferDescription, resolvedCategory } from "./categories";
 import { groupSubscriptions } from "./subscriptions";
 import { formatCurrency, formatDate } from "./format";
 import type { AlertCandidate } from "./alert-checks";
@@ -239,9 +239,11 @@ function detectUnusualSalary(transactions: Transaction[], thisMonth: string): In
   ];
 }
 
-/** Transferência (Pix/TED) de valor muito acima do que costuma ser enviado. */
+/** Transferência (Pix/TED) para outras pessoas de valor muito acima do que costuma ser enviado. */
 function detectUnusualTransfer(transactions: Transaction[], thisMonth: string): Insight[] {
-  const transfers = transactions.filter((t) => t.type === "saida" && isTransferDescription(t.description));
+  const transfers = transactions.filter(
+    (t) => t.type === "saida" && isTransferDescription(t.description) && !isInternalTransfer(t),
+  );
   const history = transfers.filter((t) => t.date.slice(0, 7) !== thisMonth).map((t) => Number(t.amount));
   if (history.length < 3) return [];
   const media = average(history);

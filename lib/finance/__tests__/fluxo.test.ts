@@ -17,8 +17,12 @@ describe("isGasto / isRenda", () => {
     expect(isGasto(makeTx({ type: "saida", description: "Supermercado" }))).toBe(true);
   });
 
-  it("não considera Pix/transferência como gasto", () => {
-    expect(isGasto(makeTx({ type: "saida", description: "Pix para Maria" }))).toBe(false);
+  it("não considera transferência entre as próprias contas como gasto", () => {
+    expect(isGasto(makeTx({ type: "saida", description: "Pix para Diego Silva", category: "Transferências" }))).toBe(false);
+  });
+
+  it("Pix para outra pessoa é gasto", () => {
+    expect(isGasto(makeTx({ type: "saida", description: "Pix para Maria", category: "Outros" }))).toBe(true);
   });
 
   it("não considera aplicação em investimento como gasto", () => {

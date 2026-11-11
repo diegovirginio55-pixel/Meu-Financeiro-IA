@@ -2,9 +2,22 @@ import { createHash } from "node:crypto";
 import { after, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyIngestToken } from "@/lib/ingest/token";
-import { parseBankNotification } from "@/lib/ingest/parse-notification";
+import { parseBankNotification, type ParsedBankNotification } from "@/lib/ingest/parse-notification";
+import { parseReceipt, type ParsedReceipt } from "@/lib/ingest/parse-receipt";
 import { PROVISIONAL_PREFIX } from "@/lib/ingest/provisional";
-import { applyCategoryRules, inferCategoryFromDescription, type CategoryRule } from "@/lib/finance/categories";
+import {
+  applyCategoryRules,
+  counterpartyFromDescription,
+  inferCategoryFromDescription,
+  isGenericCategory,
+  isTransferDescription,
+  mentionsOwnName,
+  TRANSFER_CATEGORY,
+  type CategoryRule,
+} from "@/lib/finance/categories";
+import { incomeCategory } from "@/lib/pluggy/categorize";
+import { loadOwnerNames } from "@/lib/finance/owner-names";
+import { isValidDateKey } from "@/lib/finance/validation";
 import { isInvestmentDescription } from "@/lib/finance/investment-movements";
 import { saoPauloTodayKey } from "@/lib/finance/fluxo";
 import { bankFromLabel } from "@/lib/pluggy/institution";
@@ -17,6 +30,20 @@ const MAX_BODY_BYTES = 8 * 1024;
 const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
 
 const MAX_BACKDATE_MS = 3 * 24 * 60 * 60 * 1000;
+/** Comprovante pode ser de um Pix de até 60 dias atrás. */
+const RECEIPT_MAX_DAYS = 60;
+/** Saída numa conta e entrada de mesmo valor em outra dentro disso = transferência entre as próprias contas. */
+const PAIR_WINDOW_MS = 30 * 60 * 1000;
+
+/** Pix/TED/transferência (com ou sem nome), inclusive "Recebido de Fulano" dos avisos. */
+function isTransferLike(description: string): boolean {
+  return isTransferDescription(description) || /^recebido de\b/i.test(description);
+}
+
+function shiftDateKey(key: string, days: number): string {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
 
 type Body = {
   token?: unknown;
@@ -32,6 +59,8 @@ type Body = {
   id?: unknown;
   /** App Android: hora em que o aviso apareceu (ms) — um reenvio atrasado cai no dia certo. */
   at?: unknown;
+  /** App Android: "receipt" = texto de um comprovante compartilhado do app do banco. */
+  kind?: unknown;
 };
 
 /** Hora do aviso informada pelo celular, se for plausível (até 3 dias atrás); senão, agora. */
@@ -106,28 +135,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ping: true });
   }
 
+  // Comprovante compartilhado do app do banco (o app Android lê o texto da imagem/PDF no celular).
+  const isReceipt = body.kind === "receipt";
   const input = {
     app: withoutMagicText(str(body.app, 120)),
     label: withoutMagicText(str(body.label, 120)),
     title: withoutMagicText(str(body.title, 300)),
-    text: withoutMagicText(str(body.text, 1500)),
+    text: withoutMagicText(str(body.text, isReceipt ? 4000 : 1500)),
   };
   const isTest = body.test === true || body.test === "true";
-  const preview = `${input.title ? `${input.title} — ` : ""}${input.text}`.slice(0, 120);
-  const result = parseBankNotification(input);
+  const logApp = isReceipt ? "Comprovante" : input.label || input.app;
+  const preview = (
+    isReceipt ? `Comprovante — ${input.text.replace(/\s+/g, " ")}` : `${input.title ? `${input.title} — ` : ""}${input.text}`
+  ).slice(0, 120);
+  const result = isReceipt ? parseReceipt(input.text) : parseBankNotification(input);
   if (!result.ok) {
-    const detail = result.reason === "notificação vazia" ? emptyReason(body) : result.reason;
-    if (!isTest) await appendIngestLog(userId, { app: input.label || input.app, preview, result: "ignorado", detail });
+    const detail = !isReceipt && result.reason === "notificação vazia" ? emptyReason(body) : result.reason;
+    if (!isTest) await appendIngestLog(userId, { app: logApp, preview, result: "ignorado", detail });
     return NextResponse.json({ ok: true, ignored: result.reason });
   }
-  const parsed = result.parsed;
+  const parsed: ParsedBankNotification | ParsedReceipt = result.parsed;
+  const receipt = isReceipt ? (result.parsed as ParsedReceipt) : null;
 
   const supabase = createAdminClient();
-  const [connectionsRes, accountsRes, cardsRes, rulesRes] = await Promise.all([
+  const [connectionsRes, accountsRes, cardsRes, rulesRes, ownerNames] = await Promise.all([
     supabase.from("bank_connections").select("id, institution_name").eq("user_id", userId),
     supabase.from("accounts").select("id, name, bank_connection_id, source").eq("user_id", userId),
     supabase.from("cards").select("id, name, bank_connection_id, source").eq("user_id", userId),
     supabase.from("category_rules").select("pattern, category").eq("user_id", userId),
+    loadOwnerNames(supabase, userId),
   ]);
   const connections = connectionsRes.data ?? [];
   const bankOf = (row: { name: string; bank_connection_id: string | null }) => {
@@ -142,12 +178,24 @@ export async function POST(request: Request) {
   const card = parsed.kind === "card" ? sameBank(cardsRes.data ?? [])[0] : undefined;
   const account = parsed.kind === "account" || !card ? sameBank(accountsRes.data ?? [])[0] : undefined;
 
+  // Pix/transferência para o próprio nome (ex.: "Recebido de DIEGO …") só troca dinheiro de lugar.
   const rules = (rulesRes.data ?? []) as CategoryRule[];
-  const category =
-    applyCategoryRules(parsed.description, rules) ??
+  const ruleCategory = applyCategoryRules(parsed.description, rules);
+  const counterparty = counterpartyFromDescription(parsed.description);
+  const ownTransfer = counterparty != null && mentionsOwnName(counterparty, ownerNames);
+  let category =
+    ruleCategory ??
+    (ownTransfer ? TRANSFER_CATEGORY : null) ??
     (isInvestmentDescription(parsed.description) ? "Investimentos" : null) ??
     inferCategoryFromDescription(parsed.description) ??
-    (parsed.type === "entrada" ? "Salário" : "Outros");
+    (parsed.type === "entrada" ? incomeCategory(parsed.description) : "Outros");
+
+  // Comprovante de outro dia (até 60 dias): entra na data do pagamento.
+  const todayKey = saoPauloTodayKey(noticeTime(body.at));
+  const date =
+    receipt?.date && isValidDateKey(receipt.date) && receipt.date <= todayKey && receipt.date >= shiftDateKey(todayKey, -RECEIPT_MAX_DAYS)
+      ? receipt.date
+      : todayKey;
 
   const row = {
     user_id: userId,
@@ -155,7 +203,7 @@ export async function POST(request: Request) {
     amount: parsed.amount,
     type: parsed.type,
     category,
-    date: saoPauloTodayKey(noticeTime(body.at)),
+    date,
     account_id: card ? null : (account?.id ?? null),
     card_id: card?.id ?? null,
     source: "manual" as const,
@@ -166,9 +214,64 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, test: true, wouldRegister: { ...row, user_id: undefined, pluggy_transaction_id: undefined, bank: parsed.bank } });
   }
 
+  const movement = { description: row.description, amount: row.amount, type: row.type, category, bank: parsed.bank };
+  const target = card ? "cartão" : account ? "conta" : "sem conta vinculada";
+
+  // Comprovante de algo que já está no app (pelo aviso do banco ou pelo Meu Pluggy): não duplica.
+  if (receipt) {
+    let query = supabase
+      .from("transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("type", row.type)
+      .eq("amount", row.amount)
+      .gte("date", shiftDateKey(date, -1))
+      .lte("date", shiftDateKey(date, 1));
+    if (row.account_id) query = query.eq("account_id", row.account_id);
+    const { data: same } = await query.limit(1);
+    if ((same ?? []).length > 0) {
+      await appendIngestLog(userId, {
+        app: logApp,
+        preview,
+        result: "duplicado",
+        detail: `Já estava no app: R$ ${row.amount.toFixed(2).replace(".", ",")} · ${row.description}`,
+      });
+      return NextResponse.json({ ok: true, registered: false, movement });
+    }
+  }
+
+  // Pix entre duas contas do usuário sem nome no aviso ("Pix enviado" num banco e "Pix recebido"
+  // no outro, mesmo valor, poucos minutos): os dois viram transferência.
+  let pairedId: string | null = null;
+  if (!ruleCategory && category !== TRANSFER_CATEGORY && isTransferLike(row.description)) {
+    const { data: candidates } = await supabase
+      .from("transactions")
+      .select("id, account_id, category, description")
+      .eq("user_id", userId)
+      .like("pluggy_transaction_id", `${PROVISIONAL_PREFIX}%`)
+      .eq("type", row.type === "entrada" ? "saida" : "entrada")
+      .eq("amount", row.amount)
+      .gte("created_at", new Date(Date.now() - PAIR_WINDOW_MS).toISOString())
+      .limit(5);
+    const pair = (candidates ?? []).find(
+      (item) => item.account_id !== row.account_id && isGenericCategory(item.category) && isTransferLike(String(item.description)),
+    );
+    if (pair) {
+      pairedId = pair.id as string;
+      category = TRANSFER_CATEGORY;
+      row.category = category;
+      movement.category = category;
+    }
+  }
+
   // A mesma notificação repetida (o celular às vezes reenvia) não duplica.
-  // O app Android manda um id próprio do aviso, que vale mesmo num reenvio horas depois.
-  const clientId = str(body.id, 100).trim();
+  // O app Android manda um id próprio do aviso, que vale mesmo num reenvio horas depois;
+  // no comprovante, o identificador do Pix.
+  const clientId = receipt
+    ? receipt.transactionId
+      ? `pix:${receipt.transactionId}`
+      : `comprovante:${createHash("sha256").update(input.text).digest("hex").slice(0, 24)}`
+    : str(body.id, 100).trim();
   const bucket = Math.floor(Date.now() / DEDUPE_WINDOW_MS);
   const fingerprint = createHash("sha256")
     .update(
@@ -188,8 +291,11 @@ export async function POST(request: Request) {
   if (error) return serverError("Não foi possível registrar a notificação.", error);
 
   const registered = (data ?? []).length > 0;
-  const target = card ? "cartão" : account ? "conta" : "sem conta vinculada";
   const insertedId = (data ?? [])[0]?.id as string | undefined;
+  if (registered && pairedId) {
+    const { error: pairError } = await supabase.from("transactions").update({ category: TRANSFER_CATEGORY }).eq("id", pairedId);
+    if (pairError) console.error("Erro ao marcar o par da transferência:", pairError);
+  }
   if (registered && insertedId) {
     // Depois de responder ao celular: aviso na hora (saldo novo + limite de hoje) e alertas de controle.
     after(() =>
@@ -205,15 +311,11 @@ export async function POST(request: Request) {
     );
   }
   await appendIngestLog(userId, {
-    app: input.label || input.app,
+    app: logApp,
     preview,
     result: registered ? "registrado" : "duplicado",
     detail: `${row.type === "entrada" ? "Entrada" : "Saída"} de R$ ${row.amount.toFixed(2).replace(".", ",")} · ${row.description} · ${category} · ${parsed.bank ?? "banco não identificado"} (${target})`,
   });
 
-  return NextResponse.json({
-    ok: true,
-    registered: (data ?? []).length > 0,
-    movement: { description: row.description, amount: row.amount, type: row.type, category, bank: parsed.bank },
-  });
+  return NextResponse.json({ ok: true, registered, movement });
 }

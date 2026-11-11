@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isInvestmentDescription, promoteInvestmentsFromTransactions } from "@/lib/finance/investment-movements";
-import { applyCategoryRules, inferCategoryFromDescription, type CategoryRule } from "@/lib/finance/categories";
+import { promoteInvestmentsFromTransactions } from "@/lib/finance/investment-movements";
+import { isBlandDescription, isGenericCategory, type CategoryRule } from "@/lib/finance/categories";
+import { categorizePluggyTransaction } from "./categorize";
+import { loadOwnerNames, rememberOwnerNames } from "@/lib/finance/owner-names";
 import type { Account, Investment } from "@/lib/finance/types";
 import { CDI_ANNUAL_FALLBACK } from "@/lib/finance/investment-yield";
 import { pluggyApi, pluggyInvestmentAmount, resolvePluggyPosition, type PluggyAccount, type PluggyInvestment } from "./client";
@@ -23,51 +25,6 @@ import { cleanupStaleProvisional, reconcileProvisional } from "@/lib/ingest/prov
 
 const TRANSACTIONS_LOOKBACK_DAYS = 90;
 
-const CATEGORY_MAP: Record<string, string> = {
-  restaurants: "Alimentação",
-  "food and drink": "Alimentação",
-  groceries: "Alimentação",
-  transport: "Transporte",
-  transportation: "Transporte",
-  "auto & transport": "Transporte",
-  housing: "Moradia",
-  rent: "Moradia",
-  utilities: "Moradia",
-  education: "Educação",
-  health: "Saúde",
-  healthcare: "Saúde",
-  pharmacy: "Saúde",
-  entertainment: "Lazer",
-  leisure: "Lazer",
-  subscriptions: "Assinaturas",
-  streaming: "Assinaturas",
-  shopping: "Compras",
-  investments: "Investimentos",
-  loans: "Dívidas",
-  "credit card payment": "Dívidas",
-  salary: "Salário",
-  income: "Salário",
-};
-
-function mapCategory(
-  pluggyCategory: string | null | undefined,
-  isCredit: boolean,
-  description?: string | null,
-  customRules: CategoryRule[] = [],
-): string {
-  if (description) {
-    const custom = applyCategoryRules(description, customRules);
-    if (custom) return custom;
-  }
-  if (description && isInvestmentDescription(description)) return "Investimentos";
-  const inferred = description ? inferCategoryFromDescription(description) : null;
-  if (inferred) return inferred;
-  if (pluggyCategory) {
-    const mapped = CATEGORY_MAP[pluggyCategory.toLowerCase()];
-    if (mapped) return mapped;
-  }
-  return isCredit ? "Salário" : "Outros";
-}
 
 async function knownPluggyIds(
   supabase: SupabaseClient,
@@ -152,6 +109,7 @@ async function syncTransactionsForAccount(
   pluggyAccountId: string,
   accountId: string | null,
   cardId: string | null,
+  ownerNames: string[] = [],
 ): Promise<MovementNotice[]> {
   const transactions = await pluggyApi.fetchAllTransactions(pluggyAccountId, daysAgoKey(TRANSACTIONS_LOOKBACK_DAYS));
   // Cartão: guarda as parcelas que vão cair nas próximas faturas (não interrompe a sincronização se falhar).
@@ -173,7 +131,7 @@ async function syncTransactionsForAccount(
       description: t.description || "Transação importada",
       amount: roundMoney(Math.abs(t.amount)),
       type: t.type === "CREDIT" ? "entrada" : "saida",
-      category: mapCategory(t.category, t.type === "CREDIT", t.description, customRules),
+      category: categorizePluggyTransaction(t, { onCard: Boolean(cardId), customRules, ownerNames }),
       date: toSaoPauloDateOnly(t.date),
       account_id: accountId,
       card_id: cardId,
@@ -186,18 +144,25 @@ async function syncTransactionsForAccount(
   // Já existentes: atualiza só o que mudou no banco (ex.: pendente que virou
   // definitivo com outro valor) e nunca o que o usuário editou. A categoria
   // atual é mantida — o sync antigo regravava tudo e desfazia a
-  // categorização em lote a cada 10 minutos.
+  // categorização em lote a cada 10 minutos —, exceto quando ela é genérica
+  // ("Outros"/"Salário") e o banco agora diz algo melhor (ex.: transferência
+  // entre as próprias contas). Se o banco só manda "COMPRA CARTAO DEBITO" e o
+  // aviso do celular trouxe o nome da loja, fica o nome da loja.
   const changedRows = rows.flatMap((row) => {
     const current = existing.get(row.pluggy_transaction_id);
     if (!current || current.user_edited) return [];
+    const description =
+      isBlandDescription(row.description) && !isBlandDescription(current.description) ? current.description : row.description;
+    const category = isGenericCategory(current.category) && !isGenericCategory(row.category) ? row.category : current.category;
     const changed =
-      current.description !== row.description ||
+      current.description !== description ||
       roundMoney(Number(current.amount)) !== row.amount ||
       current.type !== row.type ||
       current.date !== row.date ||
       current.account_id !== row.account_id ||
-      current.card_id !== row.card_id;
-    return changed ? [{ ...row, category: current.category }] : [];
+      current.card_id !== row.card_id ||
+      current.category !== category;
+    return changed ? [{ ...row, description, category }] : [];
   });
 
   // ignoreDuplicates + select devolve só as linhas realmente inseridas:
@@ -459,6 +424,9 @@ export async function syncBankConnection(
 
   const item = await pluggyApi.waitForItemIdle(pluggyItemId);
   const { results: accounts } = await pluggyApi.fetchAccounts(pluggyItemId);
+  // Titular das contas: reconhece Pix para o próprio nome (não é gasto).
+  await rememberOwnerNames(supabase, userId, accounts.map((account) => account.owner));
+  const ownerNames = await loadOwnerNames(supabase, userId);
   const onlyBank = singleInstitutionFromAccounts(accounts);
   const todaySnapshotDate = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
@@ -495,7 +463,7 @@ export async function syncBankConnection(
         .single();
 
       if (accountRow?.id) syncedAccountIds.push(accountRow.id);
-      const created = await syncTransactionsForAccount(supabase, userId, account.id, accountRow?.id ?? null, null);
+      const created = await syncTransactionsForAccount(supabase, userId, account.id, accountRow?.id ?? null, null, ownerNames);
       newMovements.push(...created);
 
       if (accountRow?.id) {
@@ -534,7 +502,7 @@ export async function syncBankConnection(
         .single();
 
       if (cardRow?.id) syncedCardIds.push(cardRow.id);
-      const created = await syncTransactionsForAccount(supabase, userId, account.id, null, cardRow?.id ?? null);
+      const created = await syncTransactionsForAccount(supabase, userId, account.id, null, cardRow?.id ?? null, ownerNames);
       newMovements.push(...created);
     }
   }

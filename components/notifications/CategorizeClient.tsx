@@ -23,6 +23,7 @@ export default function CategorizeClient({ transaction }: { transaction: Tx }) {
   const [category, setCategory] = useState(transaction.category);
   const [saving, setSaving] = useState<string | null>(null);
   const [savedCategory, setSavedCategory] = useState<string | null>(null);
+  const [learnedNote, setLearnedNote] = useState("");
   const [alwaysUse, setAlwaysUse] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,10 +36,9 @@ export default function CategorizeClient({ transaction }: { transaction: Tx }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category: next }),
       });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error || "Não foi possível salvar a categoria.");
-      }
+      const data = (await res.json().catch(() => ({}))) as { error?: string; learned?: string };
+      if (!res.ok) throw new Error(data.error || "Não foi possível salvar a categoria.");
+      setLearnedNote(data.learned ?? "");
       if (alwaysUse) {
         // Regra: próximos lançamentos com a mesma descrição já chegam nessa categoria.
         await fetch("/api/category-rules", {
@@ -78,6 +78,7 @@ export default function CategorizeClient({ transaction }: { transaction: Tx }) {
             <p role="status" className="text-sm text-emerald-300">
               Pronto! Categorizado como {CATEGORY_ICONS[savedCategory] ?? ""} {savedCategory}.
             </p>
+            {learnedNote && <p className="text-sm text-zinc-400">{learnedNote}</p>}
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/detalhes"

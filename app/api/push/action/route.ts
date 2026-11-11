@@ -4,6 +4,7 @@ import { verifyPushAction } from "@/lib/push/actions";
 import { CATEGORIES, CATEGORY_ICONS } from "@/lib/finance/categories";
 import { markBillPaid } from "@/lib/finance/bill-reminders";
 import { serverError } from "@/lib/api/errors";
+import { learnCategoryChoice, learnedMessage } from "@/lib/finance/category-learning";
 
 /**
  * Botões das notificações push ("🍔 Alimentação", "✅ Já paguei"). Chamado
@@ -34,14 +35,22 @@ export async function POST(request: Request) {
       .update({ category })
       .eq("id", claim.t)
       .eq("user_id", claim.u)
-      .select("description")
+      .select("description, type")
       .maybeSingle();
     if (error) return serverError("Não foi possível categorizar.", error);
     if (!data) return NextResponse.json({ error: "Lançamento não encontrado." }, { status: 404 });
+    // Pix para alguém: os próximos (e os antigos ainda sem categoria) dessa pessoa vão junto.
+    const learned = await learnCategoryChoice(
+      supabase,
+      claim.u,
+      { id: claim.t, description: data.description, type: data.type },
+      category,
+    );
+    const extra = learnedMessage(learned);
     return NextResponse.json({
       ok: true,
       title: `${CATEGORY_ICONS[category] ?? "✅"} Categorizado como ${category}`,
-      body: data.description,
+      body: extra ? `${data.description}\n${extra}` : data.description,
     });
   }
 

@@ -23,12 +23,12 @@ describe("limite de hoje", () => {
     expect(status.over).toBe(0);
   });
 
-  it("sem orçamento: saldo até o próximo dia 5, e mostra quanto passou", () => {
-    // 26/11 → 05/12 = 10 dias, inclusive.
+  it("sem orçamento: saldo até o próximo salário (5º dia útil), e mostra quanto passou", () => {
+    // 26/11 → 07/12 (5º dia útil de dezembro) = 12 dias, inclusive.
     const status = dailyLimitStatus({ tx: [tx("2026-11-26", 150)], totalBalance: 1000, spendingLimit: null, todayKey: "2026-11-26" });
     expect(status.basis).toBe("balance");
-    expect(status.perDay).toBeCloseTo(100);
-    expect(status.over).toBeCloseTo(50);
+    expect(status.perDay).toBeCloseTo(1000 / 12);
+    expect(status.over).toBeCloseTo(150 - 1000 / 12);
     expect(status.remaining).toBe(0);
   });
 });
@@ -74,5 +74,17 @@ describe("aviso da movimentação em tempo real", () => {
     );
     expect(message.title).toMatch(/^💰 Entrou R\$\s0,01$/);
     expect(message.body.split("\n")).toEqual(["Pix recebido de ANA", expect.stringMatching(/^Saldo agora: R\$\s10,00$/)]);
+  });
+});
+
+describe("aviso de transferência entre as próprias contas", () => {
+  it("não fala de limite do dia nem de categoria", () => {
+    const message = realtimeMovementMessage(
+      { description: "Pix para Diego Isidoro", amount: 500, type: "saida", category: "Transferências", bank: "Inter" },
+      { balance: 900, daily: { perDay: 30, spentToday: 100, remaining: 0, over: 70, basis: "balance" }, categoryLimit: null },
+    );
+    expect(message.title).toMatch(/^🔁 Transferência R\$\s500,00 · Inter$/);
+    expect(message.body).toContain("não conta como gasto");
+    expect(message.body).not.toContain("limite");
   });
 });
