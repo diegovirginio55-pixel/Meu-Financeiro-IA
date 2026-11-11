@@ -28,6 +28,8 @@ export interface AlertCandidate {
 const LOW_BALANCE_HORIZON_DAYS = 7;
 const CATEGORY_SPIKE_MULTIPLIER = 1.4;
 const CATEGORY_SPIKE_MIN_AVERAGE = 30;
+/** Diferença mínima (em reais) entre a projeção e a média para valer um aviso. */
+const CATEGORY_SPIKE_MIN_EXCESS = 150;
 const SUBSCRIPTION_STABLE_TOLERANCE = 0.03;
 const SUBSCRIPTION_MIN_INCREASE_PCT = 0.05;
 const SUBSCRIPTION_MIN_INCREASE_ABS = 2;
@@ -173,7 +175,10 @@ export function computeSmartAlertsFromData({
       const average = history.reduce((s, v) => s + v, 0) / pastMonths.length;
       if (average < CATEGORY_SPIKE_MIN_AVERAGE) return;
       const projected = (total / dayOfMonth) * daysInMonth;
-      if (projected > average * CATEGORY_SPIKE_MULTIPLIER) {
+      // Conta paga uma vez no mês (internet, luz) não deve ser projetada como se repetisse todo dia:
+      // só avisa se a diferença for relevante em reais e o gasto já passou de boa parte da média.
+      const relevant = projected - average >= CATEGORY_SPIKE_MIN_EXCESS && total >= average * 0.75;
+      if (relevant && projected > average * CATEGORY_SPIKE_MULTIPLIER) {
         alerts.push({
           kind: "category_spike",
           refKey: `${thisMonth}:${category}`,

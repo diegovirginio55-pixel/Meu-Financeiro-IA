@@ -83,6 +83,9 @@ public class StatusActivity extends Activity {
     protected void onResume() {
         super.onResume();
         WidgetUpdateWorker.refreshNow(this);
+        // "Estou vivo" a cada 6 h: o site mostra a versão e avisa se o celular parar de dar sinal.
+        StatusWorker.schedule(this);
+        StatusWorker.sendNow(this);
         if (hasNotificationAccess()) {
             try {
                 NotificationListenerService.requestRebind(new ComponentName(this, BankNotificationListener.class));
@@ -173,6 +176,7 @@ public class StatusActivity extends Activity {
                 + "gastos de hoje sem abrir o app.", 12, MUTED, false, 24);
         addText("Bancos lidos: " + BankApps.NAMES + ". Também lê SMS de banco com valor em R$. Avisos de outros apps "
                 + "(e SMS de pessoas) nunca saem do celular.", 12, MUTED, false, 12);
+        addText("Versão " + Forwarder.appVersion(this), 12, MUTED, false, 12);
     }
 
     /** Apps fora da lista que mostraram valores em R$: o usuário decide se o app lê os avisos deles. */

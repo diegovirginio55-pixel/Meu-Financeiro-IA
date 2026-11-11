@@ -1,5 +1,6 @@
 import type { Transaction } from "./types";
 import { isGasto } from "./fluxo";
+import { isTransferDescription } from "./categories";
 
 /**
  * Reduz uma descrição de transação a uma "chave" que identifica o mesmo
@@ -38,7 +39,10 @@ export interface SubscriptionGroup {
  */
 export function groupSubscriptions(transactions: Transaction[], minMonths = 3): SubscriptionGroup[] {
   const byKey = new Map<string, SubscriptionEntry[]>();
-  transactions.filter(isGasto).forEach((t) => {
+  // Pix/transferência para uma pessoa não é assinatura, mesmo repetindo todo mês com valores diferentes.
+  transactions
+    .filter((t) => isGasto(t) && !isTransferDescription(t.description))
+    .forEach((t) => {
     const key = subscriptionKey(t.description);
     if (key.length < 4) return;
     const list = byKey.get(key) ?? [];

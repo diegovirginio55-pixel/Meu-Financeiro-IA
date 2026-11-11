@@ -91,10 +91,13 @@ export default function RealTimeSetupClient({
   endpoint,
   initialToken,
   log,
+  phone,
 }: {
   endpoint: string;
   initialToken: string | null;
   log: IngestLogEntry[];
+  /** Último sinal do app Android (null se o app novo ainda não falou com o servidor). */
+  phone: { version: string; listener: boolean; ago: string; silent: boolean } | null;
 }) {
   const router = useRouter();
   const [platform, setPlatform] = useState<"android" | "iphone">("android");
@@ -401,6 +404,28 @@ export default function RealTimeSetupClient({
           >
             3. Últimas notificações recebidas
           </SectionLabel>
+          {phone ? (
+            <p
+              role="status"
+              className={`rounded-xl border p-3 text-xs leading-relaxed ${
+                phone.silent || !phone.listener
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+                  : "border-emerald-500/30 bg-emerald-500/5 text-emerald-200"
+              }`}
+            >
+              <strong>App Android {phone.version}</strong> · último sinal {phone.ago} ·{" "}
+              {phone.silent
+                ? "sem sinal há mais de um dia: abra “Leitura dos bancos” no celular para religar."
+                : phone.listener
+                  ? "leitura dos avisos ligada ✓"
+                  : "leitura dos avisos DESLIGADA: abra “Leitura dos bancos” no celular e toque em Liberar acesso."}
+            </p>
+          ) : (
+            <p className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3 text-xs leading-relaxed text-zinc-400">
+              O app Android ainda não informou a versão. Se você usa o app, instale a versão mais nova (botão Baixar o
+              app, acima) e abra “Leitura dos bancos” uma vez.
+            </p>
+          )}
           {log.length === 0 ? (
             <p className="text-sm text-zinc-500">
               Nenhuma ainda. Depois de configurar o celular, faça o teste — a lista se atualiza sozinha a cada 10 s.

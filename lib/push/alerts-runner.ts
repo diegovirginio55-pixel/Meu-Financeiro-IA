@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeSmartAlerts, computeWeeklySummary, type AlertCandidate } from "@/lib/finance/alert-checks";
-import { saoPauloHour } from "@/lib/finance/fluxo";
+import { saoPauloHour, saoPauloTodayKey } from "@/lib/finance/fluxo";
+import { phoneProblem, readPhoneStatus } from "@/lib/ingest/phone-status";
 import { sendPushToUser } from "./send";
 import { signPushAction } from "./actions";
 import type { PushPayload } from "./payload";
@@ -141,6 +142,11 @@ export async function runAlertsForUser(supabase: SupabaseClient, userId: string,
     ...categoryAlerts,
     ...(recapReminder(now) ? [recapReminder(now) as AlertCandidate] : []),
   ];
+  // Leitura do celular parada: avisa uma vez por dia (antes só se percebia quando faltava um lançamento).
+  const phone = phoneProblem(await readPhoneStatus(supabase, userId).catch(() => null), now);
+  if (phone) {
+    candidates.push({ ...phone, refKey: saoPauloTodayKey(now), url: "/bancos/tempo-real" });
+  }
   let sent = 0;
   for (const candidate of candidates) {
     if (candidate.kind === "daily_budget") {

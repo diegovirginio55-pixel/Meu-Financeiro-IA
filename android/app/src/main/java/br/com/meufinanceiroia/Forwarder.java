@@ -1,8 +1,11 @@
 package br.com.meufinanceiroia;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
+
+import androidx.core.app.NotificationManagerCompat;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -120,10 +123,48 @@ final class Forwarder {
         });
     }
 
+    /** Versão instalada (ex.: "1.0.7"), para o site mostrar e saber se o app está atualizado. */
+    static String appVersion(Context context) {
+        try {
+            String name = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
+            return name == null ? "?" : name;
+        } catch (PackageManager.NameNotFoundException | RuntimeException e) {
+            return "?";
+        }
+    }
+
+    /** O "Acesso às notificações" está liberado para este app? */
+    static boolean hasNotificationAccess(Context context) {
+        try {
+            return NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.getPackageName());
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** "Estou vivo": só informa a versão e o estado do leitor (o site avisa se o celular sumir). */
+    static JSONObject status() {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("status", true);
+        } catch (JSONException ignored) {
+            // não falha
+        }
+        return body;
+    }
+
     static Outcome post(Context context, JSONObject body) {
         String endpoint = Prefs.endpoint(context);
         if (endpoint == null) {
             return new Outcome(true, "Não conectado: toque em Ativar neste celular no site.");
+        }
+        boolean statusOnly = body.optBoolean("status");
+        try {
+            // Todo envio leva a versão do app e o estado do leitor.
+            body.put("v", appVersion(context));
+            body.put("listener", hasNotificationAccess(context));
+        } catch (JSONException ignored) {
+            // não falha
         }
         HttpURLConnection connection = null;
         try {
@@ -142,13 +183,14 @@ final class Forwarder {
             int code = connection.getResponseCode();
             String response = readAll(code >= 400 ? connection.getErrorStream() : connection.getInputStream());
             String summary = describe(code, response);
+            if (statusOnly) return new Outcome(code < 500, summary);
             Prefs.recordSend(context, summary);
             // Movimentação registrada: o widget mostra o saldo novo.
             if (code < 300) WidgetUpdateWorker.refreshNow(context);
             return new Outcome(code < 500, summary);
         } catch (IOException | RuntimeException e) {
             String summary = "Sem conexão com o servidor — o app tenta de novo sozinho.";
-            Prefs.recordSend(context, summary);
+            if (!statusOnly) Prefs.recordSend(context, summary);
             return new Outcome(false, summary);
         } finally {
             if (connection != null) connection.disconnect();
@@ -160,6 +202,7 @@ final class Forwarder {
         try {
             JSONObject json = new JSONObject(response);
             if (json.optBoolean("ping")) return "Teste recebido pelo Meu Financeiro ✓";
+            if (json.optBoolean("status")) return "Estado enviado ✓";
             if (json.has("ignored")) return "Ignorado: " + json.optString("ignored");
             if (json.has("registered")) {
                 JSONObject movement = json.optJSONObject("movement");

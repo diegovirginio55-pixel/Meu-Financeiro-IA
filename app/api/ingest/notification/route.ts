@@ -24,6 +24,7 @@ import { bankFromLabel } from "@/lib/pluggy/institution";
 import { officialInstitutionName } from "@/lib/pluggy/brands";
 import { serverError } from "@/lib/api/errors";
 import { appendIngestLog } from "@/lib/ingest/log";
+import { recordPhoneStatus } from "@/lib/ingest/phone-status";
 import { notifyRealtimeMovement } from "@/lib/push/realtime-movement";
 
 const MAX_BODY_BYTES = 8 * 1024;
@@ -61,6 +62,11 @@ type Body = {
   at?: unknown;
   /** App Android: "receipt" = texto de um comprovante compartilhado do app do banco. */
   kind?: unknown;
+  /** App Android: versão do app e se o leitor de notificações está ligado (vão em todo envio). */
+  v?: unknown;
+  listener?: unknown;
+  /** App Android: "estou vivo" periódico — só atualiza o estado, não registra nada. */
+  status?: unknown;
 };
 
 /** Hora do aviso informada pelo celular, se for plausível (até 3 dias atrás); senão, agora. */
@@ -123,6 +129,17 @@ export async function POST(request: Request) {
   const userId = await verifyIngestToken(body.token ?? bearer ?? url.searchParams.get("token"));
   if (!userId) {
     return NextResponse.json({ error: "Token inválido. Gere um novo em Bancos → Saldo em tempo real." }, { status: 401 });
+  }
+
+  const appVersion = str(body.v, 20).trim();
+  if (appVersion) {
+    await recordPhoneStatus(createAdminClient(), userId, {
+      version: appVersion,
+      listener: body.listener === true || body.listener === "true",
+    });
+  }
+  if (body.status === true || body.status === "true") {
+    return NextResponse.json({ ok: true, status: true });
   }
 
   if (body.ping === true || body.ping === "true") {

@@ -19,6 +19,8 @@ public class BankNotificationListener extends NotificationListenerService {
     @Override
     public void onListenerConnected() {
         Prefs.setListenerConnected(this, true);
+        StatusWorker.schedule(this);
+        StatusWorker.sendNow(this);
     }
 
     @Override
